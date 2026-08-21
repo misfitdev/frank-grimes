@@ -190,6 +190,153 @@
     })(start);
   }
 
+  // Grimey read this before you did. Each mark is a pen gesture drawn over the
+  // thing it is about: geometry is CSS-relative so nothing needs remeasuring.
+  var MARKS = {
+    // A rough ellipse: one loop, overshot past its own start.
+    ellipse: {
+      box: "0 0 100 46",
+      stretch: true,
+      paths: [
+        "M92 9C82 2 58 1 38 3 18 5 4 12 5 22c1 10 20 18 44 20 24 2 47-3 48-14 1-9-15-16-34-18"
+      ],
+      style: "left:-0.45em;right:-0.45em;top:-0.28em;bottom:-0.3em;"
+    },
+    // A hand underline, laid twice the way a pen doubles back.
+    squiggle: {
+      box: "0 0 100 12",
+      stretch: true,
+      paths: [
+        "M1 5c14 3 28-1 42 1s28 4 42 1c5-1 10-2 14-4",
+        "M4 9c16 2 30-1 45 1s26 3 40 0"
+      ],
+      // Explicit width: an SVG with a viewBox sizes from its intrinsic ratio
+      // when width is auto, so left/right offsets alone will not stretch it.
+      style: "left:-0.15em;width:calc(100% + 0.3em);bottom:-0.5em;height:0.62em;"
+    },
+    // Two strokes and two dots in the margin: this one is a gotcha.
+    bang: {
+      box: "0 0 26 54",
+      paths: ["M8 4C5 18 5 29 7 38", "M20 3c-3 14-3 25-1 34"],
+      dots: [
+        [7, 47, 2.4],
+        [19, 45, 2.4]
+      ],
+      style: "right:-2.9rem;top:0.6rem;width:1.5rem;height:3.1rem;"
+    },
+    // A tick where the report was signed off.
+    tick: {
+      box: "0 0 40 34",
+      paths: ["M3 17c4 3 8 7 12 13C21 20 28 9 37 3"],
+      style: "left:calc(100% + 0.75rem);top:-0.3rem;width:1.8rem;height:1.55rem;"
+    }
+  };
+
+  // non-scaling-stroke dashes in screen space, so under a stretched viewBox the
+  // path's own length is the wrong unit and the tail never draws. Walk the path
+  // through the screen matrix and measure what the browser will actually dash.
+  function screenLength(path) {
+    var local = path.getTotalLength();
+    var ctm = path.getScreenCTM();
+    if (!ctm) return local;
+
+    var steps = 24;
+    var total = 0;
+    var prev = null;
+
+    for (var i = 0; i <= steps; i++) {
+      var point = path.getPointAtLength((local * i) / steps).matrixTransform(ctm);
+      if (prev) {
+        total += Math.hypot(point.x - prev.x, point.y - prev.y);
+      }
+      prev = point;
+    }
+
+    // Sampled chords cut corners; pad so the stroke is never short.
+    return total * 1.06;
+  }
+
+  function drawMarks() {
+    var targets = document.querySelectorAll("[data-mark]");
+    if (!targets.length) return;
+
+    var ns = "http://www.w3.org/2000/svg";
+
+    var observer = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add("is-drawn");
+          observer.unobserve(entry.target);
+        });
+      },
+      { rootMargin: "0px 0px -22% 0px" }
+    );
+
+    targets.forEach(function (target) {
+      var spec = MARKS[target.dataset.mark];
+      if (!spec) return;
+
+      var svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("class", "pen-mark");
+      svg.setAttribute("viewBox", spec.box);
+      svg.setAttribute("fill", "none");
+      svg.setAttribute("aria-hidden", "true");
+      if (spec.stretch) svg.setAttribute("preserveAspectRatio", "none");
+      svg.setAttribute("style", spec.style);
+
+      var strokes = [];
+
+      spec.paths.forEach(function (d) {
+        var path = document.createElementNS(ns, "path");
+        path.setAttribute("d", d);
+        svg.appendChild(path);
+        strokes.push(path);
+      });
+
+      (spec.dots || []).forEach(function (dot) {
+        var circle = document.createElementNS(ns, "circle");
+        circle.setAttribute("cx", dot[0]);
+        circle.setAttribute("cy", dot[1]);
+        circle.setAttribute("r", dot[2]);
+        circle.setAttribute("class", "pen-dot");
+        svg.appendChild(circle);
+      });
+
+      target.classList.add("has-mark");
+      target.appendChild(svg);
+
+      if (reduced) {
+        target.classList.add("is-drawn");
+        return;
+      }
+
+      // Lengths must be read after the element is in the document. The dash is
+      // overshot so the draw always covers the stroke, then dropped once the
+      // mark is down: dash units and stretched viewBoxes do not agree, and the
+      // finished mark must not depend on them.
+      strokes.forEach(function (path, index) {
+        var length = screenLength(path) * 1.4;
+        var delay = index * 110;
+
+        path.style.strokeDasharray = length;
+        path.style.strokeDashoffset = length;
+        path.style.transitionDelay = delay + "ms";
+
+        path.addEventListener(
+          "transitionend",
+          function () {
+            path.style.strokeDasharray = "none";
+            path.style.strokeDashoffset = "";
+          },
+          { once: true }
+        );
+      });
+
+      observer.observe(target);
+    });
+  }
+
   // Stamps that are already on the page arrived with the ink long dry.
   function ragStaticStamps() {
     document.querySelectorAll(".report-stamp.is-static").forEach(function (stamp) {
@@ -201,5 +348,6 @@
   trackReadingPosition();
   stampOnFinish();
   ragStaticStamps();
+  drawMarks();
   rakeLight();
 })();

@@ -124,6 +124,50 @@ body::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.22'/%3E%3C/svg%3E");
 }
 
+/* Grimey's marks. One pen, one stroke weight, one ink. */
+.has-mark {
+  position: relative;
+}
+
+.pen-mark {
+  position: absolute;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.pen-mark path {
+  stroke: var(--signal);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  transition: stroke-dashoffset 0.5s cubic-bezier(0.33, 0.9, 0.35, 1);
+}
+
+.pen-dot {
+  fill: var(--signal);
+  opacity: 0;
+  transition: opacity 0.2s ease 0.32s;
+}
+
+.is-drawn .pen-mark path {
+  stroke-dashoffset: 0 !important;
+}
+
+.is-drawn .pen-dot {
+  opacity: 1;
+}
+
+/* Margin marks need a margin to live in. */
+@media (max-width: 900px) {
+  li[data-mark] > .pen-mark,
+  .quote-source > .pen-mark {
+    display: none;
+  }
+}
+
 /* Raking light. The sheet lifts toward whatever is lighting it. */
 .paper-light {
   position: fixed;
@@ -1078,6 +1122,7 @@ code {
 }
 
 .quote-source {
+  display: inline-block;
   color: var(--ink-faint);
 }
 
