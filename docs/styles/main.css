@@ -124,6 +124,51 @@ body::before {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.22'/%3E%3C/svg%3E");
 }
 
+/* Raking light. The sheet lifts toward whatever is lighting it. */
+.paper-light {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 46rem;
+  height: 46rem;
+  margin: -23rem 0 0 -23rem;
+  /* Behind the content: light falls on the sheet, not on the ink. */
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform;
+  transition: opacity 0.6s ease;
+}
+
+.paper-light.is-lit {
+  opacity: 1;
+}
+
+.paper-light span {
+  position: absolute;
+  inset: 0;
+}
+
+/* The lit side of the sheet. */
+.paper-light .glow {
+  mix-blend-mode: screen;
+  background-image: radial-gradient(
+    circle closest-side,
+    rgba(255, 252, 240, 1),
+    rgba(255, 250, 232, 0.42) 34%,
+    rgba(255, 250, 232, 0) 66%
+  );
+}
+
+/* Raking light rakes: the fiber it crosses casts its own small shadows. */
+.paper-light .tooth {
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='t'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.62' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23t)' opacity='0.55'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+  mask-image: radial-gradient(circle closest-side, #000 8%, rgba(0, 0, 0, 0.35) 40%, transparent 66%);
+}
+
 ::selection {
   background-color: var(--signal);
   color: #fff;
@@ -328,13 +373,15 @@ code {
 /* ===== Layout ===== */
 .content {
   position: relative;
+  z-index: 1;
   max-width: var(--shell);
   margin: 0 auto;
   padding: 0 2rem;
 }
 
 /* Binder margin: the red rule ruled paper carries down its left edge. */
-.content::before {
+.content::before,
+.content::after {
   content: "";
   position: absolute;
   top: 0;
@@ -342,6 +389,26 @@ code {
   left: 0.75rem;
   width: 1px;
   background-color: rgba(193, 40, 29, 0.35);
+}
+
+/* The margin doubles as the read-so-far mark: it inks in as you descend. */
+.content::after {
+  width: 2px;
+  background-color: var(--signal);
+  transform-origin: top center;
+  transform: scaleY(0);
+}
+
+@supports (animation-timeline: scroll()) {
+  .content::after {
+    animation: margin-ink linear both;
+    animation-timeline: scroll(root block);
+  }
+}
+
+@keyframes margin-ink {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
 }
 
 .section {
@@ -520,6 +587,13 @@ code {
   border-top: 2px solid var(--rule-ink);
   border-bottom: 2px solid var(--rule-ink);
   margin-bottom: 3rem;
+  animation: field-fill 0.75s var(--ease) 0.1s both;
+}
+
+/* The masthead fields fill in the way a form gets completed: left to right. */
+@keyframes field-fill {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
 }
 
 .report-meta > div {
@@ -814,6 +888,34 @@ code {
   width: 5.25rem;
 }
 
+/* Each verdict gets stamped as the table comes into view, top down. */
+@supports (animation-timeline: view()) {
+  .verdict-cell {
+    animation: verdict-stamp linear both;
+    animation-timeline: view();
+    animation-range: entry 30% entry 65%;
+  }
+
+  tr:nth-child(2) .verdict-cell {
+    animation-range: entry 38% entry 73%;
+  }
+
+  tr:nth-child(3) .verdict-cell {
+    animation-range: entry 46% entry 81%;
+  }
+}
+
+@keyframes verdict-stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.6) rotate(-6deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
 .verdict-cell.green {
   background-color: rgba(28, 111, 61, 0.08);
   color: var(--green);
@@ -906,7 +1008,7 @@ code {
   transform: rotate(-8deg);
 }
 
-.js .report-stamp {
+.js .report-stamp[data-stamp-on-read]:not(.is-stamped) {
   opacity: 0;
 }
 
@@ -1031,6 +1133,8 @@ code {
 
 /* ===== Footer ===== */
 .site-footer {
+  position: relative;
+  z-index: 1;
   border-top: 1px solid var(--rule);
   padding: 1.5rem 0;
 }
@@ -1181,5 +1285,12 @@ code {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /* Scroll and view timelines ignore duration, so switch them off by name. */
+  .content::after,
+  .report-meta,
+  .verdict-cell {
+    animation: none !important;
   }
 }
