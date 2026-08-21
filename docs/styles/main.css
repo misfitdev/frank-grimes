@@ -911,7 +911,7 @@ code {
 }
 
 .js .report-stamp.is-stamped {
-  animation: stamp-down 0.42s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+  animation: stamp-down 0.34s var(--ease) forwards;
 }
 
 @keyframes stamp-down {

@@ -29,5 +29,9 @@ fmt:
 fmt-check:
     shfmt -d -i 4 -ci scripts/*.sh benchmark/*.sh hooks/*.sh
 
-# Lint, format-check, and validate
+# Serve the GitHub Pages site locally for review
+preview:
+    cd docs && python3 -m http.server 8080
+
+# Lint, format-check, validate, and preview the site
 check: lint fmt-check validate
