@@ -1,0 +1,58 @@
+# Dependencies and build output
+node_modules/
+vendor/
+dist/
+build/
+coverage/
+.cache/
+.tmp/
+tmp/
+
+# Provider credentials and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+service-account*.json
+.aws/
+.gcloud/
+.azure/
+.config/
+
+# Local model and runtime state
+.grimes-state.json
+.grimes/
+.models/
+.ollama/
+.lmstudio/
+models/
+checkpoints/
+*.gguf
+*.safetensors
+*.onnx
+
+# Reports and generated artifacts
+GRIMES_REPORT.md
+API_QUALITY_REPORT.md
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Tooling, editors, and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+*~
