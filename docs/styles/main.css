@@ -890,18 +890,20 @@ code {
 
 /* Each verdict gets stamped as the table comes into view, top down. */
 @supports (animation-timeline: view()) {
+  /* Stamp in the contain phase: entry ranges finish while the chip is still
+     at the bottom edge, where nobody is looking yet. */
   .verdict-cell {
     animation: verdict-stamp linear both;
     animation-timeline: view();
-    animation-range: entry 30% entry 65%;
+    animation-range: contain 18% contain 34%;
   }
 
   tr:nth-child(2) .verdict-cell {
-    animation-range: entry 38% entry 73%;
+    animation-range: contain 26% contain 42%;
   }
 
   tr:nth-child(3) .verdict-cell {
-    animation-range: entry 46% entry 81%;
+    animation-range: contain 34% contain 50%;
   }
 }
 
