@@ -895,15 +895,15 @@ code {
   .verdict-cell {
     animation: verdict-stamp linear both;
     animation-timeline: view();
-    animation-range: contain 18% contain 34%;
+    animation-range: contain 2% contain 12%;
   }
 
   tr:nth-child(2) .verdict-cell {
-    animation-range: contain 26% contain 42%;
+    animation-range: contain 8% contain 18%;
   }
 
   tr:nth-child(3) .verdict-cell {
-    animation-range: contain 34% contain 50%;
+    animation-range: contain 14% contain 24%;
   }
 }
 
