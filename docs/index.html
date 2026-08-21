@@ -2,21 +2,23 @@
   THESIS: Frank Grimes documentation is a Grimes Report that was dangerous enough
   to put on the web. The site looks like a clinical falsification report crossed
   with a warning label. It does not welcome visitors; it tells them what they're
-  dealing with. Dark ground, cold type, red used as a warning signal, not a brand
-  color. No cards. No rounded corners. No "friendly docs" reflex.
+  dealing with. Manila board, ink rules, red used as a stamp, not a brand color.
+  No rounded corners. No "friendly docs" reflex.
 
-  OWN-WORLD: Near-black ground (#0a0a0b), off-white text (#e6e6e6), signal red
-  (#e83838) used as a warning — philosophy statement, verdict cells, the final
-  word. Monospace for code and structural labels. System sans for body, but cold.
-  No decorative fonts. The grimey.png logo is the only image.
+  OWN-WORLD: Manila ground (#ece5d5) with near-white form surfaces (#fbfaf5),
+  ink (#16171a), stamp red (#c1281d) on the title, the hazard band, the verdict
+  field and the section rules. A red binder margin runs down the left edge.
+  IBM Plex Condensed for display, Plex Sans for reading, Plex Mono for every
+  structural label. The grimey.png logo is the only image.
 
   STORY: A visitor lands and immediately understands this is not a normal docs site.
   The first viewport tells them what Frank Grimes does and what it assumes about
   their code. They find the integration path. They leave with the skill loaded.
 
-  FIRST VIEWPORT: A report-style header. "DISCIPLINED FALSIFICATION REVIEW" as a
-  structural label. "Frank Grimes" as the title. The philosophy statement as a
-  warning callout. No hero-metrics template. No welcome.
+  FIRST VIEWPORT: A report masthead. "Frank Grimes" as the title, the report's
+  own field row beneath it (report type, subject, opening verdict), then the
+  philosophy statement as a hazard-banded notice. No hero-metrics template.
+  No welcome.
 
   FORM: Read-mode documentation site. Static HTML, no build step. GitHub Pages
   serves from /docs. Single page with anchored sections.
@@ -70,7 +72,7 @@
           </div>
           <div>
             <dt>Opening verdict</dt>
-            <dd class="meta-red">Red until proven otherwise</dd>
+            <dd class="meta-red">Red</dd>
           </div>
         </dl>
 
@@ -116,54 +118,6 @@
             </div>
           </li>
         </ol>
-      </div>
-    </section>
-
-    <section class="section" id="providers">
-      <div class="section-inner">
-        <h2 class="section-heading">Integration</h2>
-        <p class="section-intro">Frank Grimes is provider-neutral. The core skill and stop hook work with any agent that can load markdown skills and execute bash scripts.</p>
-
-        <div class="integration-list">
-          <article class="integration-item">
-            <header class="integration-header">
-              <span class="integration-name">Claude Code</span>
-              <span class="integration-path">.claude/skills/</span>
-            </header>
-            <div class="integration-body">
-              <pre class="code-block"><code>mkdir -p .claude/skills
-ln -s ../../skill .claude/skills/frank-grimes</code></pre>
-              <p>Invoke with <code class="code-inline">/frank-grimes:grind &lt;target&gt;</code>.</p>
-            </div>
-          </article>
-
-          <article class="integration-item">
-            <header class="integration-header">
-              <span class="integration-name">OpenCode</span>
-              <span class="integration-path">.opencode/skills/</span>
-            </header>
-            <div class="integration-body">
-              <pre class="code-block"><code>mkdir -p .opencode/skills
-ln -s ../../skill .opencode/skills/frank-grimes</code></pre>
-              <p>OpenCode also reads <code class="code-inline">.claude/skills/</code> and <code class="code-inline">.agents/skills/</code>.</p>
-            </div>
-          </article>
-
-          <article class="integration-item">
-            <header class="integration-header">
-              <span class="integration-name">Codex</span>
-              <span class="integration-path">.agents/skills/</span>
-            </header>
-            <div class="integration-body">
-              <pre class="code-block"><code>mkdir -p .agents/skills
-ln -s ../../skill .agents/skills/frank-grimes</code></pre>
-            </div>
-          </article>
-        </div>
-
-        <div class="integration-note">
-          <p><strong>Other providers:</strong> Any agent that supports markdown skills and bash hooks can use Frank Grimes. Load <code class="code-inline">skill/SKILL.md</code> as a skill, configure your stop hook to call <code class="code-inline">hooks/stop.sh</code>, and ensure <code class="code-inline">jq</code> is installed. See <a href="adapters/">adapters documentation</a> for details.</p>
-        </div>
       </div>
     </section>
 
@@ -237,15 +191,15 @@ ln -s ../../skill .agents/skills/frank-grimes</code></pre>
                 </thead>
                 <tbody>
                   <tr>
-                    <td class="verdict-cell green">GREEN</td>
+                    <td class="verdict-col"><span class="verdict-cell green">GREEN</span></td>
                     <td>All P0 mitigated or accepted with timeline. All P1 have mitigations or plan. Verification exists. Observability sufficient.</td>
                   </tr>
                   <tr>
-                    <td class="verdict-cell yellow">YELLOW</td>
+                    <td class="verdict-col"><span class="verdict-cell yellow">YELLOW</span></td>
                     <td>P0 mitigated but P1 evidence weak. Verification path non-comprehensive.</td>
                   </tr>
                   <tr>
-                    <td class="verdict-cell red">RED</td>
+                    <td class="verdict-col"><span class="verdict-cell red">RED</span></td>
                     <td>Any P0 lacks mitigation. No verification path. Observability insufficient.</td>
                   </tr>
                 </tbody>
@@ -256,10 +210,60 @@ ln -s ../../skill .agents/skills/frank-grimes</code></pre>
       </div>
     </section>
 
+    <section class="section" id="providers">
+      <div class="section-inner">
+        <h2 class="section-heading">Integration</h2>
+        <p class="section-intro">Frank Grimes is provider-neutral. The core skill and stop hook work with any agent that can load markdown skills and execute bash scripts.</p>
+
+        <div class="integration-list">
+          <article class="integration-item">
+            <header class="integration-header">
+              <span class="integration-name">Claude Code</span>
+              <span class="integration-path">.claude/skills/</span>
+            </header>
+            <div class="integration-body">
+              <pre class="code-block"><code>mkdir -p .claude/skills
+ln -s ../../skill .claude/skills/frank-grimes</code></pre>
+              <p>Invoke with <code class="code-inline">/frank-grimes:grind &lt;target&gt;</code>.</p>
+            </div>
+          </article>
+
+          <article class="integration-item">
+            <header class="integration-header">
+              <span class="integration-name">OpenCode</span>
+              <span class="integration-path">.opencode/skills/</span>
+            </header>
+            <div class="integration-body">
+              <pre class="code-block"><code>mkdir -p .opencode/skills
+ln -s ../../skill .opencode/skills/frank-grimes</code></pre>
+              <p>OpenCode also reads <code class="code-inline">.claude/skills/</code> and <code class="code-inline">.agents/skills/</code>.</p>
+            </div>
+          </article>
+
+          <article class="integration-item">
+            <header class="integration-header">
+              <span class="integration-name">Codex</span>
+              <span class="integration-path">.agents/skills/</span>
+            </header>
+            <div class="integration-body">
+              <pre class="code-block"><code>mkdir -p .agents/skills
+ln -s ../../skill .agents/skills/frank-grimes</code></pre>
+            </div>
+          </article>
+        </div>
+
+        <div class="integration-note">
+          <p><strong>Other providers:</strong> Any agent that supports markdown skills and bash hooks can use Frank Grimes. Load <code class="code-inline">skill/SKILL.md</code> as a skill, configure your stop hook to call <code class="code-inline">hooks/stop.sh</code>, and ensure <code class="code-inline">jq</code> is installed. See <a href="adapters/">adapters documentation</a> for details.</p>
+        </div>
+      </div>
+    </section>
+
     <section class="section" id="benchmark">
       <div class="section-inner">
-        <h2 class="section-heading">Benchmark</h2>
+        <h2 class="section-heading">Benchmark <span class="status-stamp">Unfinished</span></h2>
         <p class="section-intro">The <code class="code-inline">benchmark/</code> directory contains a framework for validating grind quality across different target types. Designed for A/B testing: swap the skill, run the benchmark, compare scores.</p>
+
+        <p class="status-note"><strong>Do not rely on this yet.</strong> The harness and the targets are in the repo, but the scoring is not calibrated and the results are not trustworthy. Everything below describes the intended shape, not a finished tool.</p>
 
         <div class="benchmark-grid">
           <div class="benchmark-col">

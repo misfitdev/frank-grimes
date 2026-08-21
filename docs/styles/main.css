@@ -112,6 +112,18 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Paper fiber. Without it the manila reads as a flat beige fill. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.22'/%3E%3C/svg%3E");
+}
+
 ::selection {
   background-color: var(--signal);
   color: #fff;
@@ -307,6 +319,35 @@ code {
   background-color: var(--signal);
 }
 
+/* Struck-on status marker for anything the repo has not finished. */
+.status-stamp {
+  display: inline-block;
+  vertical-align: 0.35em;
+  margin-left: 0.75rem;
+  font-family: var(--mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--signal-text);
+  padding: 0.3125rem 0.5rem;
+  border: 1px solid var(--signal);
+  transform: rotate(-2deg);
+}
+
+.status-note {
+  padding: 1rem 1.125rem;
+  margin-bottom: 2.25rem;
+  font-size: 0.9375rem;
+  color: var(--ink-body);
+  background-color: var(--signal-wash);
+  border: 1px dashed var(--signal);
+}
+
+.status-note strong {
+  color: var(--signal-text);
+}
+
 .section-intro,
 .lead {
   font-size: 1.1875rem;
@@ -427,8 +468,12 @@ code {
 }
 
 .report-meta > div {
-  padding: 0.875rem 1.25rem 0.9375rem 0;
+  padding: 0.875rem 1.25rem 0.9375rem;
   border-right: 1px solid var(--rule);
+}
+
+.report-meta > div:first-child {
+  padding-left: 0;
 }
 
 .report-meta > div:last-child {
@@ -612,6 +657,10 @@ code {
   border-bottom: 1px solid var(--rule);
 }
 
+.phase:last-child {
+  border-bottom: none;
+}
+
 .phase-body {
   display: grid;
   grid-template-columns: 6.5rem 1fr;
@@ -687,6 +736,11 @@ code {
   color: var(--ink-body);
 }
 
+.verdict-col {
+  width: 8.5rem;
+  border-right: 1px solid var(--rule);
+}
+
 .verdict-table tr:last-child td {
   border-bottom: none;
 }
@@ -695,12 +749,14 @@ code {
   font-family: var(--mono);
   font-weight: 600;
   font-size: 0.75rem;
+  line-height: 1;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  padding: 0.3125rem 0.5rem;
-  display: inline-block;
-  min-width: 4.25rem;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.875rem;
+  width: 5.25rem;
 }
 
 .verdict-cell.green {
@@ -725,6 +781,7 @@ code {
 .benchmark-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  align-items: start;
   gap: 1.5rem;
 }
 
@@ -903,7 +960,7 @@ code {
   .report-meta > div {
     border-right: none;
     border-bottom: 1px solid var(--rule);
-    padding-right: 0;
+    padding: 0.875rem 0;
   }
 
   .report-meta > div:last-child {
