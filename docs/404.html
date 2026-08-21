@@ -3,16 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Page not found — Frank Grimes</title>
-  <link rel="stylesheet" href="styles/main.css">
-  <link rel="icon" href="assets/grimey.png">
+  <title>404 — Frank Grimes</title>
+  <meta name="robots" content="noindex">
+  <link rel="preload" href="/fonts/PlexSansCondensed-700.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/styles/main.css">
+  <link rel="icon" href="/img/grimey.png">
 </head>
 <body>
   <header class="site-header">
     <div class="header-inner">
-        <a href="/" class="logo-link">
-          <img src="img/grimey.png" alt="Frank Grimes" class="logo" width="48" height="48">
-        </a>
+      <a href="/" class="logo-link">
+        <img src="/img/grimey.png" alt="" class="logo" width="32" height="32">
+        <span class="logo-wordmark">Frank Grimes</span>
+      </a>
       <nav class="top-nav">
         <a href="/">Home</a>
         <a href="https://github.com/misfitdev/frank-grimes" class="github-link">GitHub</a>
@@ -21,14 +24,32 @@
   </header>
 
   <main class="content">
-    <section class="hero">
-      <div class="hero-inner">
-        <h1 class="title">404</h1>
-        <p class="subtitle">This page doesn't exist. The grind didn't find it.</p>
-        <div class="philosophy-callout">
-          <span class="callout-label">Suggested action</span>
-          <span class="callout-text">Go back to the homepage</span>
+    <section class="report-header">
+      <div class="report-header-inner">
+        <h1 class="report-title"><span class="title-line">Page</span><span class="title-line">Not found</span></h1>
+        <p class="report-subtitle">This page doesn't exist. The grind didn't find it either.</p>
+
+        <dl class="report-meta">
+          <div>
+            <dt>Status</dt>
+            <dd>404 · No such document</dd>
+          </div>
+          <div>
+            <dt>Cause</dt>
+            <dd>Bad link, or it was never here</dd>
+          </div>
+          <div>
+            <dt>Verdict</dt>
+            <dd class="meta-red">Red</dd>
+          </div>
+        </dl>
+
+        <div class="warning-callout">
+          <p class="warning-text">Go back and start from the report.</p>
+          <p class="warning-source">Suggested action</p>
         </div>
+
+        <p class="final-links"><a href="/" class="final-link is-primary">Back to the homepage</a></p>
       </div>
     </section>
   </main>

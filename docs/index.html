@@ -1,26 +1,25 @@
 <!--
-  THESIS: Frank Grimes documentation is a serious tool for serious engineers.
-  The site refuses the "friendly docs" reflex - warm cream, rounded cards, soft
-  shadows - and instead commits to a stark, high-contrast editorial surface that
-  matches the skill's clinical, uncompromising voice. Dark ground, precise type,
-  no decoration that doesn't earn its place.
+  THESIS: Frank Grimes documentation is a Grimes Report that was dangerous enough
+  to put on the web. The site looks like a clinical falsification report crossed
+  with a warning label. It does not welcome visitors; it tells them what they're
+  dealing with. Dark ground, cold type, red used as a warning signal, not a brand
+  color. No cards. No rounded corners. No "friendly docs" reflex.
 
-  OWN-WORLD: Near-black ground (#0a0a0b), off-white text (#e6e6e6), a single
-  signal red accent (#e83838) used sparingly for verdicts and critical calls.
-  System type stack: ui-monospace for code, system sans for body. No decorative
-  fonts. The grimey.png logo is the only image asset.
+  OWN-WORLD: Near-black ground (#0a0a0b), off-white text (#e6e6e6), signal red
+  (#e83838) used as a warning — philosophy statement, verdict cells, the final
+  word. Monospace for code and structural labels. System sans for body, but cold.
+  No decorative fonts. The grimey.png logo is the only image.
 
-  STORY: A visitor lands, understands what Frank Grimes does in seconds, finds
-  the integration path for their provider, and leaves with the skill loaded.
-  The site is a reference, not a marketing page.
+  STORY: A visitor lands and immediately understands this is not a normal docs site.
+  The first viewport tells them what Frank Grimes does and what it assumes about
+  their code. They find the integration path. They leave with the skill loaded.
 
-  FIRST VIEWPORT: Logo centered at top, title and tagline below, three provider
-  cards (Claude Code, OpenCode, Codex) as the primary navigation, then a "Start
-  here" path. No hero-metrics template. No kicker above the heading.
+  FIRST VIEWPORT: A report-style header. "DISCIPLINED FALSIFICATION REVIEW" as a
+  structural label. "Frank Grimes" as the title. The philosophy statement as a
+  warning callout. No hero-metrics template. No welcome.
 
   FORM: Read-mode documentation site. Static HTML, no build step. GitHub Pages
-  serves from /docs. Single page with anchored sections, plus separate pages for
-  deep reference (skill content, benchmark, adapters).
+  serves from /docs. Single page with anchored sections.
 
   FINISH: unreviewed and undocumented is unfinished; this build ends with the
   finish review, the verdict, and DESIGN.md.
@@ -32,19 +31,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Frank Grimes — Disciplined Falsification Review</title>
   <meta name="description" content="A clinical, pessimistic iteration loop for systematically destroying, rebuilding, and hardening ideas. Assumes everything is broken until proven otherwise.">
+  <link rel="preload" href="fonts/PlexSansCondensed-700.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/PlexSans-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="styles/main.css">
   <link rel="icon" href="img/grimey.png">
 </head>
 <body>
   <header class="site-header">
     <div class="header-inner">
-        <a href="#top" class="logo-link">
-          <img src="img/grimey.png" alt="Frank Grimes" class="logo" width="48" height="48">
-        </a>
+      <a href="#top" class="logo-link">
+        <img src="img/grimey.png" alt="" class="logo" width="32" height="32">
+        <span class="logo-wordmark">Frank Grimes</span>
+      </a>
       <nav class="top-nav">
         <a href="#start">Start</a>
         <a href="#process">Process</a>
-        <a href="#providers">Providers</a>
+        <a href="#providers">Integration</a>
         <a href="#benchmark">Benchmark</a>
         <a href="https://github.com/misfitdev/frank-grimes" class="github-link">GitHub</a>
       </nav>
@@ -52,13 +54,29 @@
   </header>
 
   <main class="content">
-    <section class="hero" id="top">
-      <div class="hero-inner">
-        <h1 class="title">Frank Grimes</h1>
-        <p class="subtitle">Disciplined Falsification Review. A pessimistic iteration loop for systematically destroying, rebuilding, and hardening ideas. Assumes everything is broken until proven otherwise.</p>
-        <div class="philosophy-callout">
-          <span class="callout-label">Philosophy</span>
-          <span class="callout-text">Everything is crap until proven otherwise.</span>
+    <section class="report-header" id="top">
+      <div class="report-header-inner">
+        <h1 class="report-title"><span class="title-line">Frank</span><span class="title-line">Grimes</span></h1>
+        <p class="report-subtitle">A pessimistic iteration loop for systematically destroying, rebuilding, and hardening ideas.</p>
+
+        <dl class="report-meta">
+          <div>
+            <dt>Report type</dt>
+            <dd>Disciplined falsification review</dd>
+          </div>
+          <div>
+            <dt>Subject</dt>
+            <dd>Whatever you were about to ship</dd>
+          </div>
+          <div>
+            <dt>Opening verdict</dt>
+            <dd class="meta-red">Red until proven otherwise</dd>
+          </div>
+        </dl>
+
+        <div class="warning-callout">
+          <p class="warning-text">Everything is crap until proven otherwise.</p>
+          <p class="warning-source">The Grimes Grind philosophy</p>
         </div>
       </div>
     </section>
@@ -66,33 +84,33 @@
     <section class="section" id="start">
       <div class="section-inner">
         <h2 class="section-heading">Start here</h2>
-         <p class="lead">Frank Grimes is a structured critique process. Load the skill, point it at something, and watch it try to prove the thing wrong. When it can't find meaningful flaws anymore, you have earned confidence, not through hope but through survival.</p>
+        <p class="lead">Frank Grimes is a structured critique process. Load the skill, point it at something, and watch it try to prove the thing wrong. When it can't find meaningful flaws anymore, you have earned confidence, not through hope but through survival.</p>
 
         <ol class="start-steps">
           <li>
-            <span class="step-number">1</span>
-            <div class="step-content">
+            <span class="step-label">01</span>
+            <div class="step-body">
               <h3>Load the skill</h3>
-              <p>The portable skill lives in <code class="code-inline">skill/SKILL.md</code>. Load it into your agent's skill system. See <a href="#providers">Providers</a> for provider-specific setup.</p>
+              <p>The portable skill lives in <code class="code-inline">skill/SKILL.md</code>. Load it into your agent's skill system. See <a href="#providers">Integration</a> for provider-specific setup.</p>
             </div>
           </li>
           <li>
-            <span class="step-number">2</span>
-            <div class="step-content">
+            <span class="step-label">02</span>
+            <div class="step-body">
               <h3>Install jq</h3>
               <p>Required for the auto-loop stop hook. <code class="code-inline">brew install jq</code> on macOS, <code class="code-inline">apt-get install jq</code> on Linux.</p>
             </div>
           </li>
           <li>
-            <span class="step-number">3</span>
-            <div class="step-content">
+            <span class="step-label">03</span>
+            <div class="step-body">
               <h3>Run a grind</h3>
-               <p>Invoke the skill on your target, a file, a directory, recent changes, or a description. The skill guides you through scope, categories, and mode.</p>
+              <p>Invoke the skill on your target, a file, a directory, recent changes, or a description. The skill guides you through scope, categories, and mode.</p>
             </div>
           </li>
           <li>
-            <span class="step-number">4</span>
-            <div class="step-content">
+            <span class="step-label">04</span>
+            <div class="step-body">
               <h3>Read the report</h3>
               <p>Every grind produces a structured Grimes Report with a verdict (GREEN/YELLOW/RED), risk register, and Grimey's final word.</p>
             </div>
@@ -103,59 +121,47 @@
 
     <section class="section" id="providers">
       <div class="section-inner">
-        <h2 class="section-heading">Providers</h2>
-        <p class="section-intro">Frank Grimes is provider-neutral. The core skill and stop hook work with any agent that can load markdown skills and execute bash scripts. Adapters make integration trivial.</p>
+        <h2 class="section-heading">Integration</h2>
+        <p class="section-intro">Frank Grimes is provider-neutral. The core skill and stop hook work with any agent that can load markdown skills and execute bash scripts.</p>
 
-        <div class="provider-grid">
-          <article class="provider-card">
-            <header class="card-header">
-              <h3 class="card-title">Claude Code</h3>
-              <span class="card-badge">.claude/skills/</span>
+        <div class="integration-list">
+          <article class="integration-item">
+            <header class="integration-header">
+              <span class="integration-name">Claude Code</span>
+              <span class="integration-path">.claude/skills/</span>
             </header>
-            <div class="card-body">
-              <p>Copy the adapter files into your project's <code class="code-inline">.claude/</code> directory, or symlink the skill.</p>
+            <div class="integration-body">
               <pre class="code-block"><code>mkdir -p .claude/skills
 ln -s ../../skill .claude/skills/frank-grimes</code></pre>
               <p>Invoke with <code class="code-inline">/frank-grimes:grind &lt;target&gt;</code>.</p>
             </div>
-            <footer class="card-footer">
-              <a href="adapters/claude-code/" class="card-link">Setup guide</a>
-            </footer>
           </article>
 
-          <article class="provider-card">
-            <header class="card-header">
-              <h3 class="card-title">OpenCode</h3>
-              <span class="card-badge">.opencode/skills/</span>
+          <article class="integration-item">
+            <header class="integration-header">
+              <span class="integration-name">OpenCode</span>
+              <span class="integration-path">.opencode/skills/</span>
             </header>
-            <div class="card-body">
-              <p>OpenCode reads skills from multiple paths. Symlink the skill into one of them.</p>
+            <div class="integration-body">
               <pre class="code-block"><code>mkdir -p .opencode/skills
 ln -s ../../skill .opencode/skills/frank-grimes</code></pre>
               <p>OpenCode also reads <code class="code-inline">.claude/skills/</code> and <code class="code-inline">.agents/skills/</code>.</p>
             </div>
-            <footer class="card-footer">
-              <a href="adapters/opencode/" class="card-link">Setup guide</a>
-            </footer>
           </article>
 
-          <article class="provider-card">
-            <header class="card-header">
-              <h3 class="card-title">Codex</h3>
-              <span class="card-badge">.agents/skills/</span>
+          <article class="integration-item">
+            <header class="integration-header">
+              <span class="integration-name">Codex</span>
+              <span class="integration-path">.agents/skills/</span>
             </header>
-            <div class="card-body">
-              <p>Codex reads skills from <code class="code-inline">.agents/skills/</code>. Symlink the skill there.</p>
+            <div class="integration-body">
               <pre class="code-block"><code>mkdir -p .agents/skills
 ln -s ../../skill .agents/skills/frank-grimes</code></pre>
             </div>
-            <footer class="card-footer">
-              <a href="adapters/codify/" class="card-link">Setup guide</a>
-            </footer>
           </article>
         </div>
 
-        <div class="provider-note">
+        <div class="integration-note">
           <p><strong>Other providers:</strong> Any agent that supports markdown skills and bash hooks can use Frank Grimes. Load <code class="code-inline">skill/SKILL.md</code> as a skill, configure your stop hook to call <code class="code-inline">hooks/stop.sh</code>, and ensure <code class="code-inline">jq</code> is installed. See <a href="adapters/">adapters documentation</a> for details.</p>
         </div>
       </div>
@@ -164,66 +170,66 @@ ln -s ../../skill .agents/skills/frank-grimes</code></pre>
     <section class="section" id="process">
       <div class="section-inner">
         <h2 class="section-heading">The Grimes Grind</h2>
-         <p class="section-intro">Six phases. Evidence-first throughout. The objective is not to prove the idea right; it's to prove the default assumptions wrong.</p>
+        <p class="section-intro">Six phases. Evidence-first throughout. The objective is not to prove the idea right; it's to prove the default assumptions wrong.</p>
 
         <div class="phase-list">
           <article class="phase">
-            <header class="phase-header">
-              <span class="phase-number">01</span>
-              <h3 class="phase-title">The Grimey Read</h3>
-            </header>
             <div class="phase-body">
+              <header class="phase-header">
+                <span class="phase-label">Phase 01</span>
+                <h3 class="phase-title">The Grimey Read</h3>
+              </header>
               <p>Absorb the target without trusting it. Look for what is being hidden, glossed over, or assumed. Ask at most 3 clarifying questions, then proceed with labeled assumptions.</p>
             </div>
           </article>
 
           <article class="phase">
-            <header class="phase-header">
-              <span class="phase-number">02</span>
-              <h3 class="phase-title">Default Assumptions</h3>
-            </header>
             <div class="phase-body">
+              <header class="phase-header">
+                <span class="phase-label">Phase 02</span>
+                <h3 class="phase-title">Default Assumptions</h3>
+              </header>
               <p>Assume the subject is broken in every way: LLM slop, unreliable, insecure, poorly planned, non-production-ready, unmaintainable, fragile, edge-case blind, compliance-violating, dependency-ridden.</p>
               <p class="phase-emphasis">Your objective is to prove these assumptions WRONG.</p>
             </div>
           </article>
 
           <article class="phase">
-            <header class="phase-header">
-              <span class="phase-number">03</span>
-              <h3 class="phase-title">The Grind</h3>
-            </header>
             <div class="phase-body">
+              <header class="phase-header">
+                <span class="phase-label">Phase 03</span>
+                <h3 class="phase-title">The Grind</h3>
+              </header>
               <p>Systematically attack across 23 critique categories. Evidence-first: show the specific code path BEFORE describing the risk. Prioritize by Severity × Likelihood × Blast Radius.</p>
             </div>
           </article>
 
           <article class="phase">
-            <header class="phase-header">
-              <span class="phase-number">04</span>
-              <h3 class="phase-title">The Rebuild</h3>
-            </header>
             <div class="phase-body">
+              <header class="phase-header">
+                <span class="phase-label">Phase 04</span>
+                <h3 class="phase-title">The Rebuild</h3>
+              </header>
               <p>For each issue, propose a fix. In <code class="code-inline">fix</code> mode, apply the fixes. In <code class="code-inline">report</code> mode, document only. If a fix is impossible, document the accepted risk.</p>
             </div>
           </article>
 
           <article class="phase">
-            <header class="phase-header">
-              <span class="phase-number">05</span>
-              <h3 class="phase-title">Scoped Re-Grind</h3>
-            </header>
             <div class="phase-body">
+              <header class="phase-header">
+                <span class="phase-label">Phase 05</span>
+                <h3 class="phase-title">Scoped Re-Grind</h3>
+              </header>
               <p>Take the updated version and grind again, focusing on the regression scope of the fixes. Note any new risks introduced by the fixes.</p>
             </div>
           </article>
 
           <article class="phase">
-            <header class="phase-header">
-              <span class="phase-number">06</span>
-              <h3 class="phase-title">Stop Conditions &amp; Verdict</h3>
-            </header>
             <div class="phase-body">
+              <header class="phase-header">
+                <span class="phase-label">Phase 06</span>
+                <h3 class="phase-title">Stop Conditions &amp; Verdict</h3>
+              </header>
               <p>Determine the verdict based on P0/P1 mitigation status, verification existence, and observability.</p>
               <table class="verdict-table">
                 <thead>
@@ -287,14 +293,14 @@ ln -s ../../skill .agents/skills/frank-grimes</code></pre>
     <section class="section section-final">
       <div class="section-inner">
         <div class="final-content">
-              <blockquote class="grimey-quote">
-                <p>"You know what makes me mad? Not just that this is broken. It's that someone shipped it thinking it was fine. That's the real failure."</p>
-                <cite>The Spirit of Grimey</cite>
-              </blockquote>
+          <blockquote class="grimey-quote">
+            <p class="quote-text">You know what makes me mad? Not just that this is broken. <span class="quote-hit">It's that someone shipped it thinking it was fine.</span> That's the real failure.</p>
+            <p class="quote-source">The Spirit of Grimey</p>
+          </blockquote>
           <div class="final-meta">
             <p>Frank Grimes is named after the character from <em>The Simpsons</em>, S8E23 "Homer's Enemy".</p>
             <p>Methodology inspired by pre-mortems, red teaming, and threat modeling.</p>
-            <p><a href="https://github.com/misfitdev/frank-grimes" class="final-link">View on GitHub</a> · <a href="skill/SKILL.md" class="final-link">Read the skill</a></p>
+            <p class="final-links"><a href="https://github.com/misfitdev/frank-grimes" class="final-link is-primary">View on GitHub</a> <a href="skill/SKILL.md" class="final-link">Read the skill</a></p>
           </div>
         </div>
       </div>
