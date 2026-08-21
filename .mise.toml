@@ -1,0 +1,5 @@
+[tools]
+jq = "latest"
+shellcheck = "latest"
+shfmt = "latest"
+just = "latest"

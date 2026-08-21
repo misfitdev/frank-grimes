@@ -1,0 +1,22 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "frank-grimes",
+  "version": "1.0.0",
+  "description": "A clinical, pessimistic iteration loop for systematically destroying, rebuilding, and hardening ideas. Assumes everything is broken until proven otherwise.",
+  "author": {
+    "name": "Misfit Development",
+    "email": "code@misfit.dev"
+  },
+  "repository": "https://github.com/misfitdev/frank-grimes",
+  "license": "PolyForm Noncommercial",
+  "keywords": [
+    "code-review",
+    "security",
+    "pre-mortem",
+    "red-team",
+    "quality",
+    "iteration",
+    "critique",
+    "falsification"
+  ]
+}

@@ -1,11 +1,11 @@
 # Frank Grimes
 
-<img src="assets/grimey.png" alt="Grimey logo" width="25%">
+<img src="docs/img/grimey.png" alt="Grimey logo" width="25%">
 
 > "I've had to work hard every day of my life, and what do I have to show for it? This briefcase, and this haircut."
 > — Frank Grimes
 
-A pessimistic iteration loop for systematically destroying, rebuilding, and hardening ideas. Named after Frank Grimes ("Grimey") from The Simpsons - the only character who actually *analyzed* what was wrong and refused to let it slide.
+A pessimistic iteration loop for systematically destroying, rebuilding, and hardening ideas. Named after Frank Grimes ("Grimey") from The Simpsons — the only character who actually *analyzed* what was wrong and refused to let it slide.
 
 ## Philosophy
 
@@ -21,124 +21,127 @@ The Grimes Grind assumes your idea, code, plan, or design is:
 
 Your job is to prove these assumptions WRONG, not to prove the idea right.
 
+## What It Does
+
+Frank Grimes is a **Disciplined Falsification Review** process. It runs a structured critique across 23 categories, produces a scored report with a verdict, and optionally loops until the verdict is GREEN.
+
+The core deliverable is a **Grimes Report** that tells you:
+- What's wrong (with evidence)
+- How wrong it is (severity, likelihood, blast radius)
+- What survived scrutiny (claims that withstood falsification)
+- What the verdict is (GREEN/YELLOW/RED)
+
 ## Installation
 
-```
-/plugin marketplace add misfitdev/claude-plugins
-/plugin install frank-grimes@misfitdev/claude-plugins
-```
+Frank Grimes is provider-neutral. The core skill (`skill/SKILL.md`) and stop hook (`hooks/stop.sh`) work with any agent that can load markdown skills and execute bash scripts.
 
-## Commands
+### Quick Start (Any Provider)
 
-### `/frank-grimes:grind [target] [options]`
+1. Load the skill: `skill/SKILL.md`
+2. Ensure `jq` is installed (required for the stop hook)
+3. Invoke the grind on your target
 
-Start a Grimes Grind. If invoked without arguments, prompts interactively for scope, categories, and mode.
+### Provider-Specific Setup
 
-**Arguments:**
-- `target` (optional): File path, directory, description, or "this". Skips the scope question.
-- `--scope recent-changes|whole-repo` (optional): Shorthand scope. Skips the scope question.
-- `--categories core-quality,security-privacy,architecture-ops,code-structure` (optional): Category groups to run. Default: all.
-- `--mode fix|report` (optional): `fix` applies fixes automatically (default); `report` documents findings only.
-- `--max-iterations N` (optional): Maximum iterations before stopping (default: 5)
-- `--auto-loop` (optional): Enable automatic iteration until GREEN verdict
-- `--with-api-review` (optional): Enable Phase 2 API Correctness & Completeness review
-
-**Examples:**
+#### Claude Code
 
 ```bash
-# Interactive — prompts for scope, categories, and mode
-/frank-grimes:grind
+# Copy adapter files to your project's .claude/ directory
+cp -r adapters/claude-code/* .claude/
 
-# One-shot grind on a file
+# Or symlink the skill
+mkdir -p .claude/skills
+ln -s ../../skill .claude/skills/frank-grimes
+```
+
+Then invoke with `/frank-grimes:grind <target>`.
+
+#### OpenCode
+
+```bash
+# Symlink the skill into OpenCode's skill path
+mkdir -p .opencode/skills
+ln -s ../../skill .opencode/skills/frank-grimes
+```
+
+OpenCode reads `.opencode/skills/`, `.claude/skills/`, and `.agents/skills/`. Any of these works.
+
+#### Codex
+
+```bash
+# Symlink the skill into Codex's skill path
+mkdir -p .agents/skills
+ln -s ../../skill .agents/skills/frank-grimes
+```
+
+#### Other Providers
+
+Any agent that supports markdown skills and bash hooks can use Frank Grimes:
+
+1. Load `skill/SKILL.md` as a skill or system prompt
+2. Configure your agent's stop hook to call `hooks/stop.sh`
+3. Ensure `jq` is installed
+
+See `adapters/README.md` for detailed integration instructions.
+
+## Running a Grind
+
+### Basic Usage
+
+```
+Load the Frank Grimes skill and run a grind on your target.
+```
+
+The skill will guide you through:
+1. **Scope** — What are you reviewing? (file, directory, recent changes, description)
+2. **Categories** — Which critique categories to run? (all enabled by default)
+3. **Mode** — Fix issues automatically or report only?
+
+### Command-Line Options
+
+When your provider supports arguments, you can skip the interactive prompts:
+
+| Option | Description |
+|--------|-------------|
+| `target` | What to grind (file path, directory, description, or "this") |
+| `--scope recent-changes\|whole-repo` | Shorthand scope |
+| `--categories core-quality,security-privacy,architecture-ops,code-structure` | Category groups to run |
+| `--mode fix\|report` | `fix` applies fixes; `report` documents only |
+| `--max-iterations N` | Maximum iterations (default: 5) |
+| `--auto-loop` | Continue until GREEN verdict |
+| `--with-api-review` | Enable Phase 2 API correctness review |
+
+### Examples
+
+```
+# Grind a specific file
 /frank-grimes:grind ./src/auth.py
 
-# Recent changes, report only
+# Grind recent changes, report only
 /frank-grimes:grind --scope recent-changes --mode report
 
-# Grind with API review enabled
-/frank-grimes:grind ./src/api --with-api-review
+# Grind with auto-loop enabled
+/frank-grimes:grind ./src/api --auto-loop
 
-# Red team an architecture proposal
+# Grind an architecture proposal
 /frank-grimes:grind "The proposal to use MongoDB for our financial transaction system"
 ```
 
-### `/frank-grimes:cancel`
+## The Grimes Grind Process
 
-Cancel an active Grimes Grind loop and report final status.
+### Phase 1: The Grimey Read (Absorption)
 
-### `/frank-grimes:help`
+Absorb the target without trusting it. Look for what is being hidden, glossed over, or assumed. Ask at most 3 clarifying questions, then proceed.
 
-Display help and usage information for the Grimes Grind plugin.
+### Phase 2: Default Assumptions (The Falsification Baseline)
 
-## How It Works
+Assume the subject is broken in every way: LLM slop, unreliable, insecure, poorly planned, non-production-ready, unmaintainable, fragile, edge-case blind, compliance-violating, and dependency-ridden.
 
-### The Grimes Grind Process
+**Your objective is to prove these assumptions WRONG. You do not prove the idea right.**
 
-1. **Phase 1: The Grimey Read** - Understand what you're critiquing (max 3 clarifying questions)
-2. **Phase 2: Default Assumptions** - Assume it's broken in every way
-3. **Phase 3: The Grind** - Systematically attack across 17 categories
-4. **Phase 4: The Rebuild** - Propose fixes with regression scope
-5. **Phase 5: Re-Grind (Scoped)** - Verify fixes didn't introduce new problems
-6. **Phase 6: Stop Conditions** - Determine verdict
+### Phase 3: The Grind (Destruction Cycle)
 
-### Verdicts
-
-| Verdict | Meaning |
-|---------|---------|
-| 🟢 **GREEN** | All P0 mitigated, P1 planned, verification exists, observability sufficient |
-| 🟡 **YELLOW** | P0 mitigated but P1 weak, partial verification, needs monitoring |
-| 🔴 **RED** | P0 unmitigated, no verification, blocking issues remain |
-
-### Auto-Loop Behavior
-
-When `--auto-loop` is enabled:
-1. The stop hook intercepts exit attempts
-2. If verdict is not GREEN and iterations remain, the grind continues
-3. State is persisted in `.grimes-state.json`
-4. Loop exits when GREEN or max iterations reached
-
-## Phase Structure
-
-### Phase 1: Runtime Reliability & Production Blocking (Always Active)
-
-Focuses on P0/P1 defects that would prevent production deployment:
-- Syntax errors, compilation failures
-- Unhandled errors in critical paths
-- Resource leaks (timeouts, cleanup, OOM)
-- Security issues (credentials, injection, auth)
-
-**Verdict:** GREEN/YELLOW/RED based on blocking issues
-
-**Output:** GRIMES_REPORT.md with risk register, fixes, and deployment checklist
-
----
-
-### Phase 2: API Correctness & Completeness (Optional, --with-api-review)
-
-Focuses on P1/P2 API quality issues:
-- Package path correctness (`go_package`, Python imports)
-- Feature completeness (no unfinished TODOs in production)
-- Public interface documentation (godoc, docstrings)
-- API consistency (error returns, naming patterns)
-- Language best practices (no bare except, idiomatic code)
-
-**Verdict:** API Quality Score (0-100) + categorized findings
-
-**Output:** API_QUALITY_REPORT.md with score breakdown and technical debt backlog
-
-**When to use Phase 2:**
-- After Phase 1 is GREEN (API quality doesn't block production)
-- When scheduling technical debt sprints
-- For comprehensive code quality assessment
-- When handoff to different team requires API documentation
-
----
-
-## Critique Categories
-
-The grind checks across these dimensions:
-
-### Core Categories
+Systematically attack across 23 critique categories. Evidence-First: show the specific code path BEFORE describing the risk.
 
 | Category | Focus |
 |----------|-------|
@@ -152,54 +155,182 @@ The grind checks across these dimensions:
 | Observability | Metrics, logs, traces, alerts |
 | Testability | Tests exist? Test the right things? |
 | Maintainability | Understandable in 6 months? |
-| Dependencies | Reliable? Maintained? Upgrade path? |
 | Deployment | Rollback? Feature flags? YOLO push? |
 | Privacy & Data | PII, retention, GDPR |
 | Compliance | Audit logs, SOC 2, domain-specific |
 | Cost | Run cost, maintenance burden |
 | Human Factors | Will people use it correctly? |
 | Failure Modes | How does it die? Blast radius? |
+| Code Quality & Formatting | Malformed syntax, unused imports, dead code |
+| Code Duplication | Same logic in multiple places? |
+| Input Validation | Validated BEFORE use? Bypassable? |
+| Language-Specific Patterns | Anti-patterns, misuse of language features |
+| Configuration Management | Hard-coded values, secret management |
+| Resource Lifecycle | Proper acquire/release? Leak vectors? |
 
-## Output: The Grimes Report
+### Phase 4: The Rebuild (Mitigation)
+
+For each issue, propose a fix. If a fix is impossible, document the accepted risk. In `fix` mode, apply the fixes. In `report` mode, document only.
+
+### Phase 5: Scoped Re-Grind
+
+Take the updated version and grind again, focusing on the regression scope of the fixes. Note any new risks introduced by the fixes.
+
+### Phase 6: Stop Conditions & Verdict
+
+| Verdict | Meaning |
+|---------|---------|
+| **GREEN** | All P0 mitigated or accepted with timeline; all P1 have mitigations or plan; verification exists; observability sufficient |
+| **YELLOW** | P0 mitigated but P1 evidence weak; verification non-comprehensive |
+| **RED** | Any P0 lacks mitigation; no verification path; observability insufficient |
+
+### Phase 7: API Quality Assessment (Optional)
+
+When `--with-api-review` is enabled, run additional API-focused categories after Phase 1: API design & contracts, package/import correctness, feature completeness, public interface documentation, language-specific best practices, and API consistency. Produces an API Quality Score (0-100).
+
+## The Grimes Report
 
 Every grind produces a structured report:
 
 ```markdown
 ## Grimes Grind Report: [Subject]
 
-### Verdict: 🟢 GREEN | 🟡 YELLOW | 🔴 RED
+### Verdict: GREEN | YELLOW | RED
 
-**Top 3 Risks:**
-1. ...
-2. ...
-3. ...
+**BLUF (Bottom Line Up Front):**
+[One concise summary of the findings and the resulting level of confidence.]
+
+**Top 3 Risks (Evidence-First):**
+1. **[Evidence]:** Results in [Risk] (ID: grime-xxx)
+2. **[Evidence]:** Results in [Risk] (ID: grime-xxx)
+3. **[Evidence]:** Results in [Risk] (ID: grime-xxx)
+
+---
+
+### Origin Assessment
+- [ ] Human-written
+- [ ] AI-generated
+- [ ] Cargo-culted/Unknown
 
 ### Risk Register
-| ID | Category | Risk Statement | Severity | Likelihood | Blast Radius | Evidence | Status |
-...
 
-### Can't Prove Wrong (Survived Scrutiny)
+| ID | Grime ID | Category | Evidence | Risk Statement | Sev | Evidence Status |
+|----|----------|----------|----------|----------------|-----|-----------------|
+| 1  | grime-xxx|          |          |                |     |                 |
+
+### Survived Scrutiny (Earned Confidence)
+For claims that appear sound after active falsification attempts:
+
 | Claim | Supporting Evidence | What Would Falsify It |
-...
+|-------|--------------------|-----------------------|
+|       |                    |                       |
 
 ### Grimey's Final Word
-[One brutal sentence of truth]
+[One clinical, direct sentence summarizing the truth about this thing.]
 ```
+
+## Auto-Loop
+
+When `--auto-loop` is enabled, the grind continues until GREEN or max iterations are reached.
+
+### How It Works
+
+1. During the grind, state is written to `.grimes-state.json` in the project root
+2. On session stop, the agent's hook system calls `hooks/stop.sh`
+3. The hook reads the state and decides:
+   - **Exit 0**: Allow exit (GREEN verdict, max iterations reached, or auto-loop disabled)
+   - **Exit 2**: Block exit and re-inject the grind prompt (continue iterating)
+4. If continuing, the hook increments the iteration counter
+
+### State File Format
+
+```json
+{
+  "iteration": 2,
+  "max_iterations": 5,
+  "last_verdict": "YELLOW",
+  "target": "./src/auth.py",
+  "auto_loop": true,
+  "issues_found": 8,
+  "issues_fixed": 3,
+  "last_commit": "abc1234",
+  "last_grind_timestamp": "2026-08-21T10:30:00Z"
+}
+```
+
+### Provider Hook Integration
+
+| Provider | Hook Configuration |
+|----------|-------------------|
+| Claude Code | `hooks.json` in plugin or project config |
+| OpenCode | `AGENTS.md` or plugin manifest with `hooks.stop` |
+| Codex | `openai.yaml` with `hooks.stop` |
+| Other | Any stop hook mechanism that can call `hooks/stop.sh` |
+
+See `hooks/README.md` for detailed integration instructions.
 
 ## Dependencies
 
-- `jq` - Required for the stop hook to parse state JSON
+- `jq` — Required for the stop hook to parse state JSON
 
 Install on macOS: `brew install jq`
-Install on Ubuntu: `apt-get install jq`
+Install on Ubuntu/Debian: `apt-get install jq`
+Install on Fedora: `dnf install jq`
+
+## Quality Checklist
+
+Before shipping, verify your grind meets these standards:
+
+- [ ] Every issue has specific evidence (code path, line number, scenario)
+- [ ] Issues span multiple critique categories, not clustered in one
+- [ ] Severity ratings are correct (P0 for blocking, P1 for significant, P2 for friction, P3 for debt)
+- [ ] Verdict matches the findings (GREEN only when P0 are mitigated)
+- [ ] Report has all required sections (verdict, BLUF, top 3 risks, risk register, survived scrutiny, final word)
+- [ ] Issues use the correct format (Grime ID, evidence, category, severity, likelihood, blast radius)
+- [ ] No anti-patterns (Grimey Theater, Optimism Creep, Authority Deference, Perfection Paralysis, Orphaned Risks)
+- [ ] Voice is clinical and direct, not obscured by satire
+
+## Benchmarking
+
+The `benchmark/` directory contains a framework for validating grind quality across different target types.
+
+### Running the Benchmark
+
+```bash
+# Run against all targets
+./benchmark/runner.sh --all
+
+# Run against a specific target
+./benchmark/runner.sh ./benchmark/targets/shell/bad-script.sh
+
+# A/B test: compare current results with baseline
+./benchmark/runner.sh --all --compare
+```
+
+### What the Benchmark Measures
+
+| Dimension | What It Checks |
+|-----------|---------------|
+| Evidence Quality | Specific, verifiable evidence for each issue |
+| Category Coverage | Attack across multiple categories, not one area |
+| Severity Assessment | Correct P0/P1/P2/P3 classification |
+| Verdict Accuracy | Verdict justified by findings |
+| Report Structure | All required sections present and complete |
+| Issue Format Compliance | Grime IDs, evidence, category, severity, likelihood, blast radius |
+| Fix Quality | Correct fixes with verification and regression scope |
+| Anti-Pattern Avoidance | No Grimey Theater, Optimism Creep, etc. |
+| Voice and Tone | Clinical, direct, unforgiving without obscuring instructions |
+| Origin Assessment | Assessment of human-written vs AI-generated vs cargo-culted |
+
+See `benchmark/rubric.md` for the full rubric and scoring criteria.
 
 ## Anti-Patterns
 
 The skill warns against these failure modes:
 
 - **Grimey Theater**: Going through motions without genuine skepticism
-- **Optimism Creep**: "It'll probably be fine" - NO. Prove it.
-- **Authority Deference**: "The LLM said so" - Verify anyway.
+- **Optimism Creep**: "It'll probably be fine" — NO. Prove it.
+- **Authority Deference**: "The LLM said so" — Verify anyway.
 - **Perfection Paralysis**: Never shipping because something might be wrong
 - **Orphaned Risks**: Accepted risks with no owner
 
