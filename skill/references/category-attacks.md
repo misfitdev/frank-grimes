@@ -1,6 +1,6 @@
 # Category Attack Cards
 
-Read only the cards routed by Phase 1. A probe is an action plus a recorded result, not a question left unanswered. Probes are ordered options governed by Phase 5's marginal-yield rule, not a completion checklist. Commands below are selection rules: execute only checked-in commands or tools already available in the environment, never install a tool or use the network for a probe.
+Read only the cards routed by Phase 1. A probe is an action plus a recorded result, not a question left unanswered. Probes are ordered options governed by Phase 5's marginal-yield rule, not a completion checklist. Commands below are selection rules: execute only checked-in commands or tools already available in the environment, never install a tool or use the network for a local probe. Current-landscape research is governed separately by the research phase and [references/research.md](research.md).
 
 ## COR — Correctness and invariants
 

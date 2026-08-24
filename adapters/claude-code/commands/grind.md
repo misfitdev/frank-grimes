@@ -22,6 +22,9 @@ arguments:
   - name: with-api-review
     description: Enable Phase 2 API Correctness review after Phase 1 (default false)
     required: false
+  - name: research
+    description: "Current-landscape research: online (default), offline, or frozen:<path>"
+    required: false
 allowed-tools:
   - Read
   - Glob
@@ -30,6 +33,8 @@ allowed-tools:
   - Edit
   - Write
   - AskUserQuestion
+  - WebSearch
+  - WebFetch
 ---
 
 # Grimes Grind Command
@@ -43,6 +48,7 @@ Execute a Grimes Grind on the target using the grimey methodology.
 - `max-iterations`: Stop after N iterations (default 5)
 - `auto-loop`: Loop until GREEN verdict if enabled (default false)
 - `with-api-review`: Enable Phase 2 API Correctness & Completeness review (default false)
+- `research`: `online` (default when available), `offline`, or `frozen:<path>` for a pinned research bundle
 
 **Return format:** GRIMES_RESULT JSON with verdict, findings, and fixes
 
@@ -137,6 +143,7 @@ Once scope, categories, and mode are determined, **execute the Grimes Grind inli
 - **Max iterations:** from `$ARGUMENTS` or default 5
 - **Auto-loop:** from `$ARGUMENTS` or default false
 - **Phase 2 (API Review):** from `$ARGUMENTS` or default false
+- **Research mode:** from `$ARGUMENTS` or default `online` when WebSearch/WebFetch are available; otherwise `offline` with the limitation recorded
 - **Current iteration:** 1
 - **Previous findings:** none (first iteration)
 

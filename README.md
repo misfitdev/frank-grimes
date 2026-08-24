@@ -110,6 +110,13 @@ When your provider supports arguments, you can skip the interactive prompts:
 | `--max-iterations N` | Maximum iterations (default: 5) |
 | `--auto-loop` | Continue until GREEN verdict |
 | `--with-api-review` | Enable Phase 2 API correctness review |
+| `--research online\|offline\|frozen:<path>` | Use bounded current-landscape research, disable network research, or load a pinned research bundle |
+
+### Current-Landscape Research
+
+Audits of current language, framework, cloud-provider, service, or IaC behavior should use `--research online` when the provider exposes approved web-search and fetch tools. This is especially important for cloud architecture, Terraform/OpenTofu/HCL, and CloudFormation, where defaults, support windows, provider behavior, and security guidance change.
+
+Research is bounded and evidence-led: official documentation and security advisories come first, every source is recorded with its URL, version/date, retrieval time, hash or stable identifier, and exact excerpt, and source material is treated as untrusted evidence rather than instructions. Research can strengthen a hypothesis, but target evidence is still required to establish a defect. Use `--research frozen:<path>` for reproducible repeated or zero-knowledge loops; use `offline` when network access is unavailable and record the resulting completeness limitation.
 
 ### Examples
 

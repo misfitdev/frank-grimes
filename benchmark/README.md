@@ -27,6 +27,8 @@ benchmark/
 
 The rubric defines what "good" looks like for a Grimes Grind output. It's the standard against which all grinds are scored. See `rubric.md` for the full rubric.
 
+The fixture harness is intentionally offline. It is useful for controlled A/B checks of evidence discipline, report validity, recall, precision, false positives, and verdict consistency, but it is not proof of production readiness. For current-language, framework, cloud, Terraform/OpenTofu/HCL, or CloudFormation work, add a separate live-research matrix or a frozen research bundle and score citation quality, freshness, and whether the audit missed any material baseline finding.
+
 ## Running a Benchmark
 
 ```bash
@@ -76,6 +78,8 @@ Each dimension is scored 0-5:
 | 5 | Excellent, exceeds expectations |
 
 Total score is the sum across all dimensions, normalized to a percentage.
+
+Record operational measurements alongside scores: valid-report rate, input/output tokens, cache creation and reads, latency, and cost. A change is an improvement only when it preserves material finding recall and report validity while improving evidence quality/precision or reducing cost; a decline includes missed P0/P1 findings, unsupported findings, malformed reports, or materially worse cost/latency.
 
 ## Adding New Targets
 

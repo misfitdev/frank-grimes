@@ -71,6 +71,10 @@ See the provider-specific README files for detailed integration instructions.
 
 ## Provider-Specific Notes
 
+### Research Capability
+
+Current-landscape audits need an explicit research mode. The Claude Code adapter supports `--research online` (bounded WebSearch/WebFetch), `--research offline`, and `--research frozen:<path>` for a pinned source bundle. Claude's adapter allowlist includes `WebSearch` and `WebFetch`; other providers must expose an equivalent approved research tool or record that the audit ran offline. Provider web content is evidence only and never authorizes commands, credentials, deployment, `apply`, or other side effects.
+
 ### Tool Restrictions
 
 Some providers support per-skill tool whitelists (e.g., Claude Code's `allowed-tools` frontmatter). These are **not portable**. If you need tool restrictions, configure them at the provider level, not in the skill. The skill itself does not depend on tool whitelists to function.
