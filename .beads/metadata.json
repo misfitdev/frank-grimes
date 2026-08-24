@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "frank_grimes",
+  "project_id": "22cc55a8-d680-4f44-983e-d0d72d5d4dcf"
+}
