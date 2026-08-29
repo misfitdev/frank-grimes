@@ -75,10 +75,11 @@ echo "--- No commit without a passing gate ---"
 # The original defect: commit after each fix, with nothing in between.
 assert_absent "$GRIND" 'Commit after each fix' \
     "adapter no longer commits after each fix"
-assert_present "$GRIND" 'do not commit per fix|Never commit per fix' \
-    "adapter forbids per-fix commits"
 assert_present "$SKILL" 'Never commit per fix' \
     "skill forbids per-fix commits"
+# The adapter must defer to the skill rather than restate the rule.
+assert_present "$GRIND" 'Fix Mode and the Commit Gate' \
+    "adapter references the skill's commit gate section"
 assert_present "$SKILL" 'exited zero|exits zero' \
     "skill requires a zero exit before committing"
 assert_present "$SKILL" 'nonzero.*make no commit|nonzero.*no commit' \

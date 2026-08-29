@@ -25,47 +25,45 @@ Confidence is not assumed; it is earned by surviving a relentless, adversarial c
 ## Quick Start
 
 ```bash
-# Interactive — prompts for scope, categories, and mode
+# Interactive — prompts for scope
 /frank-grimes:grind
 
 # Direct — skip prompts by specifying the target
 /frank-grimes:grind ./src/auth.ts --auto-loop
 ```
 
-When invoked without arguments, Grimes will ask three setup questions before grinding:
-1. **Scope** — Recent changes, whole repo, or a specific target
-2. **Categories** — Which of the 23 critique categories to evaluate (all enabled by default)
-3. **Mode** — Fix issues automatically or report only
+When invoked without arguments, Grimes asks for the scope and defaults to report mode. Category routing is not a question — the skill selects 5-8 of the ten categories from the target's own shape and records why for all ten.
 
 ## Verdicts
 
-- **GREEN:** Confidence earned. Terminal flaws mitigated or risks explicitly accepted
-- **YELLOW:** Conditional confidence. Mitigation evidence is weak or incomplete
-- **RED:** Failure. Critical flaws exist without mitigation
+The colour is derived from the verdict tuple, never asserted. See the skill for the derivation.
+
+- **RED:** `decision=block` — an open P0 remains
+- **YELLOW:** anything unconfirmed — including a carried accepted P0, or no available adjudicator
+- **GREEN:** the full tuple plus an independent adjudicator that reached the same conclusion without seeing the report
 
 ## Command Reference
 
 ### `/frank-grimes:grind [target] [options]`
 
-Starts a Grimes Grind. If invoked without arguments, prompts interactively for scope, categories, and mode.
+Starts a Grimes Grind. If invoked without arguments, prompts for scope. Reports by default.
 
 **Arguments:**
 - `target` (optional) - What to grind: file path, directory, code snippet, or description. Skips the scope question.
 - `--scope recent-changes|whole-repo` (optional) - Shorthand scope. Skips the scope question.
-- `--categories core-quality,security-privacy,architecture-ops,code-structure` (optional) - Comma-separated category groups. Skips the category question. Default: all groups.
+- `--categories COR,SEC,REL` (optional) - Restrict routing to these canonical categories. Default: the skill routes 5-8 itself.
 - `--mode report|fix` (optional) - `report` documents findings and edits nothing (default); `fix` applies fixes and then runs a verification gate. Skips the mode question.
 - `--verify-command <cmd>` (optional) - Command used to verify a fix batch. Without a usable gate, fix mode edits but never commits.
 - `--commit` (optional) - Authorize one commit of the verified batch. Requires `--mode fix` and a gate that exited zero. Off by default.
 - `--max-iterations N` (optional) - Maximum iterations before stopping (default: 5)
-- `--auto-loop` (optional) - Automatically continue until GREEN verdict or max iterations reached
-- `--with-api-review` (optional) - Enable Phase 2 API Correctness & Completeness review
+- `--auto-loop` (optional) - Continue while iterations still change the verdict, up to the maximum
 
 **Examples:**
 ```bash
 /frank-grimes:grind ./src/auth.ts
 /frank-grimes:grind --scope recent-changes --mode report
 /frank-grimes:grind "Review this architecture" --max-iterations 3 --auto-loop
-/frank-grimes:grind ./src/api --with-api-review --mode report
+/frank-grimes:grind ./src/api --mode fix --verify-command "just check"
 /frank-grimes:grind this --auto-loop
 ```
 

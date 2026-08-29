@@ -298,6 +298,51 @@ else
     fail "stop.sh does not reference .grimes-state.json"
 fi
 
+# SKILL.md is the sole normative methodology. A second copy in an adapter or a
+# README does not stay in sync; it goes stale and then contradicts the skill.
+# These markers are normative definitions, not mentions, so they may appear in
+# exactly one file.
+echo "--- Methodology Ownership ---"
+
+# shellcheck disable=SC2016  # backticks are literal markdown, not substitution
+NORMATIVE_MARKERS=(
+    'Phase 2: Default Assumption'
+    'E1 — reproduced'
+    'E3 — inferred'
+    'Route exactly'
+    'Derive `RED` from'
+)
+
+for marker in "${NORMATIVE_MARKERS[@]}"; do
+    OWNERS=$(grep -rlF "$marker" \
+        "$PROJECT_ROOT/skills" \
+        "$PROJECT_ROOT/adapters" \
+        "$PROJECT_ROOT/hooks" \
+        "$PROJECT_ROOT/README.md" \
+        "$PROJECT_ROOT/docs" 2>/dev/null | grep -v '/audit/' || true)
+    OWNER_COUNT=$(echo "$OWNERS" | grep -c . || true)
+
+    if [[ "$OWNER_COUNT" -eq 1 ]] && [[ "$OWNERS" == *"skills/frank-grimes/SKILL.md" ]]; then
+        pass "methodology marker defined only in the skill: $marker"
+    elif [[ "$OWNER_COUNT" -eq 0 ]]; then
+        fail "methodology marker missing from the skill: $marker"
+    else
+        fail "methodology marker defined outside the skill: $marker"
+        echo "$OWNERS"
+    fi
+done
+
+# Each adapter must point at the skill rather than paraphrase it.
+for adapter in "adapters/claude-code/commands/grind.md" "adapters/opencode/AGENTS.md" "adapters/codify/AGENTS.md"; do
+    if grep -qF "SKILL.md" "$PROJECT_ROOT/$adapter" 2>/dev/null; then
+        pass "$adapter references SKILL.md"
+    else
+        fail "$adapter does not reference SKILL.md"
+    fi
+done
+
+echo ""
+
 # The scorer greps for the report template's section names and field labels, so
 # editing the template silently breaks scoring. The fixtures are the tripwire:
 # a conforming report must score high and a theatrical one must not.

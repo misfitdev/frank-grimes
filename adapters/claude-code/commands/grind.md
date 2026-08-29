@@ -8,7 +8,7 @@ arguments:
     description: "Shorthand scope: 'recent-changes' (git diff), 'whole-repo', or a custom path/description. Skips the scope question."
     required: false
   - name: categories
-    description: "Comma-separated category groups to enable: 'core-quality', 'security-privacy', 'architecture-ops', 'code-structure'. Defaults to all enabled."
+    description: "Restrict routing to specific canonical categories (COR, INT, SEC, REL, OPS, PER, VER, MNT, DEP, HUM). Default: the skill routes 5-8 itself."
     required: false
   - name: mode
     description: "Output mode: 'report' (report findings only, no edits — default) or 'fix' (apply fixes; requires a verification gate before any commit)"
@@ -24,9 +24,6 @@ arguments:
     required: false
   - name: auto-loop
     description: Enable automatic iteration until GREEN verdict (default false)
-    required: false
-  - name: with-api-review
-    description: Enable Phase 2 API Correctness review after Phase 1 (default false)
     required: false
   - name: research
     description: "Current-landscape research: online (default), offline, or frozen:<path>"
@@ -50,11 +47,10 @@ Execute a Grimes Grind on the target using the grimey methodology.
 
 **Arguments:**
 - `target` / `scope`: What to review — file path, directory, `recent-changes`, `whole-repo`, or a description
-- `categories`: Which category groups to evaluate (default: all four groups enabled)
-- `mode`: `fix` (default) or `report` — whether to apply fixes or report only
+- `categories`: Restrict routing to canonical categories from COR, INT, SEC, REL, OPS, PER, VER, MNT, DEP, HUM (default: the skill routes 5-8 itself)
+- `mode`: `report` (default) or `fix` — `fix` also requires a verification gate, and `--commit` before anything is committed
 - `max-iterations`: Stop after N iterations (default 5)
 - `auto-loop`: Loop until GREEN verdict if enabled (default false)
-- `with-api-review`: Enable Phase 2 API Correctness & Completeness review (default false)
 - `research`: `online` (default when available), `offline`, or `frozen:<path>` for a pinned research bundle
 
 **Return format:** GRIMES_RESULT JSON with verdict, findings, and fixes
@@ -65,17 +61,17 @@ Execute a Grimes Grind on the target using the grimey methodology.
 # Interactive setup (asks scope, categories, mode)
 /frank-grimes:grind
 
-# Phase 1 only (runtime reliability)
+# Report on a single file
 /frank-grimes:grind ./src/auth.go
 
 # Recent changes, report only, skip category selection
 /frank-grimes:grind --scope recent-changes --mode report
 
-# Both phases (runtime + API correctness)
-/frank-grimes:grind ./src/api --with-api-review
+# Fix mode with an explicit gate, committing only if it passes
+/frank-grimes:grind ./src/api --mode fix --verify-command "just check" --commit
 
-# Auto-loop with API review enabled
-/frank-grimes:grind ./proto-mcp --with-api-review --auto-loop
+# Auto-loop, reporting only
+/frank-grimes:grind ./proto-mcp --auto-loop
 ```
 
 ---
@@ -106,21 +102,10 @@ Execute a Grimes Grind on the target using the grimey methodology.
 
 ### 0.2 Evaluation Categories
 
-- **If `$ARGUMENTS` contains `--categories` or `categories`:** Parse the value and use those groups. Skip this step.
-- **Otherwise**, use the **AskUserQuestion** tool with `multiSelect: true` (present all options pre-selected — the user deselects to disable):
-  - question: "Which evaluation categories should I run? (all enabled by default — deselect to skip)"
-  - header: "Categories"
-  - multiSelect: true
-  - options:
-    ```
-    [
-      { label: "Core Quality", description: "LLM Slop, Correctness, Reliability, Error Handling, Edge Cases, Code Quality & Formatting, Maintainability" },
-      { label: "Security & Privacy", description: "Security, Input Validation, Privacy & Data, Compliance" },
-      { label: "Architecture & Ops", description: "Scalability, Observability, Testability, Deployment, Failure Modes, Cost, Human Factors" },
-      { label: "Code Structure", description: "Code Duplication, Language-Specific Patterns, Configuration Management, Resource Lifecycle" }
-    ]
-    ```
-  - Store the selected groups as `enabled_category_groups` and pass them to the grimey agent.
+- **If `$ARGUMENTS` contains `--categories` or `categories`:** treat the value as a restriction on what the skill may route, using the canonical codes `COR`, `INT`, `SEC`, `REL`, `OPS`, `PER`, `VER`, `MNT`, `DEP`, `HUM`. Record that the user narrowed the routing, since it caps coverage.
+- **Otherwise:** pass no restriction and let the skill route from the contract and inventory.
+
+Routing is the skill's job: it selects 5-8 categories from the ten and records a reason for every inclusion and exclusion. Do not ask the user to pre-enable a fixed set — a list chosen before the target is read is not routing, and padding findings to fill it is the anti-pattern the skill exists to prevent.
 
 ### 0.3 Mode
 
@@ -167,90 +152,24 @@ Once scope, categories, and mode are determined, **execute the Grimes Grind inli
 
 ---
 
-## 2.0 GRIMEY METHODOLOGY
+## 2.0 EXECUTE THE METHODOLOGY
 
-You are now executing as the Grimes Reviewer. Assume everything is broken until proven otherwise. Use the following structured methodology:
+The methodology is defined once, in `skills/frank-grimes/SKILL.md`. Read it and follow it. Do not restate its phases, categories, evidence tiers, register schema, or verdict rules here — a second copy drifts from the first, and the copy is always the one that goes stale.
 
-### Phase 1: The Grimey Read (Absorption)
+This section covers only what this adapter is responsible for: invoking the skill with the resolved configuration, and the two places where a provider capability is required.
 
-Absorb the target without trusting it. Look for what is being hidden, glossed over, or assumed.
+### Fix mode and the commit gate
 
-- What is this ACTUALLY doing? (Ignore claims; look at logic)
-- What unstated assumptions are baked in?
-- What is conspicuously missing?
-- What is the provenance? (LLM slop? First draft? Cargo-culted?)
+Applies only when `mode=fix`. The rules are in the skill's "Fix Mode and the Commit Gate" section. This adapter supplies:
 
-For multi-language projects: identify languages/frameworks, configuration sources, error handling patterns, cross-language duplication, resource cleanup, and input validation entry points.
+- The gate command resolved in 0.4, run once over the whole batch via Bash.
+- `--commit` as the separate authorization the skill requires before any commit.
 
-### Phase 2: Default Assumptions (The Falsification Baseline)
+Record the command, working directory, exit code, and bounded output. Commit only when fix mode, `--commit`, and a zero exit all hold; otherwise leave edits uncommitted and say so.
 
-Assume the subject suffers from: LLM Slop, unreliability, insecurity, poor planning, non-production readiness, unmaintainability, fragility, edge-case blindness, compliance violations, and hidden dependencies.
+### Independent adjudication
 
-**Your objective is to prove these assumptions WRONG. You do not prove the idea right.**
-
-### Phase 3: The Grind (Destruction Cycle)
-
-Systematically attack the subject across the enabled categories. Evidence-First reporting: show the specific code path BEFORE describing the risk.
-
-**Only run categories whose group is in `enabled_category_groups`. If empty or "all", run all.**
-
-| Group | Categories |
-|-------|-----------|
-| **Core Quality** | LLM Slop Check, Correctness, Reliability, Error Handling, Edge Cases, Code Quality & Formatting (grime-fmt-*), Maintainability |
-| **Security & Privacy** | Security, Input Validation (grime-val-*), Privacy & Data, Compliance |
-| **Architecture & Ops** | Scalability, Observability, Testability, Deployment, Failure Modes, Cost, Human Factors |
-| **Code Structure** | Code Duplication (grime-dup-*), Language-Specific Patterns (grime-lang-*), Configuration Management (grime-cfg-*), Resource Lifecycle (grime-res-*) |
-
-**Issue format:**
-```
-### Issue: [Short Name]
-
-**Grime ID:** grime-[prefix]-[a-z0-9]{3}
-**Evidence:** [Specific code path, scenario, or logic flaw]
-**Category:** [Category name]
-**Severity:** P0 (Critical) | P1 (High) | P2 (Medium) | P3 (Low)
-**Likelihood:** High | Medium | Low
-**Blast Radius:** [What gets affected]
-**Description of Risk:** [Impact derived from the evidence]
-```
-
-### Phase 4: The Rebuild (Mitigation)
-
-**If `mode=report` (the default):** Skip Phase 4 entirely. Do NOT use Edit or Write tools. Document all findings with a "Suggested Fix" field but make no edits and no commits.
-
-**If `mode=fix`:** Apply fixes with Edit/Write across the whole batch. Do not commit here, and do not commit per fix.
-
-Fix format (for `mode=fix`):
-```
-### Fix for [Issue Name] ([Grime ID])
-
-**Proposed Change:** Specific technical action.
-**Verification:** How to prove this fix survives the next grind.
-**Residual Risk:** What is still not perfect?
-**Regression Scope:** What must be re-checked after this change?
-```
-
-### Phase 4.5: Verification and the Commit Gate (only when `mode=fix`)
-
-Run the gate selected in 0.4 exactly once, after the whole batch. Record the command, working directory, exit code, and bounded output as E1 evidence, whatever the outcome.
-
-| Gate outcome | Finding state | Commit |
-|--------------|---------------|--------|
-| exit 0 | `verified` | Only if `--commit` was also passed |
-| nonzero exit | `fixed`, verification `failed` | Never |
-| no usable gate | `fixed`, verification `unavailable` | Never |
-
-A commit requires fix mode, explicit `--commit`, and a zero exit — all three. When permitted, make exactly one commit for the batch and name the closed finding IDs in the message. Leave edits uncommitted in every other case and say so explicitly, so the user can inspect the working tree.
-
-Report `issues_fixed` as the count of `verified` findings only. Edited-but-unverified findings are not fixed.
-
-### Phase 5: Scoped Re-Grind
-
-Take the updated version and grind again, focusing strictly on the regression scope of the fixes. Note any new risks introduced by the fixes. This is your own re-check; it is not adjudication and cannot confirm a pass.
-
-### Phase 5.5: Independent Adjudication (required before any pass)
-
-Before claiming `decision=pass`, delegate to the **grimey-verifier** subagent via the Agent tool. Pass exactly this and nothing else:
+Required before any `pass`, per the skill's "Independent Adjudication" section. This adapter supplies the second context: delegate to the **grimey-verifier** subagent via the Agent tool, passing exactly this and nothing else:
 
 ```text
 Target: <repository-relative path or scope>
@@ -264,25 +183,7 @@ Claimed verdict tuple:
 
 Do NOT include findings, evidence, severities, grime IDs, proposed fixes, the report, or your reasoning. The verifier's value is that it has not seen them; contaminating the prompt destroys the only thing it provides.
 
-Resolve the two verdicts by the table in the skill's "Independent Adjudication" section: the stricter decision always wins, and an independent pass never upgrades your own `block` or `conditional`.
-
-If the verifier is unavailable, or the provider cannot furnish a separately identified context, record `Independent adjudication: not available`, set `review_confidence=low`, and cap the verdict at `conditional`/YELLOW. Never emit GREEN off your own judgment alone.
-
-### Phase 6: Stop Conditions & Verdict
-
-Derive the verdict tuple as defined in the skill, then the colour from the tuple. Never assert a colour directly.
-
-**RED:** `decision=block` — any open P0 remains.
-
-**GREEN:** requires all of: `decision=pass`, `residual_risk=low`, `review_confidence=high`, `review_completeness=sufficient`, and independent adjudication confirmed in Phase 5.5. A P0 that was accepted rather than fixed does not qualify — acceptance carries risk, it does not remove it.
-
-**YELLOW:** every other tuple, including an unavailable adjudicator, a carried accepted P0, and any tuple where you reached pass but the verifier did not.
-
-List every unmet gate by name.
-
-### Phase 7: API Quality Assessment (If `with_api_review=true`)
-
-After Phase 6, run additional Phase 2 API review categories (categories 24-29: API Design & Contracts, Package & Import Correctness, Feature Completeness, Public Interface Documentation, Language-Specific Best Practices, API Consistency). Generate API Quality Score (0-100) across 5 dimensions. Combine with Phase 1 verdict.
+Resolve the two verdicts by the skill's table: the stricter decision wins, and an independent pass never upgrades your own `block` or `conditional`. If the verifier cannot run, record `Independent adjudication: not available`, set `review_confidence=low`, and cap at `conditional`/YELLOW.
 
 ---
 

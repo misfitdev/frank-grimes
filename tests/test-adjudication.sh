@@ -79,7 +79,7 @@ echo ""
 echo "--- The prompt carries no knowledge of the primary review ---"
 # Extract the fenced prompt template the adapter tells the orchestrator to send.
 # shellcheck disable=SC2016  # backticks are literal markdown fence characters
-PROMPT_BLOCK=$(awk '/Pass exactly this and nothing else/,/^```$/' "$GRIND" | sed -n '/```text/,/```/p')
+PROMPT_BLOCK=$(awk '/passing exactly this and nothing else/,/^```$/' "$GRIND" | sed -n '/```text/,/```/p')
 
 if [[ -n "$PROMPT_BLOCK" ]]; then
     pass "adapter defines an explicit verifier prompt template"
@@ -122,8 +122,10 @@ echo ""
 echo "--- The old self-certifying escape hatch is gone ---"
 assert_absent "$GRIND" 'All P0 risks mitigated or explicitly accepted with timeline' \
     "adapter no longer grants GREEN to an accepted P0"
-assert_present "$GRIND" 'independent adjudication confirmed' \
-    "adapter requires confirmation before GREEN"
+assert_present "$GRIND" 'Required before any .pass.' \
+    "adapter requires adjudication before a pass"
+assert_present "$SKILL" 'independent adjudication confirmed it' \
+    "skill requires confirmation before a pass"
 assert_present "$GRIND" '^  - Agent$' \
     "adapter is permitted to invoke a subagent"
 

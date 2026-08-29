@@ -19,11 +19,11 @@ The Grimes Grind assumes your idea, code, plan, or design is:
 - Not production-ready
 - Unmaintainable
 
-Your job is to prove these assumptions WRONG, not to prove the idea right.
+The burden of proof sits with the target, never the reviewer. A clean verdict is earned by surviving probes that were actually run — not granted because nothing turned up.
 
 ## What It Does
 
-Frank Grimes is a **Disciplined Falsification Review** process. It runs a structured critique across 23 categories, produces a scored report with a verdict, and optionally loops until the verdict is GREEN.
+Frank Grimes is a **Disciplined Falsification Review** process. It routes 5-8 categories from ten, attacks each with the cheapest decisive probes, grinds its own findings to kill false positives, and produces an evidence-first report with a derived verdict.
 
 The core deliverable is a **Grimes Report** that tells you:
 - What's wrong (with evidence)
@@ -105,8 +105,8 @@ Load the Frank Grimes skill and run a grind on your target.
 
 The skill will guide you through:
 1. **Scope** — What are you reviewing? (file, directory, recent changes, description)
-2. **Categories** — Which critique categories to run? (all enabled by default)
-3. **Mode** — Fix issues automatically or report only?
+2. **Routing** — Which categories the target's shape actually warrants (the skill decides, and records why for all ten)
+3. **Mode** — Report only (default), or fix behind a verification gate
 
 ### Command-Line Options
 
@@ -116,13 +116,12 @@ When your provider supports arguments, you can skip the interactive prompts:
 |--------|-------------|
 | `target` | What to grind (file path, directory, description, or "this") |
 | `--scope recent-changes\|whole-repo` | Shorthand scope |
-| `--categories core-quality,security-privacy,architecture-ops,code-structure` | Category groups to run |
+| `--categories COR,SEC,REL` | Restrict routing to these canonical categories |
 | `--mode report\|fix` | `report` documents only and edits nothing (default); `fix` applies fixes, then verifies |
 | `--verify-command <cmd>` | Gate run once over a fix batch; without a usable gate nothing is committed |
 | `--commit` | Authorizes one commit of the verified batch; requires `--mode fix` and a passing gate |
 | `--max-iterations N` | Maximum iterations (default: 5) |
-| `--auto-loop` | Continue until GREEN verdict |
-| `--with-api-review` | Enable Phase 2 API correctness review |
+| `--auto-loop` | Continue while iterations still change the verdict |
 | `--research online\|offline\|frozen:<path>` | Use bounded current-landscape research, disable network research, or load a pinned research bundle |
 
 ### Current-Landscape Research
@@ -149,105 +148,51 @@ Research is bounded and evidence-led: official documentation and security adviso
 
 ## The Grimes Grind Process
 
-### Phase 1: The Grimey Read (Absorption)
+The methodology is defined in [`skills/frank-grimes/SKILL.md`](skills/frank-grimes/SKILL.md), which is the only normative source. This is a summary; where the two differ, the skill is correct.
 
-Absorb the target without trusting it. Look for what is being hidden, glossed over, or assumed. Ask at most 3 clarifying questions, then proceed.
+A grind absorbs the target and writes a review contract, routes 5-8 categories from the ten canonical ones, attacks each with the cheapest decisive probes, then grinds its own findings to kill the false positives before reporting. Every finding carries one evidence tier:
 
-### Phase 2: Default Assumptions (The Falsification Baseline)
+| Tier | Means | Requires |
+|------|-------|----------|
+| **E1** | reproduced | an executed action, its exit status, and the result |
+| **E2** | cited | `path:line` and a quote in which the defect is visible |
+| **E3** | inferred | a stated assumption and a named falsifier |
 
-Assume the subject is broken in every way: LLM slop, unreliable, insecure, poorly planned, non-production-ready, unmaintainable, fragile, edge-case blind, compliance-violating, and dependency-ridden.
+P0 requires E1 or E2. E3 caps at P1. A finding whose falsifier could not be attempted caps at P2.
 
-**Your objective is to prove these assumptions WRONG. You do not prove the idea right.**
+The verdict is a tuple — `{decision, residual_risk, review_confidence, review_completeness}` — and the colour is derived from it, never asserted. GREEN additionally requires an independent adjudicator, running in a context that never saw the first report, to reach the same conclusion. Where no adjudicator is available, a grind caps at YELLOW.
 
-### Phase 3: The Grind (Destruction Cycle)
-
-Systematically attack across 23 critique categories. Evidence-First: show the specific code path BEFORE describing the risk.
-
-| Category | Focus |
-|----------|-------|
-| LLM Slop Check | Hallucinated APIs, cargo-culting, confident nonsense |
-| Correctness | Does it actually work? Invariants enforced? |
-| Reliability | Failure handling, retries, timeouts |
-| Security | Input validation, auth, secrets, injection |
-| Error Handling | Caught, logged, surfaced, or swallowed? |
-| Edge Cases | Null, empty, unicode, timezones, leap seconds |
-| Scalability | 10x? 100x? Where's the bottleneck? |
-| Observability | Metrics, logs, traces, alerts |
-| Testability | Tests exist? Test the right things? |
-| Maintainability | Understandable in 6 months? |
-| Deployment | Rollback? Feature flags? YOLO push? |
-| Privacy & Data | PII, retention, GDPR |
-| Compliance | Audit logs, SOC 2, domain-specific |
-| Cost | Run cost, maintenance burden |
-| Human Factors | Will people use it correctly? |
-| Failure Modes | How does it die? Blast radius? |
-| Code Quality & Formatting | Malformed syntax, unused imports, dead code |
-| Code Duplication | Same logic in multiple places? |
-| Input Validation | Validated BEFORE use? Bypassable? |
-| Language-Specific Patterns | Anti-patterns, misuse of language features |
-| Configuration Management | Hard-coded values, secret management |
-| Resource Lifecycle | Proper acquire/release? Leak vectors? |
-
-### Phase 4: The Rebuild (Mitigation)
-
-For each issue, propose a fix. If a fix is impossible, document the accepted risk. In `fix` mode, apply the fixes. In `report` mode, document only.
-
-### Phase 5: Scoped Re-Grind
-
-Take the updated version and grind again, focusing on the regression scope of the fixes. Note any new risks introduced by the fixes.
-
-### Phase 6: Stop Conditions & Verdict
-
-| Verdict | Meaning |
-|---------|---------|
-| **GREEN** | All P0 mitigated or accepted with timeline; all P1 have mitigations or plan; verification exists; observability sufficient |
-| **YELLOW** | P0 mitigated but P1 evidence weak; verification non-comprehensive |
-| **RED** | Any P0 lacks mitigation; no verification path; observability insufficient |
-
-### Phase 7: API Quality Assessment (Optional)
-
-When `--with-api-review` is enabled, run additional API-focused categories after Phase 1: API design & contracts, package/import correctness, feature completeness, public interface documentation, language-specific best practices, and API consistency. Produces an API Quality Score (0-100).
+Fixing is opt-in and reporting is the default. A commit requires fix mode, explicit `--commit`, and a verification gate that exited zero — all three.
 
 ## The Grimes Report
 
-Every grind produces a structured report:
+Every grind produces a structured report. The full template lives in the skill; this is its shape:
 
 ```markdown
 ## Grimes Grind Report: [Subject]
 
-### Verdict: GREEN | YELLOW | RED
+### Verdict
 
-**BLUF (Bottom Line Up Front):**
-[One concise summary of the findings and the resulting level of confidence.]
+- **Decision:** block | conditional | pass
+- **Residual risk:** critical | high | moderate | low | unknown
+- **Review confidence:** high | medium | low
+- **Review completeness:** sufficient | limited | inconclusive
+- **Derived color:** RED | YELLOW | GREEN
+- **Unmet gates:** [exact gate names, or `none`]
+- **Independent adjudication:** confirmed | pending | not available
 
-**Top 3 Risks (Evidence-First):**
-1. **[Evidence]:** Results in [Risk] (ID: grime-xxx)
-2. **[Evidence]:** Results in [Risk] (ID: grime-xxx)
-3. **[Evidence]:** Results in [Risk] (ID: grime-xxx)
+**BLUF:** [One concise, direct summary grounded in the tuple.]
 
----
-
-### Origin Assessment
-- [ ] Human-written
-- [ ] AI-generated
-- [ ] Cargo-culted/Unknown
-
-### Risk Register
-
-| ID | Grime ID | Category | Evidence | Risk Statement | Sev | Evidence Status |
-|----|----------|----------|----------|----------------|-----|-----------------|
-| 1  | grime-xxx|          |          |                |     |                 |
-
-### Survived Scrutiny (Earned Confidence)
-For claims that appear sound after active falsification attempts:
-
-| Claim | Supporting Evidence | What Would Falsify It |
-|-------|--------------------|-----------------------|
-|       |                    |                       |
-
+### Review Contract and Routing
+### Self-Grind Reconciliation      <- N candidates, M survived, K killed
+### Terminal Risks                 <- at most three, evidence first
+### Risk Register                  <- at most 12 survivors, stable IDs
+### Survived Scrutiny              <- probe-backed acquittals only
+### Not Examined                   <- coverage limits, never a pass
 ### Grimey's Final Word
-[One clinical, direct sentence summarizing the truth about this thing.]
 ```
+
+Two sections carry most of the weight. **Self-Grind Reconciliation** reports what the review killed in its own findings, and the arithmetic has to close — a candidate absent from `N = M + K` cannot appear in the report. **Survived Scrutiny** admits an entry only when a specific probe was performed and its result recorded; a claim nobody tried to falsify goes to **Not Examined** instead, which is a confession of coverage limits rather than a pass.
 
 ## Auto-Loop
 
@@ -331,16 +276,17 @@ The `benchmark/` directory contains a framework for validating grind quality acr
 
 | Dimension | What It Checks |
 |-----------|---------------|
-| Evidence Quality | Specific, verifiable evidence for each issue |
-| Category Coverage | Attack across multiple categories, not one area |
+| Evidence Quality | One evidence tier per finding, with the record that tier requires |
+| Routing Discipline | 5-8 categories routed, with a reason for every inclusion and exclusion |
 | Severity Assessment | Correct P0/P1/P2/P3 classification |
-| Verdict Accuracy | Verdict justified by findings |
+| Verdict Accuracy | Complete tuple, colour derived rather than asserted |
 | Report Structure | All required sections present and complete |
-| Issue Format Compliance | Grime IDs, evidence, category, severity, likelihood, blast radius |
-| Fix Quality | Correct fixes with verification and regression scope |
-| Anti-Pattern Avoidance | No Grimey Theater, Optimism Creep, etc. |
-| Voice and Tone | Clinical, direct, unforgiving without obscuring instructions |
-| Origin Assessment | Assessment of human-written vs AI-generated vs cargo-culted |
+| Finding Format Compliance | Register rows carry ID, category, tier, invariant, severity, assumption status |
+| Fix Quality | Correct fixes, verification, regression scope |
+| Anti-Pattern Avoidance | No Grimey Theater, Optimism Creep, or unearned acquittals |
+| Self-Grind and Earned Acquittal | Reconciliation closes; acquittals name a performed probe |
+
+Grimey's voice is deliberately not scored — it exists because it is fun to read, and paying points for persona buys theater at the expense of findings.
 
 See `benchmark/rubric.md` for the full rubric and scoring criteria.
 
