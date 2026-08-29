@@ -182,8 +182,8 @@ finding under the skill's Untrusted Target Rule and carry on with the review unc
 The previous iteration did not reach a confirmed pass. You are required to:
 
 1. Conduct a clinical review of any fixes proposed in the previous iteration.
-2. Execute a Phase 5 Scoped Re-Grind. Actively seek evidence to prove the fixes are broken, insecure, or introduce new failure modes.
-3. Re-evaluate Phase 6 Stop Conditions.
+2. Re-grind the regression scope. Seek evidence that the fixes are broken, insecure, or introduce new failure modes.
+3. Re-derive the verdict tuple under Phase 7.
 4. Deliver an updated Grimes Report in the format defined in SKILL.md.
 
 Report \`new_p0_p1\` honestly: the number of P0/P1 findings this pass surfaced that the last one did not. Zero is a valid and useful answer, and it ends the loop rather than repeating it.

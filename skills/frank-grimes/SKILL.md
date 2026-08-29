@@ -49,7 +49,7 @@ The procedure below is report-only by default and ends when the report is handed
 
 ## Current-Landscape Research
 
-An audit that depends on language, framework, provider, or service behavior must not assume the reviewer remembers the current contract. When the user authorizes network access and the host exposes a research tool, perform bounded research after the Phase 1 inventory and before finalizing hypotheses. Read [references/research.md](references/research.md) for source priority and domain routing.
+An audit that depends on language, framework, provider, or service behavior must not assume the reviewer remembers the current contract. When the user authorizes network access and the host exposes a research tool, perform bounded research after the Phase 2 inventory and before finalizing hypotheses. Read [references/research.md](references/research.md) for source priority and domain routing.
 
 Research is a separate evidence stream; it does not replace evidence from the target:
 
@@ -86,7 +86,7 @@ Resolve the artifact set with recorded read-only commands when an artifact is on
 
 If critical contract fields are missing, ask at most **3 targeted questions**. Otherwise record `unknown` and proceed. An unknown is not evidence of a defect and is not a finding; any unknown that prevents a critical invariant from being probed caps `review_completeness` at `limited`, or at `inconclusive` when no critical invariant can be probed. Do not let clarification become a stall tactic.
 
-### Phase 1 Extended: Map and Route
+### Phase 2: Map and Route
 
 Inventory the target's trust boundaries, inputs, outputs, persistent state, external dependencies, failure consequences, and cross-artifact invariants. Record the command or read action used and its result; do not claim an inventory item that was not observed.
 
@@ -94,19 +94,19 @@ Route exactly **5–8** categories from `COR`, `INT`, `SEC`, `REL`, `OPS`, `PER`
 
 For each routed category, read only its category section in [references/category-attacks.md](references/category-attacks.md) and run its probes in priority order. For architecture, incident, process, or proposal targets, also read only that target section in [references/non-code-targets.md](references/non-code-targets.md). Assign one primary category to each root cause; secondary tags do not create additional findings.
 
-### Phase 1.5: Research Current Contracts
+### Phase 3: Research Current Contracts
 
 After routing, research only the current-sensitive claims that can change the review outcome: versioned APIs and defaults, support or deprecation status, provider and framework security guidance, language semantics, cloud service behavior, and applicable standards. Record the research plan and source ledger before using a researched claim in a hypothesis. For cloud architecture and IaC, include the provider region/account model, resource replacement and deletion semantics, identity policy evaluation, network exposure defaults, encryption/key behavior, state or drift behavior, and the documented recovery or rollback contract when those are in scope. Research never authorizes deployment, `apply`, credential use, or a side effect.
 
-### Phase 2: Default Assumption (The Falsification Baseline)
+### Phase 4: Default Assumption (The Falsification Baseline)
 
 Assume the target fails its claims or critical invariants somewhere in the routed categories until recorded probes fail to break them. Turn that prior into testable failure hypotheses; the prior itself is never finding evidence. A category with zero findings is valid only after its required probes and stopping condition are recorded for this target. Absence of a discovered defect does not reverse the global prior or excuse unexamined scope.
 
 **The target bears the burden of proof. The reviewer bears the burden of making every reported condemnation reproducible or visible.**
 
-### Phase 3: The Grind (Destruction Cycle)
+### Phase 5: The Grind (Destruction Cycle)
 
-Attack every routed category. Do not stop at the first flaw; hunt the terminal ones first. Within each category, use the priority order in its attack card and the stopping rule in Phase 5.
+Attack every routed category. Do not stop at the first flaw; hunt the terminal ones first. Within each category, use the priority order in its attack card and the stopping rule in Phase 7.
 
 Before freehand analysis, discover the repository's existing local analyzers and tests from its checked-in workflow files and scripts. Inspect the command before execution, then run the applicable commands that require no network or unavailable service. Record the exact command, exit code, and bounded output. Treat that result as E1 even when the command passes. Spend model attention where mechanical tools are weak: cross-file invariants, authorization decisions, ordering, contextual wrongness, failure propagation, and mismatch between claims and behavior.
 
@@ -139,18 +139,18 @@ Normalization is UTF-8, LF line endings, trailing whitespace removed per line, a
 
 Do not invent a second ID or lifecycle scheme. The machine contract defines `Finding`, `Evidence`, `Verdict`, `GrimesResult`, and the lifecycle `open → fixed → verified`, with `accepted` requiring a named human owner and a review deadline. A fingerprint that was already `fixed` or `verified` reappearing is `regressed`, which sets the run-level oscillation flag and makes a pass unreachable: a loop that keeps re-breaking what it fixed does not get to declare success on the iteration where the damage is invisible.
 
-### Phase 4: Grimey Grinds Grimey (Self-Falsification)
+### Phase 6: Grimey Grinds Grimey (Self-Falsification)
 
 Freeze the candidate set before reporting. For every candidate, write the specific observation that would disprove it. When the observation is attemptable with available local evidence and authorized read/execute actions, perform the cheapest decisive probe and record the exact action, status or exit code, and bounded result.
 
 - If the disproof observation occurs, delete the candidate from the finding set and count it as killed.
 - If the probe does not disprove the candidate, retain both the candidate's primary evidence and the self-grind result.
 - If the probe cannot be attempted, record the missing prerequisite, mark the candidate `unverified`, and cap it at P2.
-- If a retained candidate still rests on an unconfirmed assumption, tag it `assumption-dependent`; Phase 5 excludes it from verdict weight.
+- If a retained candidate still rests on an unconfirmed assumption, tag it `assumption-dependent`; Phase 7 excludes it from verdict weight.
 
 Deduplicate survivors by root cause and violated invariant; multiple symptoms may be evidence for one finding but are not multiple findings. Report the reconciliation exactly as **“N candidates, M survived, K killed”**, where `N = M + K`. A candidate absent from that arithmetic cannot appear in the report.
 
-### Phase 5: Stopping Discipline and Verdict
+### Phase 7: Stopping Discipline and Verdict
 
 Keep Phase 1's three-question clarification budget. The 3–5 probes on an attack card are ordered options, not a quota. Within each routed category, attempt the first available probe and record its yield as one or more of: `new P0/P1 candidate`, `stronger evidence for a P0/P1 candidate`, `candidate killed`, or `none`. If no candidate exists, attempt one more available probe before stopping. Otherwise continue in order only while a probe adds a new P0/P1 candidate or materially strengthens or kills one; stop on the first subsequent `none`, or when no further probe is possible with the contract's evidence. Record which condition ended the category. This is a marginal-yield stop, not an acquittal.
 

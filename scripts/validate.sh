@@ -347,7 +347,7 @@ echo "--- Methodology Ownership ---"
 
 # shellcheck disable=SC2016  # backticks are literal markdown, not substitution
 NORMATIVE_MARKERS=(
-    'Phase 2: Default Assumption'
+    'Phase 4: Default Assumption'
     'E1 (reproduced)'
     'E3 (inferred)'
     'Route exactly'

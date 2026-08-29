@@ -1,6 +1,6 @@
 # Non-Code Target Mappings
 
-Read only the target type selected in the review contract. These mappings define what the ten categories mean for that target; the routed attack card still supplies the probes and evidence rules. A category may be excluded only under Phase 1's P0-routing rule.
+Read only the target type selected in the review contract. These mappings define what the ten categories mean for that target; the routed attack card still supplies the probes and evidence rules. A category may be excluded only under Phase 2's P0-routing rule.
 
 ## Architecture
 

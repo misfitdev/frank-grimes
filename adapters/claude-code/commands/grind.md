@@ -188,7 +188,7 @@ Resolve the two verdicts by the skill's table: the stricter decision wins, and a
 
 ## 3.0 STRUCTURED RETURN
 
-After Phase 6 (and Phase 7 if enabled), output the following structured result. This is non-negotiable: it enables auto-loop orchestration:
+After the verdict is derived, output the following structured result. This is non-negotiable: it enables auto-loop orchestration:
 
 ```
 GRIMES_RESULT: {

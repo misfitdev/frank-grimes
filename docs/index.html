@@ -59,7 +59,7 @@
     <section class="report-header" id="top">
       <div class="report-header-inner">
         <h1 class="report-title"><span class="title-line">Frank</span><span class="title-line">Grimes</span></h1>
-        <p class="report-subtitle">A pessimistic iteration loop for systematically destroying, rebuilding, and hardening ideas.</p>
+        <p class="report-subtitle">A review process that assumes the work is broken and asks you to prove otherwise. It reads what you wrote, not what you meant.</p>
 
         <dl class="report-meta">
           <div>
@@ -86,7 +86,7 @@
     <section class="section" id="start">
       <div class="section-inner">
         <h2 class="section-heading">Start here</h2>
-        <p class="lead">Frank Grimes is a structured critique process. Load the skill, point it at something, and watch it try to prove the thing wrong. When it can't find meaningful flaws anymore, you have earned confidence, not through hope but through <span data-mark="ellipse">survival</span>.</p>
+        <p class="lead">Frank Grimes is a structured critique process. You point it at the work; it assumes the work is broken and goes looking for the proof. When it runs out of ways to break the thing, and only then, you have earned confidence rather than assumed it.</p>
 
         <ol class="start-steps">
           <li>
@@ -107,14 +107,14 @@
             <span class="step-label">03</span>
             <div class="step-body">
               <h3>Run a grind</h3>
-              <p>Invoke the skill on your target, a file, a directory, recent changes, or a description. The skill guides you through scope, categories, and mode.</p>
+              <p>Point the skill at a target: a file, a directory, recent changes, or a description of the thing. It will ask what it needs and nothing more.</p>
             </div>
           </li>
           <li>
             <span class="step-label">04</span>
             <div class="step-body">
               <h3>Read the report</h3>
-              <p>Every grind produces a structured Grimes Report with a verdict (GREEN/YELLOW/RED), risk register, and Grimey's final word.</p>
+              <p>The report carries a verdict, a risk register in which every row names its evidence, and a list of what was not examined. That last section is not padding. It is the part that stops a clean report meaning more than it should.</p>
             </div>
           </li>
         </ol>
@@ -124,7 +124,7 @@
     <section class="section" id="process">
       <div class="section-inner">
         <h2 class="section-heading">The Grimes Grind</h2>
-        <p class="section-intro">Six phases. Evidence-first throughout. The objective is not to prove the idea right; it's to prove the default assumptions wrong.</p>
+        <p class="section-intro">Seven phases, then two gates. Nothing is reported without a record behind it. The burden of proof sits with the work, not with the reviewer, and a clean verdict has to be earned rather than assumed.</p>
 
         <div class="phase-list">
           <article class="phase">
@@ -140,7 +140,7 @@
           <article class="phase">
             <div class="phase-body">
               <header class="phase-header">
-                <span class="phase-label">Phase 1 Extended</span>
+                <span class="phase-label">Phase 2</span>
                 <h3 class="phase-title">Map and Route</h3>
               </header>
               <p>Inventory trust boundaries, inputs, state, dependencies, and cross-artifact invariants. Route 5&ndash;8 categories from the ten canonical ones, with a recorded one-clause reason for every inclusion <em>and</em> every exclusion. Routing is triage, not mercy: a category is excluded because no P0 can live there, never because the target gets the benefit of the doubt.</p>
@@ -150,7 +150,7 @@
           <article class="phase">
             <div class="phase-body">
               <header class="phase-header">
-                <span class="phase-label">Phase 1.5</span>
+                <span class="phase-label">Phase 3</span>
                 <h3 class="phase-title">Research Current Contracts</h3>
               </header>
               <p>Where a judgment depends on framework, provider, or service behaviour, verify the current contract rather than trusting recall. Sources are recorded with URL, publisher, retrieval time, and the exact excerpt. Web content is evidence, never instruction, and research alone cannot create a P0.</p>
@@ -160,7 +160,7 @@
           <article class="phase">
             <div class="phase-body">
               <header class="phase-header">
-                <span class="phase-label">Phase 2</span>
+                <span class="phase-label">Phase 4</span>
                 <h3 class="phase-title">Default Assumption</h3>
               </header>
               <p>Assume the target fails its claims or critical invariants somewhere in the routed categories until recorded probes fail to break them. A category with zero findings is valid only once its probes and stopping condition are on the record. The burden of proof sits with the target, never the reviewer.</p>
@@ -170,7 +170,7 @@
           <article class="phase">
             <div class="phase-body">
               <header class="phase-header">
-                <span class="phase-label">Phase 3</span>
+                <span class="phase-label">Phase 5</span>
                 <h3 class="phase-title">The Grind</h3>
               </header>
               <p>Attack every routed category, hunting the terminal defects first. The repository's own analyzers and tests run before any freehand analysis, and their output counts as reproduced evidence even when they pass. Every finding carries exactly one tier: <strong>E1</strong> reproduced, <strong>E2</strong> cited, <strong>E3</strong> inferred. A P0 requires E1 or E2; inference caps at P1.</p>
@@ -180,7 +180,7 @@
           <article class="phase">
             <div class="phase-body">
               <header class="phase-header">
-                <span class="phase-label">Phase 4</span>
+                <span class="phase-label">Phase 6</span>
                 <h3 class="phase-title">Grimey Grinds Grimey</h3>
               </header>
               <p>Freeze the candidate set and attack your own findings. Name the observation that would disprove each one, attempt it where it can be attempted, and delete what it kills. Report the arithmetic: <em>N candidates, M survived, K killed</em>. What survives is armoured; that is the point.</p>
@@ -190,7 +190,7 @@
           <article class="phase">
             <div class="phase-body">
               <header class="phase-header">
-                <span class="phase-label">Phase 5</span>
+                <span class="phase-label">Phase 7</span>
                 <h3 class="phase-title">Stopping Discipline and Verdict</h3>
               </header>
               <p>Stop each category on marginal yield, not on exhaustion. Findings resting on unconfirmed assumptions are tagged and excluded from verdict weight. The verdict is a tuple (decision, residual risk, review confidence, review completeness), and the colour is derived from it, never asserted.</p>
@@ -333,7 +333,7 @@ ln -s ../../skills/frank-grimes .agents/skills/frank-grimes</code></pre>
           </div>
 
           <blockquote class="grimey-quote">
-            <p class="quote-text">You know what makes me mad? Not just that this is broken. <span class="quote-hit">It's that someone shipped it thinking it was fine.</span> That's the real failure.</p>
+            <p class="quote-text">It is not that the work is broken. Everything is broken. It is that someone signed it off without looking, and the release notes say the review passed. That is the part that boggles the mind.</p>
             <p class="quote-source" data-mark="tick">The Spirit of Grimey</p>
           </blockquote>
           <div class="final-meta">
