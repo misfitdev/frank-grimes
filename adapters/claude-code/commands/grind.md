@@ -23,7 +23,7 @@ arguments:
     description: Maximum grind iterations before stopping (default 5)
     required: false
   - name: auto-loop
-    description: Enable automatic iteration until GREEN verdict (default false)
+    description: Iterate while each pass still surfaces new P0/P1 findings, up to max-iterations (default false)
     required: false
   - name: research
     description: "Current-landscape research: online (default), offline, or frozen:<path>"
@@ -50,21 +50,21 @@ Execute a Grimes Grind on the target using the grimey methodology.
 - `categories`: Restrict routing to canonical categories from COR, INT, SEC, REL, OPS, PER, VER, MNT, DEP, HUM (default: the skill routes 5-8 itself)
 - `mode`: `report` (default) or `fix` — `fix` also requires a verification gate, and `--commit` before anything is committed
 - `max-iterations`: Stop after N iterations (default 5)
-- `auto-loop`: Loop until GREEN verdict if enabled (default false)
+- `auto-loop`: Iterate while passes still yield new P0/P1 findings (default false)
 - `research`: `online` (default when available), `offline`, or `frozen:<path>` for a pinned research bundle
 
-**Return format:** GRIMES_RESULT JSON with verdict, findings, and fixes
+**Return format:** a GRIMES_RESULT block carrying the verdict tuple, findings, and verification status
 
 **Examples:**
 
 ```bash
-# Interactive setup (asks scope, categories, mode)
+# Interactive setup (asks for scope; reports by default)
 /frank-grimes:grind
 
 # Report on a single file
 /frank-grimes:grind ./src/auth.go
 
-# Recent changes, report only, skip category selection
+# Recent changes, report only
 /frank-grimes:grind --scope recent-changes --mode report
 
 # Fix mode with an explicit gate, committing only if it passes
@@ -141,11 +141,10 @@ Once scope, categories, and mode are determined, **execute the Grimes Grind inli
 
 **Resolved configuration:**
 - **Target / Scope:** (from step 0.1)
-- **Enabled category groups:** (from step 0.2)
+- **Category restriction:** (from step 0.2, or none)
 - **Mode:** (from step 0.3) — `fix` = apply edits; `report` = document only, no edits
 - **Max iterations:** from `$ARGUMENTS` or default 5
 - **Auto-loop:** from `$ARGUMENTS` or default false
-- **Phase 2 (API Review):** from `$ARGUMENTS` or default false
 - **Research mode:** from `$ARGUMENTS` or default `online` when WebSearch/WebFetch are available; otherwise `offline` with the limitation recorded
 - **Current iteration:** 1
 - **Previous findings:** none (first iteration)

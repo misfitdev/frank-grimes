@@ -40,7 +40,6 @@ fail() { echo -e "${RED}FAIL${NC}: $*"; }
 info() { echo -e "${BLUE}INFO${NC}: $*"; }
 warn() { echo -e "${YELLOW}WARN${NC}: $*"; }
 
-# Parse arguments
 ALL=false
 COMPARE=false
 TARGET=""
@@ -67,13 +66,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Check for jq
 if ! command -v jq &>/dev/null; then
     echo "ERROR: jq is required for the benchmark runner"
     exit 1
 fi
 
-# Create results directory
 mkdir -p "$RESULTS_DIR"
 
 # Timestamp for this run
@@ -210,7 +207,6 @@ score_dimension() {
             ;;
 
         "severity_assessment")
-            # Check for proper severity distribution
             local p0_count p1_count p2_count p3_count
             p0_count=$(count_matches '\| *P0 *\|' "$report_file")
             p1_count=$(count_matches '\| *P1 *\|' "$report_file")
@@ -566,7 +562,6 @@ elif [[ "$ALL" == true ]]; then
         echo -e "${BLUE}Target: $target_name ($target_type)${NC}"
         echo -e "${BLUE}========================================${NC}"
 
-        # Create work directory
         work_dir="$RESULTS_DIR/$target_name-$TIMESTAMP"
         mkdir -p "$work_dir"
 

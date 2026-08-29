@@ -154,7 +154,7 @@
                 <span class="phase-label">Phase 03</span>
                 <h3 class="phase-title">The Grind</h3>
               </header>
-              <p>Systematically attack across 23 critique categories. Evidence-first: show the specific code path BEFORE describing the risk. Prioritize by Severity × Likelihood × Blast Radius.</p>
+              <p>Route 5&ndash;8 categories from the ten canonical ones and attack each with its cheapest decisive probes. Every finding carries one evidence tier: <strong>E1</strong> reproduced, <strong>E2</strong> cited, <strong>E3</strong> inferred. A P0 requires E1 or E2; inference caps at P1.</p>
             </div>
           </article>
 
@@ -162,9 +162,9 @@
             <div class="phase-body">
               <header class="phase-header">
                 <span class="phase-label">Phase 04</span>
-                <h3 class="phase-title">The Rebuild</h3>
+                <h3 class="phase-title">Grimey Grinds Grimey</h3>
               </header>
-              <p>For each issue, propose a fix. In <code class="code-inline">fix</code> mode, apply the fixes. In <code class="code-inline">report</code> mode, document only. If a fix is impossible, document the accepted risk.</p>
+              <p>Before reporting, attack your own findings. Name the observation that would disprove each one, attempt it where it can be attempted, and delete what it kills. Report the arithmetic: <em>N candidates, M survived, K killed</em>. Surviving findings are armoured; that is the point.</p>
             </div>
           </article>
 
@@ -172,9 +172,9 @@
             <div class="phase-body">
               <header class="phase-header">
                 <span class="phase-label">Phase 05</span>
-                <h3 class="phase-title">Scoped Re-Grind</h3>
+                <h3 class="phase-title">Fix Mode</h3>
               </header>
-              <p>Take the updated version and grind again, focusing on the regression scope of the fixes. Note any new risks introduced by the fixes.</p>
+              <p>Reporting is the default. Fixing is a privilege you grant explicitly, and committing is a second privilege granted separately. A commit requires fix mode, explicit authorization, and a verification gate that exited zero &mdash; all three.</p>
             </div>
           </article>
 
@@ -184,7 +184,7 @@
                 <span class="phase-label">Phase 06</span>
                 <h3 class="phase-title">Stop Conditions &amp; Verdict</h3>
               </header>
-              <p>Determine the verdict based on P0/P1 mitigation status, verification existence, and observability.</p>
+              <p>The verdict is a tuple &mdash; decision, residual risk, review confidence, review completeness. The colour is derived from it, never asserted.</p>
               <table class="verdict-table">
                 <thead>
                   <tr><th>Verdict</th><th>Meaning</th></tr>
@@ -192,15 +192,15 @@
                 <tbody>
                   <tr>
                     <td class="verdict-col"><span class="verdict-cell green">GREEN</span></td>
-                    <td>All P0 mitigated or accepted with timeline. All P1 have mitigations or plan. Verification exists. Observability sufficient.</td>
+                    <td>Nothing open, evidence sufficient, and an independent adjudicator who never saw the first report reached the same conclusion.</td>
                   </tr>
                   <tr>
                     <td class="verdict-col"><span class="verdict-cell yellow">YELLOW</span></td>
-                    <td>P0 mitigated but P1 evidence weak. Verification path non-comprehensive.</td>
+                    <td>Anything unconfirmed: no adjudicator available, a risk accepted rather than fixed, or coverage that fell short.</td>
                   </tr>
                   <tr>
                     <td class="verdict-col"><span class="verdict-cell red">RED</span></td>
-                    <td>Any P0 lacks mitigation. No verification path. Observability insufficient.</td>
+                    <td>An open P0 remains. The decision is block.</td>
                   </tr>
                 </tbody>
               </table>
@@ -253,7 +253,7 @@ ln -s ../../skills/frank-grimes .agents/skills/frank-grimes</code></pre>
         </div>
 
         <div class="integration-note">
-          <p><strong>Other providers:</strong> Any agent that supports markdown skills and bash hooks can use Frank Grimes. Load <code class="code-inline">skills/frank-grimes/SKILL.md</code> as a skill, configure your stop hook to call <code class="code-inline">hooks/stop.sh</code>, and ensure <code class="code-inline">jq</code> is installed. See <a href="adapters/">adapters documentation</a> for details.</p>
+          <p><strong>Other providers:</strong> Any agent that supports markdown skills and bash hooks can use Frank Grimes. Load <code class="code-inline">skills/frank-grimes/SKILL.md</code> as a skill, configure your stop hook to call <code class="code-inline">hooks/stop.sh</code>, and ensure <code class="code-inline">jq</code> is installed. See <a href="https://github.com/misfitdev/frank-grimes/tree/main/adapters">adapters documentation</a> for details.</p>
         </div>
       </div>
     </section>
@@ -309,7 +309,7 @@ ln -s ../../skills/frank-grimes .agents/skills/frank-grimes</code></pre>
           <div class="final-meta">
             <p>Frank Grimes is named after the character from <em>The Simpsons</em>, S8E23 "Homer's Enemy".</p>
             <p>Methodology inspired by pre-mortems, red teaming, and threat modeling.</p>
-            <p class="final-links"><a href="https://github.com/misfitdev/frank-grimes" class="final-link is-primary">View on GitHub</a> <a href="skills/frank-grimes/SKILL.md" class="final-link">Read the skill</a></p>
+            <p class="final-links"><a href="https://github.com/misfitdev/frank-grimes" class="final-link is-primary">View on GitHub</a> <a href="https://github.com/misfitdev/frank-grimes/blob/main/skills/frank-grimes/SKILL.md" class="final-link">Read the skill</a></p>
           </div>
         </div>
       </div>
@@ -318,7 +318,7 @@ ln -s ../../skills/frank-grimes .agents/skills/frank-grimes</code></pre>
 
   <footer class="site-footer">
     <div class="footer-inner">
-      <p class="footer-copy">Frank Grimes · <a href="LICENSE">License</a> · <a href="https://github.com/misfitdev/frank-grimes">GitHub</a></p>
+      <p class="footer-copy">Frank Grimes · <a href="https://github.com/misfitdev/frank-grimes/blob/main/LICENSE">License</a> · <a href="https://github.com/misfitdev/frank-grimes">GitHub</a></p>
     </div>
   </footer>
   <script src="scripts/report.js" defer></script>

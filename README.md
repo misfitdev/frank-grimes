@@ -196,14 +196,14 @@ Two sections carry most of the weight. **Self-Grind Reconciliation** reports wha
 
 ## Auto-Loop
 
-When `--auto-loop` is enabled, the grind continues until GREEN or max iterations are reached.
+When `--auto-loop` is enabled, the grind keeps iterating while each pass still surfaces new P0/P1 findings. It stops on a confirmed pass, on the first pass that finds nothing new, or at the iteration cap.
 
 ### How It Works
 
 1. During the grind, state is written to `.grimes-state.json` in the project root
 2. On session stop, the agent's hook system calls `hooks/stop.sh`
 3. The hook reads the state and decides:
-   - **Exit 0**: Allow exit (GREEN verdict, max iterations reached, or auto-loop disabled)
+   - **Exit 0**: Allow exit (pass confirmed, no new P0/P1 findings, iteration cap reached, or auto-loop disabled)
    - **Exit 2**: Block exit and re-inject the grind prompt (continue iterating)
 4. If continuing, the hook increments the iteration counter
 

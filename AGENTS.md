@@ -126,3 +126,25 @@ bd prime                # Refresh Beads context
 
 **Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
 <!-- END BEADS CODEX SETUP -->
+
+## Build & Test
+
+```bash
+just              # list recipes
+just check        # lint, format, proto-lint, validate, and all contract tests
+just validate     # repo structure, manifests, ownership, and fixture scoring
+just gen          # regenerate protobuf bindings after editing the contract
+just bench-all    # run the benchmark against every target
+```
+
+`just check` is the gate. It must exit 0 before anything is committed.
+
+## Architecture Overview
+
+`skills/frank-grimes/SKILL.md` is the sole normative methodology; nothing else may restate its phases, categories, evidence tiers, or verdict rules. `proto/frank_grimes/v2/contracts.proto` is the sole normative machine contract, enforced by the `grimes-contract` codec. Adapters under `adapters/` carry provider-specific wiring only — arguments, tools, and transport. `hooks/stop.sh` owns the iteration loop.
+
+## Conventions & Patterns
+
+- A methodology change goes in the skill, never in an adapter copy. `validate.sh` fails the build if a normative marker appears in two files.
+- A contract change requires `just gen` and the regenerated bindings in the same commit.
+- Tests are black-box: they run the real script or CLI against fixtures, and every one of them has been checked to fail when its defect is reintroduced.

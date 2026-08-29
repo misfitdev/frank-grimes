@@ -60,18 +60,22 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 
 ## Build & Test
 
-_Add your build and test commands here_
-
 ```bash
-# Example:
-# npm install
-# npm test
+just              # list recipes
+just check        # lint, format, proto-lint, validate, and all contract tests
+just validate     # repo structure, manifests, ownership, and fixture scoring
+just gen          # regenerate protobuf bindings after editing the contract
+just bench-all    # run the benchmark against every target
 ```
+
+`just check` is the gate. It must exit 0 before anything is committed.
 
 ## Architecture Overview
 
-_Add a brief overview of your project architecture_
+`skills/frank-grimes/SKILL.md` is the sole normative methodology; nothing else may restate its phases, categories, evidence tiers, or verdict rules. `proto/frank_grimes/v2/contracts.proto` is the sole normative machine contract, enforced by the `grimes-contract` codec. Adapters under `adapters/` carry provider-specific wiring only — arguments, tools, and transport. `hooks/stop.sh` owns the iteration loop.
 
 ## Conventions & Patterns
 
-_Add your project-specific conventions here_
+- A methodology change goes in the skill, never in an adapter copy. `validate.sh` fails the build if a normative marker appears in two files.
+- A contract change requires `just gen` and the regenerated bindings in the same commit.
+- Tests are black-box: they run the real script or CLI against fixtures, and every one of them has been checked to fail when its defect is reintroduced.

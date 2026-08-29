@@ -74,7 +74,7 @@ This file documents the flaws that a good Grimes Grind should find in the Go ser
 
 A grind that reports any of these has produced a false positive, and precision is scored against it:
 
-- **SQL injection.** Every query uses `$1` placeholder binding (`main.go:85`, `main.go:108`, and the DELETE branch). User input never reaches query text. An earlier version of this file claimed injection "if the query construction changes" — a hypothetical about code that does not exist is not a finding.
+- **SQL injection.** Every query uses `$1` placeholder binding (`main.go:85`, `main.go:108`, and the DELETE branch). User input never reaches query text. A hypothetical about code that does not exist is not a finding.
 - **Missing CSRF protection.** No cookie or ambient credential is used, so there is no cross-site request forgery surface to protect.
 
 ## What a Good Grind Should Find

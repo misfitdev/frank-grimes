@@ -26,7 +26,6 @@ LOG_DIR="${PROJECT_ROOT}/.grimes/logs"
 LOG_FILE="${LOG_DIR}/hook.log"
 QUARANTINE_DIR="${PROJECT_ROOT}/.grimes/quarantine"
 
-# Initialize directories
 mkdir -p "$LOG_DIR"
 
 log() {
@@ -58,7 +57,6 @@ sanitize_target() {
         cut -c1-200
 }
 
-# Validate jq is available
 if ! command -v jq &>/dev/null; then
     log "ERROR: jq not found. Auto-loop feature requires jq."
     echo "ERROR: jq is required for auto-loop feature. Install with: brew install jq (macOS) or apt-get install jq (Linux)" >&2
@@ -71,7 +69,6 @@ if [[ ! -f "$STATE_FILE" ]]; then
     exit 0
 fi
 
-# Validate state file is valid JSON
 if ! jq empty "$STATE_FILE" 2>/dev/null; then
     log "ERROR: Corrupted state file at $STATE_FILE. Cannot parse JSON."
     quarantine_state "unparseable-json"
@@ -79,7 +76,6 @@ if ! jq empty "$STATE_FILE" 2>/dev/null; then
     exit 0
 fi
 
-# Validate required fields exist
 for field in iteration max_iterations last_verdict target auto_loop; do
     if ! jq -e ".$field" "$STATE_FILE" &>/dev/null; then
         log "ERROR: State file missing required field: $field"
@@ -89,7 +85,6 @@ for field in iteration max_iterations last_verdict target auto_loop; do
     fi
 done
 
-# Read state
 STATE=$(cat "$STATE_FILE")
 ITERATION=$(echo "$STATE" | jq -r '.iteration // 0')
 MAX_ITERATIONS=$(echo "$STATE" | jq -r '.max_iterations // 5')
@@ -97,7 +92,6 @@ LAST_VERDICT=$(echo "$STATE" | jq -r '.last_verdict // "RED"')
 TARGET=$(echo "$STATE" | jq -r '.target // ""')
 AUTO_LOOP=$(echo "$STATE" | jq -r '.auto_loop // false')
 
-# Validate iteration and max_iterations are positive integers
 if ! [[ "$ITERATION" =~ ^[0-9]+$ ]] || [[ "$ITERATION" -eq 0 ]]; then
     log "ERROR: iteration is not a valid positive integer: $ITERATION"
     rm -f "$STATE_FILE"
@@ -159,7 +153,6 @@ log "BLOCKING EXIT and continuing to iteration $((ITERATION + 1))"
 
 NEXT_ITERATION=$((ITERATION + 1))
 
-# Update state
 if ! echo "$STATE" | jq ".iteration = $NEXT_ITERATION" >"$STATE_FILE.tmp"; then
     log "ERROR: Failed to update state file"
     echo "ERROR: Failed to update grind state. Allowing exit." >&2

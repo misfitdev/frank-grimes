@@ -19,17 +19,17 @@ skills/
 adapters/
 ├── README.md              # This file
 ├── claude-code/           # Claude Code integration
-│   ├── hooks.json
+│   ├── hooks.json         # Stop hook registration
+│   ├── agents/
+│   │   └── grimey-verifier.md   # Independent adjudicator
 │   └── commands/
 │       ├── grind.md
 │       ├── help.md
 │       └── cancel.md
-├── opencode/              # OpenCode integration
-│   ├── AGENTS.md
-│   └── README.md
-└── codify/                # Codex integration
-    ├── AGENTS.md
-    └── README.md
+├── opencode/
+│   └── AGENTS.md          # OpenCode integration
+└── codify/
+    └── AGENTS.md          # Codex integration
 ```
 
 The Claude manifest points `commands` and `hooks` back into `adapters/claude-code/`, so provider-specific material stays in this directory rather than spreading across the root.
@@ -47,7 +47,7 @@ Install as a plugin:
 
 This registers the skill, the `grind`/`help`/`cancel` commands, and the Stop hook that drives the loop. Commands are namespaced under the plugin name: `/frank-grimes:grind`.
 
-Copying the adapter into `.claude/` still works for skill-and-command use, but the Stop hook resolves `${CLAUDE_PLUGIN_ROOT}` and only fires under a plugin install:
+For skill-and-command use without the loop, copy the commands in directly. The Stop hook resolves `${CLAUDE_PLUGIN_ROOT}`, so it fires only under a plugin install:
 
 ```bash
 cp -r adapters/claude-code/commands .claude/
@@ -64,7 +64,7 @@ ln -s ../../skills/frank-grimes .opencode/skills/frank-grimes
 
 # Option 2: User-level
 mkdir -p ~/.config/opencode/skills
-ln -s /path/to/frank-grimes/skill ~/.config/opencode/skills/frank-grimes
+ln -s /path/to/frank-grimes/skills/frank-grimes ~/.config/opencode/skills/frank-grimes
 ```
 
 OpenCode also reads `.claude/skills/` and `.agents/skills/`, so symlinking to any of these works.
@@ -90,7 +90,7 @@ Any agent that can load a markdown skill and execute a bash script can use Frank
 2. Configure your agent's stop hook to call `hooks/stop.sh`
 3. Ensure `jq` is installed for the stop hook
 
-See the provider-specific README files for detailed integration instructions.
+See the `AGENTS.md` file in each provider directory for detailed integration instructions.
 
 ## Provider-Specific Notes
 
@@ -130,7 +130,8 @@ To add support for a new provider:
 1. Create `adapters/<provider>/`
 2. Document how to load the skill (`skills/frank-grimes/SKILL.md`) on that provider
 3. Document how to configure the stop hook (`hooks/stop.sh`) on that provider
-4. Include any provider-specific manifest or configuration files needed
-5. Update this README with the new provider
+4. Document whether the provider can furnish an independent adjudication context; if it cannot, say so, because that caps every verdict at YELLOW
+5. Include any provider-specific manifest or configuration files needed
+6. Update this README with the new provider
 
 The core skill and hook stay clean. Adapters are where provider-specific details live.

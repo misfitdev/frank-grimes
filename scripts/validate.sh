@@ -162,7 +162,6 @@ if [[ -f "$SKILL_MD" ]]; then
     # Extract frontmatter between first --- markers
     FRONTMATTER=$(sed -n '1,/^---$/p' "$SKILL_MD" | sed '1d;$d')
 
-    # Check for name field
     if echo "$FRONTMATTER" | grep -qE '^name:'; then
         NAME_VALUE=$(echo "$FRONTMATTER" | grep -E '^name:' | sed 's/name:[[:space:]]*//' | tr -d '"' | tr -d "'")
         if [[ -n "$NAME_VALUE" ]]; then
@@ -178,7 +177,6 @@ if [[ -f "$SKILL_MD" ]]; then
         fail "SKILL.md frontmatter missing 'name' field"
     fi
 
-    # Check for description field
     if echo "$FRONTMATTER" | grep -qE '^description:'; then
         # Handle multi-line YAML folded scalar (description: >)
         # Extract description value, handling both single-line and multi-line formats

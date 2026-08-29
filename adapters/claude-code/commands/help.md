@@ -57,6 +57,7 @@ Starts a Grimes Grind. If invoked without arguments, prompts for scope. Reports 
 - `--commit` (optional) - Authorize one commit of the verified batch. Requires `--mode fix` and a gate that exited zero. Off by default.
 - `--max-iterations N` (optional) - Maximum iterations before stopping (default: 5)
 - `--auto-loop` (optional) - Continue while iterations still change the verdict, up to the maximum
+- `--research online|offline|frozen:<path>` (optional) - Bounded current-landscape research, no network, or a pinned source bundle
 
 **Examples:**
 ```bash

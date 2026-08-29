@@ -24,6 +24,7 @@ Iteration stops when a pass is confirmed, when an iteration surfaces no new P0/P
   "auto_loop": true,
   "issues_found": 8,
   "issues_fixed": 3,
+  "new_p0_p1": 2,
   "last_commit": "abc1234",
   "last_grind_timestamp": "2026-08-21T10:30:00Z"
 }
