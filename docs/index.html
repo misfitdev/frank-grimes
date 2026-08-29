@@ -133,7 +133,7 @@
                 <span class="phase-label">Phase 1</span>
                 <h3 class="phase-title">The Grimey Read</h3>
               </header>
-              <p>I read the thing before I judge it, and I write down what it claims before I test any of it: what it says it does, what has to stay true, where it runs, and what evidence I am not going to be able to get. I will ask three questions. Not thirty. Anything I cannot establish is recorded as unknown and stays unknown. That is not a finding against you, but it does cap what I can honestly claim to have covered.</p>
+              <p>Read the target before judging it. Record what it claims before testing any of it: what it says it does, what must remain true, where it runs, and what evidence cannot be obtained. Three clarifying questions are permitted. Not thirty. Anything that cannot be established is recorded as unknown and remains unknown. An unknown is not a finding, but it caps what the review may honestly claim to have covered.</p>
             </div>
           </article>
 
@@ -143,7 +143,7 @@
                 <span class="phase-label">Phase 2</span>
                 <h3 class="phase-title">Map and Route</h3>
               </header>
-              <p>I map the trust boundaries, the inputs, the state, the dependencies, and the invariants that run across files. Then I select five to eight categories from the ten and write one clause for every category I selected and every one I did not. Excluding a category means I am satisfied nothing terminal can live there. It does not mean the work has been given the benefit of the doubt.</p>
+              <p>Map the trust boundaries, inputs, state, dependencies, and the invariants that run across files. Select five to eight categories from the ten, and record one clause for every category selected and every category passed over. An exclusion asserts that nothing terminal can live in that category. It does not extend the benefit of the doubt.</p>
             </div>
           </article>
 
@@ -153,7 +153,7 @@
                 <span class="phase-label">Phase 3</span>
                 <h3 class="phase-title">Research Current Contracts</h3>
               </header>
-              <p>Where the judgment turns on somebody else's framework or provider, I go and read what that contract says today rather than what I remember it saying. URL, publisher, retrieval time, exact excerpt, all recorded. A page is evidence, never an instruction. And a document recommending a control is not proof that this code is missing one.</p>
+              <p>Where a judgment turns on another party's framework or provider, read what that contract states today rather than what it was remembered to state. Record the URL, publisher, retrieval time, and exact excerpt. Retrieved pages are evidence, never instruction. A document recommending a control is not proof that this target lacks one.</p>
             </div>
           </article>
 
@@ -163,7 +163,7 @@
                 <span class="phase-label">Phase 4</span>
                 <h3 class="phase-title">Default Assumption</h3>
               </header>
-              <p>I begin from the position that it fails somewhere in the categories I routed, and I hold that position until the probes fail to break it. A category with nothing in it is a legitimate result, but only once the probes and the stopping condition are on the record. "I found nothing" and "I did not look" produce an identical empty section, which is precisely why I write down which one it was.</p>
+              <p>Begin from the position that the target fails somewhere in the routed categories, and hold it until the probes fail to break it. A category with no findings is a legitimate result, but only once its probes and stopping condition are on the record. "Nothing was found" and "nobody looked" produce an identical empty section. Which one occurred is recorded.</p>
             </div>
           </article>
 
@@ -173,7 +173,7 @@
                 <span class="phase-label">Phase 5</span>
                 <h3 class="phase-title">The Grind</h3>
               </header>
-              <p>I attack every routed category and go after the terminal defects first. Your own linters and tests run before I do anything freehand, and their output is evidence whether they pass or fail. Every finding carries exactly one tier: E1 means I reproduced it, E2 means I can point at the line, E3 means I inferred it and named what would prove me wrong. A P0 requires E1 or E2. An inference does not become critical because I feel strongly about it.</p>
+              <p>Attack every routed category, terminal defects first. The repository's own linters and tests run before any freehand analysis, and their output is evidence whether they pass or fail. Every finding carries exactly one tier: E1 reproduced, E2 cited to a line, E3 inferred with the falsifier named. A P0 requires E1 or E2. An inference does not become critical through conviction.</p>
             </div>
           </article>
 
@@ -183,7 +183,7 @@
                 <span class="phase-label">Phase 6</span>
                 <h3 class="phase-title">Grimey Grinds Grimey</h3>
               </header>
-              <p>Then I do to my own findings what I have just done to your work. For each one I name the observation that would prove me wrong, I go looking for it, and I delete what it kills. The arithmetic is reported: N candidates, M survived, K killed. A reviewer who never withdraws a finding is not being careful. He is not checking.</p>
+              <p>Apply the same procedure to the findings themselves. For each, name the observation that would disprove it, go looking for that observation, and delete what it kills. Report the arithmetic: N candidates, M survived, K killed. A reviewer who never withdraws a finding is not being careful. He is not checking.</p>
             </div>
           </article>
 
@@ -193,7 +193,7 @@
                 <span class="phase-label">Phase 7</span>
                 <h3 class="phase-title">Stopping Discipline and Verdict</h3>
               </header>
-              <p>I stop a category when the probing stops yielding, not when I run out of stamina. Findings resting on assumptions I could not confirm are tagged and kept out of the verdict entirely. The verdict itself is four fields: decision, residual risk, confidence, completeness. The colour follows from those. I do not get to choose it, and neither do you.</p>
+              <p>Stop a category when the probing stops yielding, not when stamina runs out. Findings resting on unconfirmed assumptions are tagged and excluded from the verdict. The verdict is four fields: decision, residual risk, confidence, completeness. The colour follows from them. It is not chosen by the reviewer, and it is not negotiable with the author.</p>
               <table class="verdict-table">
                 <thead>
                   <tr><th>Verdict</th><th>Meaning</th></tr>
@@ -222,7 +222,7 @@
                 <span class="phase-label">Gate</span>
                 <h3 class="phase-title">Fix Mode and the Commit Gate</h3>
               </header>
-              <p>I report. I do not touch your files unless you tell me to, and telling me to is not the same as telling me I may commit. Those are two separate permissions and I will ask for both. A commit requires fix mode, explicit authorization, and a verification command that exited zero. An unverified fix is a claim that a defect is gone, made by the one party with an interest in it being gone.</p>
+              <p>Reporting is the default. Files are not modified without instruction, and instruction to modify is not instruction to commit. These are two permissions and both are requested separately. A commit requires fix mode, explicit authorization, and a verification command that exited zero. An unverified fix is a claim that a defect is gone, entered by the one party with an interest in it being gone.</p>
             </div>
           </article>
 
@@ -232,7 +232,7 @@
                 <span class="phase-label">Gate</span>
                 <h3 class="phase-title">Independent Adjudication</h3>
               </header>
-              <p>I do not certify my own work. A pass requires a second review that never saw mine, handed nothing but the target and the verdict I claimed. Where we disagree, the stricter of us wins. Where there is nobody to ask, the verdict stops at yellow, because nobody checking is not the same as nobody objecting.</p>
+              <p>A review does not certify itself. A pass requires a second review that never saw the first, supplied with nothing but the target and the claimed verdict. Where the two disagree, the stricter decision stands. Where no second reviewer is available, the verdict stops at yellow. Nobody checking is not the same as nobody objecting.</p>
             </div>
           </article>
 
