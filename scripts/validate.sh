@@ -129,6 +129,16 @@ else
     warn "jq not found - skipping JSON validation"
 fi
 
+# Schema checks the field-level assertions above cannot make. Not run with
+# --strict: that flags the repo's own CLAUDE.md, which is contributor
+# instructions rather than plugin-shipped context.
+if command -v claude &>/dev/null; then
+    check claude plugin validate "$PROJECT_ROOT/.claude-plugin/plugin.json" "Claude plugin manifest passes claude plugin validate"
+    check claude plugin validate "$PROJECT_ROOT" "Claude marketplace manifest passes claude plugin validate"
+else
+    warn "claude not found - skipping plugin manifest schema validation"
+fi
+
 echo ""
 
 # ============================================
