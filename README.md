@@ -1,7 +1,7 @@
 # Frank Grimes
 
 [![Build](https://github.com/misfitdev/frank-grimes/actions/workflows/release.yml/badge.svg?job=Lint%2C+format%2C+and+test)](https://github.com/misfitdev/frank-grimes/actions/workflows/release.yml)
-[![SLSA 3](https://github.com/misfitdev/frank-grimes/actions/workflows/release.yml/badge.svg?job=Generate+SLSA3+provenance+%2F+final)](https://github.com/misfitdev/frank-grimes/actions/workflows/release.yml)
+[![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 
 <img src="docs/img/grimey.png" alt="Grimey logo" width="25%">
 
