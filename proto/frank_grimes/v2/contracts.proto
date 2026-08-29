@@ -1,0 +1,500 @@
+// The sole normative machine contract for Frank Grimes.
+//
+// skills/frank-grimes/SKILL.md remains the sole normative methodology and
+// references these message and enum names without restating their fields.
+// Generated bindings, TextProto fixtures, and JSON projections are
+// non-normative consumers.
+syntax = "proto3";
+
+package frank_grimes.v2;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+// ---------------------------------------------------------------------------
+// Shared types
+// ---------------------------------------------------------------------------
+
+enum Category {
+  CATEGORY_UNSPECIFIED = 0;
+  CATEGORY_COR = 1;
+  CATEGORY_INT = 2;
+  CATEGORY_SEC = 3;
+  CATEGORY_REL = 4;
+  CATEGORY_OPS = 5;
+  CATEGORY_PER = 6;
+  CATEGORY_VER = 7;
+  CATEGORY_MNT = 8;
+  CATEGORY_DEP = 9;
+  CATEGORY_HUM = 10;
+}
+
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_P0 = 1;
+  SEVERITY_P1 = 2;
+  SEVERITY_P2 = 3;
+  SEVERITY_P3 = 4;
+}
+
+enum Likelihood {
+  LIKELIHOOD_UNSPECIFIED = 0;
+  LIKELIHOOD_LIKELY = 1;
+  LIKELIHOOD_PLAUSIBLE = 2;
+  LIKELIHOOD_UNLIKELY = 3;
+  LIKELIHOOD_UNKNOWN = 4;
+}
+
+enum BlastRadius {
+  BLAST_RADIUS_UNSPECIFIED = 0;
+  BLAST_RADIUS_SINGLE_USER = 1;
+  BLAST_RADIUS_LOCAL_COMPONENT = 2;
+  BLAST_RADIUS_SERVICE = 3;
+  BLAST_RADIUS_SYSTEMIC = 4;
+}
+
+enum FindingStatus {
+  FINDING_STATUS_UNSPECIFIED = 0;
+  FINDING_STATUS_OPEN = 1;
+  FINDING_STATUS_FIXED = 2;
+  FINDING_STATUS_VERIFIED = 3;
+  FINDING_STATUS_ACCEPTED = 4;
+  FINDING_STATUS_FALSE_POSITIVE = 5;
+  FINDING_STATUS_REGRESSED = 6;
+}
+
+enum EvidenceTier {
+  EVIDENCE_TIER_UNSPECIFIED = 0;
+  EVIDENCE_TIER_E1 = 1;
+  EVIDENCE_TIER_E2 = 2;
+  EVIDENCE_TIER_E3 = 3;
+}
+
+message Target {
+  string root = 1 [(buf.validate.field).string.min_len = 1];
+  string scope = 2 [(buf.validate.field).string.min_len = 1];
+  bytes fingerprint_sha256 = 3 [(buf.validate.field).bytes.len = 32];
+  string display = 4 [(buf.validate.field).string.max_len = 512];
+}
+
+// A repository-relative path that cannot escape the repository root.
+message RepoPath {
+  option (buf.validate.message).cel = {
+    id: "repo_path.relative_and_contained"
+    message: "path must be repository-relative and cannot escape with .."
+    expression:
+      "!this.value.startsWith('/') && this.value != '..' && "
+      "!this.value.startsWith('../') && !this.value.contains('/../') && "
+      "!this.value.endsWith('/..')"
+  };
+
+  string value = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+  }];
+}
+
+message Location {
+  RepoPath path = 1 [(buf.validate.field).required = true];
+  optional string symbol = 2 [(buf.validate.field).string.max_len = 512];
+}
+
+message Risk {
+  Severity severity = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  Likelihood likelihood = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  BlastRadius blast_radius = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+
+// Accepting a risk is a human decision with a name attached and a date by
+// which it is revisited. An accepted finding with no owner is an orphaned risk.
+message HumanOwner {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+  string rationale = 2 [(buf.validate.field).string.min_len = 1];
+  google.protobuf.Timestamp recorded_at = 3 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp review_by = 4 [(buf.validate.field).required = true];
+}
+
+// ---------------------------------------------------------------------------
+// Evidence
+// ---------------------------------------------------------------------------
+
+message Reproduction {
+  string action = 1 [(buf.validate.field).string.min_len = 1];
+  RepoPath cwd = 2 [(buf.validate.field).required = true];
+  int32 exit_code = 3;
+  oneof output {
+    option (buf.validate.oneof).required = true;
+    string output_excerpt = 4 [(buf.validate.field).string.min_len = 1];
+    bytes output_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  }
+  google.protobuf.Timestamp completed_at = 6 [(buf.validate.field).required = true];
+}
+
+message Citation {
+  RepoPath path = 1 [(buf.validate.field).required = true];
+  uint32 line = 2 [(buf.validate.field).uint32.gt = 0];
+  string quote = 3 [(buf.validate.field).string.min_len = 1];
+}
+
+message Inference {
+  string assumption = 1 [(buf.validate.field).string.min_len = 1];
+  string reasoning = 2 [(buf.validate.field).string.min_len = 1];
+  string falsifier = 3 [(buf.validate.field).string.min_len = 1];
+}
+
+// The oneof prevents a tier being claimed without the record that tier
+// requires, which is how a command name gets promoted to reproduced evidence.
+message Evidence {
+  option (buf.validate.message).cel = {
+    id: "evidence.tier_matches_detail"
+    message: "evidence tier must match its detail branch"
+    expression:
+      "(this.tier == 1 && has(this.reproduction)) || "
+      "(this.tier == 2 && has(this.citation)) || "
+      "(this.tier == 3 && has(this.inference))"
+  };
+
+  EvidenceTier tier = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string claim = 2 [(buf.validate.field).string.min_len = 1];
+  oneof detail {
+    option (buf.validate.oneof).required = true;
+    Reproduction reproduction = 3;
+    Citation citation = 4;
+    Inference inference = 5;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Findings and the ledger
+// ---------------------------------------------------------------------------
+
+message FindingEvent {
+  uint32 iteration = 1 [(buf.validate.field).uint32.gt = 0];
+  FindingStatus from = 2 [(buf.validate.field).enum.defined_only = true];
+  FindingStatus to = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  bytes evidence_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  google.protobuf.Timestamp at = 5 [(buf.validate.field).required = true];
+  string actor = 6 [(buf.validate.field).string.min_len = 1];
+}
+
+message Finding {
+  option (buf.validate.message).cel = {
+    id: "finding.accepted_requires_human_owner"
+    message: "accepted findings require a human owner"
+    expression: "this.status != 4 || has(this.owner)"
+  };
+  option (buf.validate.message).cel = {
+    id: "finding.p0_requires_e1_or_e2"
+    message: "P0 requires E1 or E2 evidence"
+    expression: "this.risk.severity != 1 || this.evidence.tier in [1, 2]"
+  };
+  option (buf.validate.message).cel = {
+    id: "finding.e3_caps_at_p1"
+    message: "inferred evidence cannot support a severity above P1"
+    expression: "this.evidence.tier != 3 || this.risk.severity != 1"
+  };
+
+  string id = 1 [(buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$"];
+  bytes fingerprint_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  Category category = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  Location location = 4 [(buf.validate.field).required = true];
+  Risk risk = 5 [(buf.validate.field).required = true];
+  Evidence evidence = 6 [(buf.validate.field).required = true];
+  bytes evidence_sha256 = 7 [(buf.validate.field).bytes.len = 32];
+  FindingStatus status = 8 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  HumanOwner owner = 9;
+  google.protobuf.Timestamp first_seen = 10 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp last_seen = 11 [(buf.validate.field).required = true];
+  repeated FindingEvent history = 12 [(buf.validate.field).repeated.min_items = 1];
+}
+
+message Ledger {
+  uint32 schema_major = 1 [(buf.validate.field).uint32.const = 1];
+  uint32 schema_minor = 2;
+  Target target = 3 [(buf.validate.field).required = true];
+  map<string, Finding> findings = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Verdict
+// ---------------------------------------------------------------------------
+
+enum Decision {
+  DECISION_UNSPECIFIED = 0;
+  DECISION_BLOCK = 1;
+  DECISION_CONDITIONAL = 2;
+  DECISION_PASS = 3;
+  DECISION_INFORMATIONAL = 4;
+}
+
+enum ResidualRisk {
+  RESIDUAL_RISK_UNSPECIFIED = 0;
+  RESIDUAL_RISK_CRITICAL = 1;
+  RESIDUAL_RISK_HIGH = 2;
+  RESIDUAL_RISK_MODERATE = 3;
+  RESIDUAL_RISK_LOW = 4;
+  RESIDUAL_RISK_UNKNOWN = 5;
+}
+
+enum ReviewConfidence {
+  REVIEW_CONFIDENCE_UNSPECIFIED = 0;
+  REVIEW_CONFIDENCE_HIGH = 1;
+  REVIEW_CONFIDENCE_MEDIUM = 2;
+  REVIEW_CONFIDENCE_LOW = 3;
+}
+
+enum ReviewCompleteness {
+  REVIEW_COMPLETENESS_UNSPECIFIED = 0;
+  REVIEW_COMPLETENESS_SUFFICIENT = 1;
+  REVIEW_COMPLETENESS_LIMITED = 2;
+  REVIEW_COMPLETENESS_INCONCLUSIVE = 3;
+}
+
+enum LegacyColor {
+  LEGACY_COLOR_UNSPECIFIED = 0;
+  LEGACY_COLOR_GREEN = 1;
+  LEGACY_COLOR_YELLOW = 2;
+  LEGACY_COLOR_RED = 3;
+}
+
+message Verdict {
+  Decision decision = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  ResidualRisk residual_risk = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  ReviewConfidence review_confidence = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  ReviewCompleteness review_completeness = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+
+// ---------------------------------------------------------------------------
+// Result, verification, and loop state
+// ---------------------------------------------------------------------------
+
+enum Mode {
+  MODE_UNSPECIFIED = 0;
+  MODE_REPORT = 1;
+  MODE_FIX = 2;
+}
+
+enum CompletionState {
+  COMPLETION_STATE_UNSPECIFIED = 0;
+  COMPLETION_STATE_CONTINUE = 1;
+  COMPLETION_STATE_REVIEW_COMPLETE = 2;
+  COMPLETION_STATE_FIX_COMPLETE = 3;
+  COMPLETION_STATE_ITERATION_LIMIT = 4;
+  COMPLETION_STATE_BLOCKED = 5;
+}
+
+enum ProducerRole {
+  PRODUCER_ROLE_UNSPECIFIED = 0;
+  PRODUCER_ROLE_GRINDER = 1;
+  PRODUCER_ROLE_VERIFIER = 2;
+  PRODUCER_ROLE_ORCHESTRATOR = 3;
+}
+
+enum VerificationStatus {
+  VERIFICATION_STATUS_UNSPECIFIED = 0;
+  VERIFICATION_STATUS_PASSED = 1;
+  VERIFICATION_STATUS_FAILED = 2;
+  VERIFICATION_STATUS_UNAVAILABLE = 3;
+  VERIFICATION_STATUS_NOT_APPLICABLE = 4;
+}
+
+message Verification {
+  option (buf.validate.message).cel = {
+    id: "verification.passed_requires_success"
+    message: "passed verification requires command, zero exit, output digest, and timestamp"
+    expression:
+      "this.status != 1 || "
+      "(this.command != '' && this.exit_code == 0 && "
+      "size(this.output_sha256) == 32 && has(this.completed_at))"
+  };
+
+  VerificationStatus status = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string command = 2;
+  RepoPath cwd = 3;
+  int32 exit_code = 4;
+  bytes output_sha256 = 5;
+  google.protobuf.Timestamp completed_at = 6;
+}
+
+// zero_knowledge is const true: a reviewer that saw the first report is not an
+// independent reviewer, and the schema refuses to record one as if it were.
+message IndependentReview {
+  string run_id = 1 [(buf.validate.field).string.min_len = 1];
+  string reviewer_id = 2 [(buf.validate.field).string.min_len = 1];
+  bool zero_knowledge = 3 [(buf.validate.field).bool.const = true];
+  bytes target_fingerprint_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  Verdict verdict = 5 [(buf.validate.field).required = true];
+  bytes provider_attestation = 6;
+  google.protobuf.Timestamp completed_at = 7 [(buf.validate.field).required = true];
+}
+
+message MarginalYield {
+  uint32 candidates_examined = 1;
+  uint32 candidates_disproved = 2;
+  uint32 new_p0_p1 = 3;
+  uint32 new_p2_p3 = 4;
+}
+
+message FindingCounts {
+  uint32 total = 1;
+  uint32 verified = 2;
+  uint32 accepted = 3;
+  uint32 open_p0 = 4;
+  uint32 open_p1 = 5;
+}
+
+message FindingSnapshot {
+  string id = 1 [(buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$"];
+  FindingStatus status = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  Risk risk = 3 [(buf.validate.field).required = true];
+  EvidenceTier evidence_tier = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  bytes evidence_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+}
+
+message LedgerRef {
+  string path = 1 [(buf.validate.field).string.const = ".grimes/ledger.pb"];
+  bytes digest_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  bool oscillation_detected = 3;
+}
+
+message GrimesResult {
+  option (buf.validate.message).cel = {
+    id: "result.orchestrator_only"
+    message: "only the orchestrator may emit the final result"
+    expression: "this.producer_role == 3"
+  };
+  option (buf.validate.message).cel = {
+    id: "result.report_is_terminal"
+    message: "report mode must terminate as REVIEW_COMPLETE with no applicable verification"
+    expression:
+      "this.mode != 1 || "
+      "(this.completion_state == 2 && this.verification.status == 4)"
+  };
+  option (buf.validate.message).cel = {
+    id: "result.green_is_independent_and_verified"
+    message: "GREEN requires an independent matching pass, no oscillation, and required verification"
+    expression:
+      "this.legacy_color != 1 || "
+      "(has(this.independent_review) && "
+      "this.independent_review.verdict.decision == 3 && "
+      "this.independent_review.target_fingerprint_sha256 == this.target.fingerprint_sha256 && "
+      "!this.ledger.oscillation_detected && "
+      "(this.mode == 1 || this.verification.status == 1))"
+  };
+  option (buf.validate.message).cel = {
+    id: "result.green_requires_pass_tuple"
+    message: "GREEN requires decision=pass, low residual risk, high confidence, sufficient completeness"
+    expression:
+      "this.legacy_color != 1 || "
+      "(this.verdict.decision == 3 && this.verdict.residual_risk == 4 && "
+      "this.verdict.review_confidence == 1 && this.verdict.review_completeness == 1)"
+  };
+  option (buf.validate.message).cel = {
+    id: "result.red_matches_block"
+    message: "RED and decision=block must agree"
+    expression: "(this.legacy_color == 3) == (this.verdict.decision == 1)"
+  };
+  option (buf.validate.message).cel = {
+    id: "result.open_p0_blocks"
+    message: "an open P0 requires decision=block"
+    expression: "this.counts.open_p0 == 0u || this.verdict.decision == 1"
+  };
+
+  uint32 schema_major = 1 [(buf.validate.field).uint32.const = 2];
+  uint32 schema_minor = 2;
+  string run_id = 3 [(buf.validate.field).string.min_len = 1];
+  ProducerRole producer_role = 4 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  Target target = 5 [(buf.validate.field).required = true];
+  Mode mode = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  uint32 iteration = 7 [(buf.validate.field).uint32.gt = 0];
+  uint32 max_iterations = 8 [(buf.validate.field).uint32.gt = 0];
+  CompletionState completion_state = 9 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  Verdict verdict = 10 [(buf.validate.field).required = true];
+  LegacyColor legacy_color = 11 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  MarginalYield marginal_yield = 12 [(buf.validate.field).required = true];
+  FindingCounts counts = 13 [(buf.validate.field).required = true];
+  repeated FindingSnapshot findings = 14;
+  Verification verification = 15 [(buf.validate.field).required = true];
+  IndependentReview independent_review = 16;
+  LedgerRef ledger = 17 [(buf.validate.field).required = true];
+  repeated string unmet_gates = 18 [
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string.min_len = 1
+  ];
+  string summary = 19 [(buf.validate.field).string.min_len = 1];
+}
+
+message LoopState {
+  option (buf.validate.message).cel = {
+    id: "state.iteration_within_limit"
+    message: "iteration cannot exceed max_iterations"
+    expression: "this.iteration <= this.max_iterations"
+  };
+
+  uint32 schema_major = 1 [(buf.validate.field).uint32.const = 2];
+  uint32 schema_minor = 2;
+  string run_id = 3 [(buf.validate.field).string.min_len = 1];
+  Target target = 4 [(buf.validate.field).required = true];
+  Mode mode = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  uint32 iteration = 6 [(buf.validate.field).uint32.gt = 0];
+  uint32 max_iterations = 7 [(buf.validate.field).uint32.gt = 0];
+  bytes ledger_digest_sha256 = 8 [(buf.validate.field).bytes.len = 32];
+  bytes last_result_sha256 = 9 [(buf.validate.field).bytes.len = 32];
+}

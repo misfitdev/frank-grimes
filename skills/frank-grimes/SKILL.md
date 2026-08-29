@@ -133,7 +133,11 @@ Record candidate findings in this clinical form before the self-grind:
 - Disproof observation: [specific result that would show this accusation is wrong]
 ```
 
-Finding IDs and lifecycle states are content-addressed and stable through the separately defined ledger. Use that contract; do not invent a second ID or lifecycle scheme here.
+Finding identity is content-addressed, so the same defect in the same place with the same evidence carries the same ID on every run and every machine. The fingerprint is `SHA-256(category + NUL + normalized path + NUL + normalized evidence)`, and the ID is `FG-<CATEGORY>-<first 12 hex>`. Line numbers are deliberately excluded: code moving down a file is not a new finding.
+
+Normalization is UTF-8, LF line endings, trailing whitespace removed per line, and no leading or trailing blank lines. Leading indentation is preserved, because indentation changes what code means.
+
+Do not invent a second ID or lifecycle scheme. The machine contract defines `Finding`, `Evidence`, `Verdict`, `GrimesResult`, and the lifecycle `open → fixed → verified`, with `accepted` requiring a named human owner and a review deadline. A fingerprint that was already `fixed` or `verified` reappearing is `regressed`, which sets the run-level oscillation flag and makes a pass unreachable — a loop that keeps re-breaking what it fixed does not get to declare success on the iteration where the damage is invisible.
 
 ### Phase 4: Grimey Grinds Grimey (Self-Falsification)
 

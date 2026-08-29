@@ -298,6 +298,49 @@ else
     fail "stop.sh does not reference .grimes-state.json"
 fi
 
+# The .proto is the sole normative machine contract. Generated bindings that
+# have drifted from it are worse than absent: they compile, so the drift is
+# invisible until a message validates against a schema nobody wrote.
+echo "--- Machine Contract ---"
+
+check test -f "$PROJECT_ROOT/proto/frank_grimes/v2/contracts.proto" "contract proto exists"
+check test -f "$PROJECT_ROOT/buf.yaml" "buf module config exists"
+
+if command -v buf &>/dev/null; then
+    if (cd "$PROJECT_ROOT" && buf lint) &>/dev/null; then
+        pass "buf lint passes"
+    else
+        fail "buf lint fails"
+    fi
+
+    if command -v go &>/dev/null; then
+        GEN_BEFORE=$(find "$PROJECT_ROOT/gen" -name '*.go' -exec shasum {} \; 2>/dev/null | shasum | cut -d' ' -f1)
+        if (cd "$PROJECT_ROOT" && PATH="$PATH:$(go env GOPATH)/bin" buf generate) &>/dev/null; then
+            GEN_AFTER=$(find "$PROJECT_ROOT/gen" -name '*.go' -exec shasum {} \; 2>/dev/null | shasum | cut -d' ' -f1)
+            if [[ "$GEN_BEFORE" == "$GEN_AFTER" ]]; then
+                pass "generated bindings match the contract"
+            else
+                fail "generated bindings drifted from the contract; run 'just gen' and commit"
+            fi
+        else
+            warn "buf generate failed - skipping codegen drift check"
+        fi
+    else
+        warn "go not found - skipping codegen drift check"
+    fi
+else
+    warn "buf not found - skipping contract lint"
+fi
+
+# Only the codec may write the ledger; a JSON file is a projection for reading.
+if grep -rq 'ledger.json' "$PROJECT_ROOT/hooks" "$PROJECT_ROOT/adapters" 2>/dev/null; then
+    fail "ledger.json referenced as input; the authoritative ledger is .grimes/ledger.pb"
+else
+    pass "no component treats the JSON projection as control input"
+fi
+
+echo ""
+
 # SKILL.md is the sole normative methodology. A second copy in an adapter or a
 # README does not stay in sync; it goes stale and then contradicts the skill.
 # These markers are normative definitions, not mentions, so they may appear in

@@ -1,0 +1,14 @@
+version: v2
+managed:
+  enabled: true
+  disable:
+    # protovalidate ships its own Go bindings; regenerating them under our
+    # module path would fork the annotations from the runtime that reads them.
+    - module: buf.build/bufbuild/protovalidate
+  override:
+    - file_option: go_package_prefix
+      value: github.com/misfitdev/frank-grimes/gen/go
+plugins:
+  - local: protoc-gen-go
+    out: gen/go
+    opt: paths=source_relative

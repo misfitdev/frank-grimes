@@ -34,7 +34,7 @@ preview:
     cd docs && python3 -m http.server 8080
 
 # Lint, format-check, validate, and run contract tests
-check: lint fmt-check validate test-fix-gate test-adjudication test-stop-hook
+check: lint fmt-check proto-lint validate test-fix-gate test-adjudication test-stop-hook test-contracts
 
 # Run the fix-gate contract tests
 test-fix-gate:
@@ -47,3 +47,19 @@ test-adjudication:
 # Run the stop hook contract tests
 test-stop-hook:
     ./tests/test-stop-hook.sh
+
+# Regenerate protobuf bindings from the contract
+gen:
+    buf generate
+
+# Lint the protobuf contract
+proto-lint:
+    buf lint
+
+# Run the contract and ledger tests
+test-contracts:
+    ./tests/test-contracts.sh
+
+# Build the contract codec
+build:
+    go build -o bin/grimes-contract ./cmd/grimes-contract

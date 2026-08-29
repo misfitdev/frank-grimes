@@ -3,3 +3,8 @@ jq = "latest"
 shellcheck = "latest"
 shfmt = "latest"
 just = "latest"
+# Pinned: the contract's generated bindings must be byte-identical across
+# machines, and codegen output moves with the toolchain.
+go = "1.25"
+buf = "1.70.0"
+protoc = "36.0"

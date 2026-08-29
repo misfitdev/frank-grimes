@@ -1,0 +1,13 @@
+# A citation pointing outside the repository. Evidence has to be inside the
+# thing under review.
+id: "FG-SEC-9a34db214c59"
+fingerprint_sha256: "01234567890123456789012345678901"
+category: CATEGORY_SEC
+location { path { value: "../../etc/passwd" } }
+risk { severity: SEVERITY_P1 likelihood: LIKELIHOOD_PLAUSIBLE blast_radius: BLAST_RADIUS_SERVICE }
+evidence { tier: EVIDENCE_TIER_E2 claim: "leak" citation { path { value: "../../etc/passwd" } line: 1 quote: "root:x:0:0" } }
+evidence_sha256: "01234567890123456789012345678901"
+status: FINDING_STATUS_OPEN
+first_seen { seconds: 1780000000 }
+last_seen { seconds: 1780000000 }
+history { iteration: 1 from: FINDING_STATUS_UNSPECIFIED to: FINDING_STATUS_OPEN evidence_sha256: "01234567890123456789012345678901" at { seconds: 1780000000 } actor: "grimes" }

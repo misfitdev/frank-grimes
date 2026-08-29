@@ -1,0 +1,17 @@
+# An open P0 with a decision other than block. The tuple has to follow the
+# findings, not the other way round.
+schema_major: 2
+run_id: "run-004"
+producer_role: PRODUCER_ROLE_ORCHESTRATOR
+target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" }
+mode: MODE_REPORT
+iteration: 1
+max_iterations: 5
+completion_state: COMPLETION_STATE_REVIEW_COMPLETE
+verdict { decision: DECISION_CONDITIONAL residual_risk: RESIDUAL_RISK_HIGH review_confidence: REVIEW_CONFIDENCE_HIGH review_completeness: REVIEW_COMPLETENESS_SUFFICIENT }
+legacy_color: LEGACY_COLOR_YELLOW
+marginal_yield { candidates_examined: 3 }
+counts { total: 1 open_p0: 1 }
+verification { status: VERIFICATION_STATUS_NOT_APPLICABLE }
+ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678901" }
+summary: "One critical issue, downgraded."

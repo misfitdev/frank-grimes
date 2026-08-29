@@ -1,0 +1,17 @@
+# P0 resting on E3. Inference cannot carry a terminal severity: the whole point
+# of the tier cap is that a P0 must be reproduced or visibly cited.
+id: "FG-SEC-9a34db214c59"
+fingerprint_sha256: "01234567890123456789012345678901"
+category: CATEGORY_SEC
+location { path { value: "bad-script.sh" } }
+risk { severity: SEVERITY_P0 likelihood: LIKELIHOOD_PLAUSIBLE blast_radius: BLAST_RADIUS_SERVICE }
+evidence {
+  tier: EVIDENCE_TIER_E3
+  claim: "Deletion probably escapes the build directory"
+  inference { assumption: "callers pass unvalidated paths" reasoning: "no validation seen" falsifier: "a caller that validates" }
+}
+evidence_sha256: "01234567890123456789012345678901"
+status: FINDING_STATUS_OPEN
+first_seen { seconds: 1780000000 }
+last_seen { seconds: 1780000000 }
+history { iteration: 1 from: FINDING_STATUS_UNSPECIFIED to: FINDING_STATUS_OPEN evidence_sha256: "01234567890123456789012345678901" at { seconds: 1780000000 } actor: "grimes" }

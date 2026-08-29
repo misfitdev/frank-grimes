@@ -1,0 +1,17 @@
+# GREEN claimed with no independent_review. This is the P0 the adjudication
+# work closed in prose; the schema has to refuse it too.
+schema_major: 2
+run_id: "run-002"
+producer_role: PRODUCER_ROLE_ORCHESTRATOR
+target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" }
+mode: MODE_REPORT
+iteration: 1
+max_iterations: 5
+completion_state: COMPLETION_STATE_REVIEW_COMPLETE
+verdict { decision: DECISION_PASS residual_risk: RESIDUAL_RISK_LOW review_confidence: REVIEW_CONFIDENCE_HIGH review_completeness: REVIEW_COMPLETENESS_SUFFICIENT }
+legacy_color: LEGACY_COLOR_GREEN
+marginal_yield { candidates_examined: 4 candidates_disproved: 4 }
+counts { total: 0 }
+verification { status: VERIFICATION_STATUS_NOT_APPLICABLE }
+ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678901" }
+summary: "Nothing found."

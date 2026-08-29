@@ -1,0 +1,13 @@
+# An accepted risk with nobody's name on it. This is the Orphaned Risks
+# anti-pattern, made unrepresentable.
+id: "FG-SEC-9a34db214c59"
+fingerprint_sha256: "01234567890123456789012345678901"
+category: CATEGORY_SEC
+location { path { value: "bad-script.sh" } }
+risk { severity: SEVERITY_P1 likelihood: LIKELIHOOD_PLAUSIBLE blast_radius: BLAST_RADIUS_SERVICE }
+evidence { tier: EVIDENCE_TIER_E2 claim: "unquoted deletion path" citation { path { value: "bad-script.sh" } line: 22 quote: "rm -rf \"$1\"/*" } }
+evidence_sha256: "01234567890123456789012345678901"
+status: FINDING_STATUS_ACCEPTED
+first_seen { seconds: 1780000000 }
+last_seen { seconds: 1780000000 }
+history { iteration: 1 from: FINDING_STATUS_OPEN to: FINDING_STATUS_ACCEPTED evidence_sha256: "01234567890123456789012345678901" at { seconds: 1780000000 } actor: "grimes" }

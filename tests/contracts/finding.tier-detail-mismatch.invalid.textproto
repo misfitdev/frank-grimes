@@ -1,0 +1,13 @@
+# Claims E1 while carrying only a citation. This is a command name being
+# promoted to reproduced evidence, which the oneof makes impossible.
+id: "FG-COR-9a34db214c59"
+fingerprint_sha256: "01234567890123456789012345678901"
+category: CATEGORY_COR
+location { path { value: "bad-script.sh" } }
+risk { severity: SEVERITY_P2 likelihood: LIKELIHOOD_UNLIKELY blast_radius: BLAST_RADIUS_LOCAL_COMPONENT }
+evidence { tier: EVIDENCE_TIER_E1 claim: "test suite fails" citation { path { value: "bad-script.sh" } line: 3 quote: "set -euo pipefail" } }
+evidence_sha256: "01234567890123456789012345678901"
+status: FINDING_STATUS_OPEN
+first_seen { seconds: 1780000000 }
+last_seen { seconds: 1780000000 }
+history { iteration: 1 from: FINDING_STATUS_UNSPECIFIED to: FINDING_STATUS_OPEN evidence_sha256: "01234567890123456789012345678901" at { seconds: 1780000000 } actor: "grimes" }

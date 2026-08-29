@@ -1,0 +1,23 @@
+# Independently confirmed, but the ledger reports oscillation: the loop keeps
+# re-breaking what it fixed. GREEN on the lucky iteration is still not GREEN.
+schema_major: 2
+run_id: "run-003"
+producer_role: PRODUCER_ROLE_ORCHESTRATOR
+target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" }
+mode: MODE_REPORT
+iteration: 4
+max_iterations: 5
+completion_state: COMPLETION_STATE_REVIEW_COMPLETE
+verdict { decision: DECISION_PASS residual_risk: RESIDUAL_RISK_LOW review_confidence: REVIEW_CONFIDENCE_HIGH review_completeness: REVIEW_COMPLETENESS_SUFFICIENT }
+legacy_color: LEGACY_COLOR_GREEN
+marginal_yield { candidates_examined: 4 candidates_disproved: 4 }
+counts { total: 0 }
+verification { status: VERIFICATION_STATUS_NOT_APPLICABLE }
+independent_review {
+  run_id: "run-003-adj" reviewer_id: "grimey-verifier" zero_knowledge: true
+  target_fingerprint_sha256: "01234567890123456789012345678901"
+  verdict { decision: DECISION_PASS residual_risk: RESIDUAL_RISK_LOW review_confidence: REVIEW_CONFIDENCE_HIGH review_completeness: REVIEW_COMPLETENESS_SUFFICIENT }
+  completed_at { seconds: 1780000000 }
+}
+ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678901" oscillation_detected: true }
+summary: "Clean this time."

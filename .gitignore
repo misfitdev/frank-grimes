@@ -68,3 +68,6 @@ audit/
 
 # Quarantined loop state kept for diagnosis, not for sharing
 .grimes/quarantine/
+
+# Built binaries
+bin/

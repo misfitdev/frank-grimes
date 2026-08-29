@@ -1,0 +1,19 @@
+# A finished report-mode run. Terminal, verification not applicable, RED
+# because an open P0 remains.
+schema_major: 2
+run_id: "run-001"
+producer_role: PRODUCER_ROLE_ORCHESTRATOR
+target { root: "/repo" scope: "bad-script.sh" fingerprint_sha256: "01234567890123456789012345678901" display: "bad-script.sh" }
+mode: MODE_REPORT
+iteration: 1
+max_iterations: 5
+completion_state: COMPLETION_STATE_REVIEW_COMPLETE
+verdict { decision: DECISION_BLOCK residual_risk: RESIDUAL_RISK_CRITICAL review_confidence: REVIEW_CONFIDENCE_HIGH review_completeness: REVIEW_COMPLETENESS_LIMITED }
+legacy_color: LEGACY_COLOR_RED
+marginal_yield { candidates_examined: 9 candidates_disproved: 3 new_p0_p1: 2 }
+counts { total: 6 open_p0: 2 open_p1: 2 }
+verification { status: VERIFICATION_STATUS_NOT_APPLICABLE }
+ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678901" }
+unmet_gates: "decision"
+unmet_gates: "residual_risk"
+summary: "Caller-controlled deletion path and unauthenticated remote code execution."
