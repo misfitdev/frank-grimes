@@ -14,9 +14,7 @@ This file documents the flaws that a good Grimes Grind should find in the web en
 
 5. **No input validation** - POST /api/users accepts any `name` and `email` without validation. No length limits, no format checks, no sanitization.
 
-6. **No CSRF protection** - No CSRF tokens, no SameSite cookie attributes (though no cookies are used, the pattern is still concerning).
-
-7. **No Content-Type validation** - The server uses `express.json()` but doesn't validate that the Content-Type is actually application/json.
+6. **No Content-Type validation** - The server uses `express.json()` but doesn't validate that the Content-Type is actually application/json.
 
 ## Reliability Issues (P0/P1)
 
@@ -30,9 +28,7 @@ This file documents the flaws that a good Grimes Grind should find in the web en
 
 ## Correctness Issues (P1/P2)
 
-12. **nextId is not atomic** - If multiple requests come in simultaneously, `nextId++` could assign the same ID to two users. No synchronization.
-
-13. **PUT allows partial updates but doesn't validate** - If `name` is explicitly set to `null` or `undefined`, it overwrites the existing value with null/undefined.
+12. **PUT allows partial updates but doesn't validate** - If `name` is explicitly set to `null` or `undefined`, it overwrites the existing value with null/undefined.
 
 14. **DELETE doesn't check if user existed before removing** - Actually, it does check, but the pattern is inconsistent with other endpoints.
 
@@ -64,6 +60,16 @@ This file documents the flaws that a good Grimes Grind should find in the web en
 
 26. **No error handling middleware** - Express error handling middleware is not defined. Errors will crash the process or return unhandled responses.
 
+## Explicitly Not Defects
+
+A grind that reports any of these has produced a false positive, and precision is scored against it:
+
+- **Missing CSRF protection.** Authentication is a bearer token read from the `Authorization` header (`server.js:96`). Browsers do not attach that automatically, so there is no cross-site request forgery surface. CSRF applies to ambient credentials such as cookies, and none are used.
+- **A race on `nextId++`.** The POST handler (`server.js:29-39`) is entirely synchronous — no `await`, no callback, no I/O between reading `nextId` and pushing the user. Node runs it to completion before the next request is dequeued, so two requests cannot interleave there. Reporting a data race in single-threaded synchronous JavaScript is a category error.
+- **Plaintext password comparison being a timing attack.** It is a real defect for other reasons (hardcoded credential, no hashing), but a timing side channel on a hardcoded constant discloses nothing an attacker cannot read in the source.
+
 ## What a Good Grind Should Find
 
-A thorough grind should identify at least 15-20 of these issues, with evidence (specific code paths), proper severity ratings, and a justified verdict (likely RED given the P0 security issues with hardcoded credentials and unverified JWT).
+The gold roots are the unverified JWT (`server.js:98-102`, signature never checked — any client forges a token by base64-encoding a payload) and the hardcoded `password123` (`server.js:71`). Both are P0 and both are E2-citable.
+
+Judge by precision rather than count. Twenty findings are not better than eight if the extra twelve are padding, duplicate symptoms of one root cause, or unevidenced. Expected verdict is RED (`decision=block`).

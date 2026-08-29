@@ -343,6 +343,27 @@ done
 
 echo ""
 
+# Ground truth that claims a defect the target does not have makes recall and
+# precision unmeasurable: a correct grind gets penalized for declining to report
+# a phantom. Each expected set must name its known false positives.
+for target in shell go web; do
+    EXPECTED="$PROJECT_ROOT/benchmark/targets/$target/expected-issues.md"
+    if grep -q '^## Explicitly Not Defects' "$EXPECTED" 2>/dev/null; then
+        pass "$target expectations record their known false positives"
+    else
+        fail "$target expectations have no 'Explicitly Not Defects' section"
+    fi
+done
+
+# The old sets rewarded volume, which is the padding the rubric now penalizes.
+if grep -rqE 'identify at least [0-9]+' "$PROJECT_ROOT/benchmark/targets" 2>/dev/null; then
+    fail "expected sets still set a finding-count target; precision is the standard"
+else
+    pass "expected sets judge precision rather than finding count"
+fi
+
+echo ""
+
 # The scorer greps for the report template's section names and field labels, so
 # editing the template silently breaks scoring. The fixtures are the tripwire:
 # a conforming report must score high and a theatrical one must not.

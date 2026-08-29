@@ -2,17 +2,19 @@
 
 This file documents the flaws that a good Grimes Grind should find in the Go service.
 
+## Terminal Defects (P0)
+
+1. **The service does not compile** - `main.go:102` reads `err = db.Exec("INSERT INTO users (name, email) VALUES ($1, $2)", u.Name, u.Email).Error`. On a `*sql.DB` from `database/sql`, `Exec` returns `(sql.Result, error)`, and `sql.Result` has no `.Error` field — that is GORM syntax on a stdlib handle. The compiler rejects it: `multiple-value db.Exec(...) in single-value context`. The neighbouring UPDATE and DELETE branches use the correct `_, err = db.Exec(...)` form, so this is inconsistent within its own file. Reproducible as E1 with `go build`. A grind that reports style issues in a package that cannot build has misread the target.
+
 ## Security Issues (P0/P1)
 
-1. **SQL Injection in userID parameter** - The `userID` from the URL path is passed directly to SQL queries without validation. While PostgreSQL parameterized queries are used in most places, the `userID` is a string from the URL and could contain injection attempts if the query construction changes.
+3. **No authentication or authorization** - All endpoints are open. No API keys, no JWT, no session management. Anyone can read, create, update, and delete users.
 
-2. **No authentication or authorization** - All endpoints are open. No API keys, no JWT, no session management. Anyone can read, create, update, and delete users.
+4. **No rate limiting** - No protection against brute force, enumeration, or denial of service.
 
-3. **No rate limiting** - No protection against brute force, enumeration, or denial of service.
+5. **Database credentials in environment variables** - While better than hardcoded, env vars for DB_PASSWORD are still visible in process listings and logs on many systems.
 
-4. **Database credentials in environment variables** - While better than hardcoded, env vars for DB_PASSWORD are still visible in process listings and logs on many systems.
-
-5. **No HTTPS/TLS** - Server listens on plain HTTP. No TLS configuration. Data in transit is unencrypted.
+6. **No HTTPS/TLS** - Server listens on plain HTTP. No TLS configuration. Data in transit is unencrypted.
 
 ## Reliability Issues (P0/P1)
 
@@ -68,6 +70,15 @@ This file documents the flaws that a good Grimes Grind should find in the Go ser
 
 27. **No error logging** - When errors occur, they're not logged. The server continues silently.
 
+## Explicitly Not Defects
+
+A grind that reports any of these has produced a false positive, and precision is scored against it:
+
+- **SQL injection.** Every query uses `$1` placeholder binding (`main.go:85`, `main.go:108`, and the DELETE branch). User input never reaches query text. An earlier version of this file claimed injection "if the query construction changes" — a hypothetical about code that does not exist is not a finding.
+- **Missing CSRF protection.** No cookie or ambient credential is used, so there is no cross-site request forgery surface to protect.
+
 ## What a Good Grind Should Find
 
-A thorough grind should identify at least 15-20 of these issues, with evidence (specific code paths), proper severity ratings, and a justified verdict (likely RED given the P0 security and reliability issues).
+Finding #1 is the gold root: the package does not build, and every runtime claim about it is conditional on that. A grind that misses it has not run the repository's own tooling.
+
+Beyond that, judge by precision rather than count. Reporting 20 issues is not better than reporting 8 if the extra 12 are padding, duplicates of one root cause, or unevidenced. The expected verdict is RED (`decision=block`) on the compile failure alone.
