@@ -200,7 +200,11 @@
       paths: [
         "M92 9C82 2 58 1 38 3 18 5 4 12 5 22c1 10 20 18 44 20 24 2 47-3 48-14 1-9-15-16-34-18"
       ],
-      style: "left:-0.45em;right:-0.45em;top:-0.28em;bottom:-0.3em;"
+      // Explicit width and height for the same reason the squiggle needs them:
+      // an SVG with a viewBox is a replaced element, so left/right sets the
+      // width but the height then follows the viewBox ratio rather than the
+      // bottom offset. Left to itself, a longer phrase draws a taller loop.
+      style: "left:-0.45em;width:calc(100% + 0.9em);top:-0.28em;height:calc(100% + 0.58em);"
     },
     // A hand underline, laid twice the way a pen doubles back.
     squiggle: {
