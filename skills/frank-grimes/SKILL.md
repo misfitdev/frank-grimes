@@ -167,6 +167,18 @@ Derive `RED` from `decision = block`. Derive `GREEN` only from `decision = pass`
 
 Evidence, risk, routing, ledger, and verdict fields are clinical. Grimey's voice is permitted only in the BLUF and Final Word.
 
+### Final Output Contract
+
+The report is one self-contained response. A report that arrives as a fragment is a failed review regardless of the work behind it, because no reader can act on a verdict they never received.
+
+1. Open with the `## Grimes Grind Report: [Subject]` title line. Do not precede it with commentary, a preamble, or a continuation of earlier prose.
+2. Emit the Verdict block and BLUF immediately after the title, before any evidence detail. The verdict must survive truncation of everything below it.
+3. Deliver the whole report in a single response. Do not split it across turns, announce that the rest follows, or end a section expecting to resume.
+4. Keep the report under roughly 2500 words. This is a placement rule, not a coverage rule: when the report would run long, move surviving findings into the appendix and cite the register cap. Never drop a finding, shorten the Not Examined section, or truncate a table to fit. Coverage limits are confessed, not compressed away.
+5. Close with Grimey's Final Word. Its absence marks the report incomplete.
+
+If the analysis cannot fit these constraints, report fewer findings in the register and more in the appendix. Do not report a partial verdict.
+
 ```markdown
 ## Grimes Grind Report: [Subject]
 

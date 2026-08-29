@@ -315,6 +315,14 @@ if command -v jq &>/dev/null; then
     else
         fail "non-conforming fixture scores ${NONCONFORMING:-100}%; scorer no longer discriminates"
     fi
+
+    # A continuation fragment must be classified as a failed delivery rather
+    # than scored, or a truncated run silently enters an A/B comparison.
+    if "$PROJECT_ROOT/benchmark/runner.sh" --score "$PROJECT_ROOT/benchmark/fixtures/truncated-report.md" &>/dev/null; then
+        fail "truncated fixture was scored; malformed reports must be rejected"
+    else
+        pass "truncated fixture is rejected as a malformed report"
+    fi
 else
     warn "jq not found - skipping benchmark scorer regression check"
 fi

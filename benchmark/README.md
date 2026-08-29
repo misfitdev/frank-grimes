@@ -11,7 +11,8 @@ benchmark/
 ├── runner.sh              # Executes a grind against a target and scores the output
 ├── fixtures/
 │   ├── conforming-report.md    # Scores near maximum; guards against scorer drift
-│   └── nonconforming-report.md # Scores poorly; guards against a scorer that stops discriminating
+│   ├── nonconforming-report.md # Scores poorly; guards against a scorer that stops discriminating
+│   └── truncated-report.md     # Rejected outright; guards against scoring a delivery failure
 ├── targets/
 │   ├── shell/
 │   │   ├── bad-script.sh      # A deliberately bad shell script
@@ -48,7 +49,16 @@ The fixture harness is intentionally offline. It is useful for controlled A/B ch
 ./benchmark/runner.sh --score benchmark/fixtures/conforming-report.md
 ```
 
-The scorer greps for the report template's section names and field labels, so changing the template in `skills/frank-grimes/SKILL.md` without updating `runner.sh` silently zeroes whole dimensions. `scripts/validate.sh` scores both fixtures on every `just validate` and fails if the conforming report drops below 90% or the non-conforming one rises above 50%.
+The scorer greps for the report template's section names and field labels, so changing the template in `skills/frank-grimes/SKILL.md` without updating `runner.sh` silently zeroes whole dimensions. `scripts/validate.sh` scores the fixtures on every `just validate` and fails if the conforming report drops below 90% or the non-conforming one rises above 50%.
+
+## Malformed Reports
+
+A report that arrives as a continuation fragment is a failed delivery, not a bad review. Scoring one puts a meaningless number into an A/B comparison, so the runner refuses: `score_report` checks for the title, verdict, BLUF, and final word, and rejects a body that opens mid-table or mid-sentence. A rejected report is recorded with `valid_report: false` and its reason, scores nothing, and exits 2.
+
+Distinguish the two failure modes when a run fails:
+
+- **Malformed report** — the agent returned normally but the text is a fragment. Reported by the runner as `malformed report: <reasons>`.
+- **Transport failure** — the agent CLI itself errored. The report file will be missing entirely rather than partial.
 
 ## A/B Testing
 

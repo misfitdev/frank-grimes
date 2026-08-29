@@ -118,6 +118,38 @@ count_register_rows() {
     count_matches '^\|[^|]*grime-[a-z0-9]+[^|]*\|.*\| *P[0-3] *\|' "$1"
 }
 
+# A continuation fragment scores like a bad review when it is really a failed
+# delivery. Scoring one silently corrupts an A/B comparison, so classify it
+# instead. Prints a reason and returns 1 when the report is not deliverable.
+validate_report() {
+    local report_file="$1"
+    local reasons=()
+
+    grep -qE '^#{1,3} Grimes Grind Report:' "$report_file" 2>/dev/null ||
+        reasons+=("missing report title")
+    grep -qE '^#{1,4} Verdict' "$report_file" 2>/dev/null ||
+        reasons+=("missing verdict section")
+    grep -q 'BLUF' "$report_file" 2>/dev/null ||
+        reasons+=("missing BLUF")
+    grep -q "Grimey's Final Word" "$report_file" 2>/dev/null ||
+        reasons+=("missing final word")
+
+    # A body that opens mid-table or mid-sentence is a continuation fragment.
+    local first_body
+    first_body=$(grep -vE '^\s*$' "$report_file" 2>/dev/null | head -1)
+    if [[ "$first_body" =~ ^\| ]] || [[ "$first_body" =~ ^[a-z] ]]; then
+        reasons+=("body opens mid-table or mid-sentence")
+    fi
+
+    if [[ ${#reasons[@]} -gt 0 ]]; then
+        printf '%s' "${reasons[0]}"
+        printf ', %s' "${reasons[@]:1}"
+        printf '\n'
+        return 1
+    fi
+    return 0
+}
+
 score_dimension() {
     local dimension="$1"
     local report_file="$2"
@@ -389,10 +421,25 @@ score_report() {
     local target_name="$2"
     local output_file="$3"
 
+    local invalid_reason=""
+    if ! invalid_reason=$(validate_report "$report_file"); then
+        # Record the failure without scores; a fragment has no comparable score.
+        jq -n \
+            --arg target "$target_name" \
+            --arg timestamp "$TIMESTAMP" \
+            --arg reason "$invalid_reason" \
+            '{target: $target, timestamp: $timestamp, valid_report: false,
+              invalid_reason: $reason, scores: {}, total_score: 0,
+              max_possible: 0, percentage: 0}' >"$output_file"
+        fail "malformed report: $invalid_reason"
+        return 1
+    fi
+
     {
         echo "{"
         echo "  \"target\": \"$target_name\","
         echo "  \"timestamp\": \"$TIMESTAMP\","
+        echo "  \"valid_report\": true,"
         echo "  \"scores\": {"
     } >"$output_file"
 
@@ -513,7 +560,10 @@ if [[ -n "$SCORE_ONLY" ]]; then
     fi
 
     score_file=$(mktemp)
-    score_report "$SCORE_ONLY" "$(basename "$SCORE_ONLY")" "$score_file"
+    if ! score_report "$SCORE_ONLY" "$(basename "$SCORE_ONLY")" "$score_file"; then
+        rm -f "$score_file"
+        exit 2
+    fi
 
     jq -r '.scores | to_entries[] | "  \(.key): \(.value)"' "$score_file"
     echo ""
