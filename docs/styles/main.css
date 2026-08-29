@@ -129,6 +129,15 @@ body::before {
   position: relative;
 }
 
+/* An inline mark is positioned against the glyphs it annotates. Left inline,
+   the span's containing block carries the line's leading too, and the mark
+   inherits that slack and sits low. Block targets (list items, the quote
+   source) keep their own display; only inline marks get boxed. */
+span.has-mark {
+  display: inline-block;
+  line-height: 1;
+}
+
 .pen-mark {
   position: absolute;
   z-index: 1;
