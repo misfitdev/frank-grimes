@@ -183,36 +183,36 @@ fi
 echo ""
 
 # ============================================
-# 5. Provider-Neutral Language Check
+# 5. Provider Neutrality and Coverage
 # ============================================
-echo "--- Provider-Neutral Language Check ---"
+echo "--- Provider Neutrality and Coverage ---"
 
-# Check README.md for platform-specific language that should be removed
-if [[ -f "$PROJECT_ROOT/README.md" ]]; then
-    # Check for Claude-specific installation commands
-    if grep -qi "/plugin marketplace" "$PROJECT_ROOT/README.md"; then
-        fail "README.md contains '/plugin marketplace' (Claude-specific install command)"
-    else
-        pass "README.md does not contain '/plugin marketplace'"
-    fi
+# Every provider loads skill/ verbatim, so naming one there breaks the others.
+# Provider-specific setup belongs in adapters/ and README.md, which must cover
+# each supported platform rather than omit it.
+SUPPORTED_PROVIDERS=("Claude Code" "OpenCode" "Codex")
 
-    if grep -qi "/plugin install" "$PROJECT_ROOT/README.md"; then
-        fail "README.md contains '/plugin install' (Claude-specific install command)"
-    else
-        pass "README.md does not contain '/plugin install'"
-    fi
-
-    if grep -qi "claude-plugins" "$PROJECT_ROOT/README.md"; then
-        fail "README.md contains 'claude-plugins' (Claude-specific reference)"
-    else
-        pass "README.md does not contain 'claude-plugins'"
-    fi
-
-    # "Claude Code" references are allowed in provider-specific adapter sections
-    pass "README.md provider-neutral check complete"
+SKILL_LEAK=$(grep -rniE 'claude|codex|opencode|anthropic|openai' "$PROJECT_ROOT/skill" || true)
+if [[ -n "$SKILL_LEAK" ]]; then
+    fail "skill/ names a specific provider:"
+    echo "$SKILL_LEAK"
 else
-    fail "README.md not found"
+    pass "skill/ is provider-neutral"
 fi
+
+for doc in "README.md" "adapters/README.md"; do
+    if [[ -f "$PROJECT_ROOT/$doc" ]]; then
+        for provider in "${SUPPORTED_PROVIDERS[@]}"; do
+            if grep -qi "$provider" "$PROJECT_ROOT/$doc"; then
+                pass "$doc documents $provider"
+            else
+                fail "$doc does not document $provider"
+            fi
+        done
+    else
+        fail "$doc not found"
+    fi
+done
 
 echo ""
 
