@@ -19,19 +19,23 @@ bench-compare:
 
 # Lint all shell scripts
 lint:
-    shellcheck scripts/*.sh benchmark/*.sh hooks/*.sh
+    shellcheck scripts/*.sh benchmark/*.sh hooks/*.sh tests/*.sh
 
 # Format all shell scripts in place
 fmt:
-    shfmt -w -i 4 -ci scripts/*.sh benchmark/*.sh hooks/*.sh
+    shfmt -w -i 4 -ci scripts/*.sh benchmark/*.sh hooks/*.sh tests/*.sh
 
 # Check formatting without writing
 fmt-check:
-    shfmt -d -i 4 -ci scripts/*.sh benchmark/*.sh hooks/*.sh
+    shfmt -d -i 4 -ci scripts/*.sh benchmark/*.sh hooks/*.sh tests/*.sh
 
 # Serve the GitHub Pages site locally for review
 preview:
     cd docs && python3 -m http.server 8080
 
-# Lint, format-check, validate, and preview the site
-check: lint fmt-check validate
+# Lint, format-check, validate, and run contract tests
+check: lint fmt-check validate test-fix-gate
+
+# Run the fix-gate contract tests
+test-fix-gate:
+    ./tests/test-fix-gate.sh

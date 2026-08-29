@@ -53,7 +53,9 @@ Starts a Grimes Grind. If invoked without arguments, prompts interactively for s
 - `target` (optional) - What to grind: file path, directory, code snippet, or description. Skips the scope question.
 - `--scope recent-changes|whole-repo` (optional) - Shorthand scope. Skips the scope question.
 - `--categories core-quality,security-privacy,architecture-ops,code-structure` (optional) - Comma-separated category groups. Skips the category question. Default: all groups.
-- `--mode fix|report` (optional) - `fix` applies fixes automatically (default); `report` documents findings only without editing files. Skips the mode question.
+- `--mode report|fix` (optional) - `report` documents findings and edits nothing (default); `fix` applies fixes and then runs a verification gate. Skips the mode question.
+- `--verify-command <cmd>` (optional) - Command used to verify a fix batch. Without a usable gate, fix mode edits but never commits.
+- `--commit` (optional) - Authorize one commit of the verified batch. Requires `--mode fix` and a gate that exited zero. Off by default.
 - `--max-iterations N` (optional) - Maximum iterations before stopping (default: 5)
 - `--auto-loop` (optional) - Automatically continue until GREEN verdict or max iterations reached
 - `--with-api-review` (optional) - Enable Phase 2 API Correctness & Completeness review

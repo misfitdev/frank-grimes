@@ -11,7 +11,13 @@ arguments:
     description: "Comma-separated category groups to enable: 'core-quality', 'security-privacy', 'architecture-ops', 'code-structure'. Defaults to all enabled."
     required: false
   - name: mode
-    description: "Output mode: 'fix' (apply fixes automatically, default) or 'report' (report findings only, no edits)"
+    description: "Output mode: 'report' (report findings only, no edits — default) or 'fix' (apply fixes; requires a verification gate before any commit)"
+    required: false
+  - name: verify-command
+    description: "Command used to verify fixes before committing. Without a usable gate, fix mode edits but never commits."
+    required: false
+  - name: commit
+    description: "Authorize a single commit of the verified fix batch (default false). Requires mode=fix and a gate that exited zero."
     required: false
   - name: max-iterations
     description: Maximum grind iterations before stopping (default 5)
@@ -118,17 +124,28 @@ Execute a Grimes Grind on the target using the grimey methodology.
 ### 0.3 Mode
 
 - **If `$ARGUMENTS` contains `--mode fix`, `--mode report`, or `mode=`:** Use the provided value. Skip this step.
-- **Otherwise**, use the **AskUserQuestion** tool:
-  - question: "Should I apply fixes automatically or just report findings?"
+- **Otherwise** default to `mode=report`. Only ask when the invocation is ambiguous, using the **AskUserQuestion** tool:
+  - question: "Should I report findings only, or also apply fixes?"
   - header: "Mode"
   - options:
     ```
     [
-      { label: "Fix (Recommended)", description: "Apply fixes automatically as issues are found" },
-      { label: "Report Only", description: "Identify and document all issues but make no file edits" }
+      { label: "Report Only (Default)", description: "Identify and document all issues but make no file edits" },
+      { label: "Fix", description: "Apply fixes, then run a verification gate. Commits only with explicit --commit and a passing gate." }
     ]
     ```
-  - Map "Fix (Recommended)" → `mode=fix`, "Report Only" → `mode=report`.
+  - Map "Report Only (Default)" → `mode=report`, "Fix" → `mode=fix`.
+
+### 0.4 Verification Gate (only when `mode=fix`)
+
+Select the gate before making any edit, using the order in the skill's "Fix Mode and the Commit Gate" section:
+
+1. `--verify-command` when supplied.
+2. The repository's checked-in aggregate check (for example `just check`).
+3. A single documented test or CI command.
+4. Otherwise `verification=unavailable`.
+
+Inspect the command before running it. Record which rule selected it. If the gate is `unavailable`, continue in fix mode but state up front that no commit will occur.
 
 ---
 
@@ -198,9 +215,9 @@ Systematically attack the subject across the enabled categories. Evidence-First 
 
 ### Phase 4: The Rebuild (Mitigation)
 
-**If `mode=fix`:** For each issue, propose a fix and apply it using Edit/Write tools. Commit after each fix with `git add` and `git commit`.
+**If `mode=report` (the default):** Skip Phase 4 entirely. Do NOT use Edit or Write tools. Document all findings with a "Suggested Fix" field but make no edits and no commits.
 
-**If `mode=report`:** Skip Phase 4 entirely. Do NOT use Edit or Write tools. Document all findings with a "Suggested Fix" field but make no edits.
+**If `mode=fix`:** Apply fixes with Edit/Write across the whole batch. Do not commit here, and do not commit per fix.
 
 Fix format (for `mode=fix`):
 ```
@@ -211,6 +228,20 @@ Fix format (for `mode=fix`):
 **Residual Risk:** What is still not perfect?
 **Regression Scope:** What must be re-checked after this change?
 ```
+
+### Phase 4.5: Verification and the Commit Gate (only when `mode=fix`)
+
+Run the gate selected in 0.4 exactly once, after the whole batch. Record the command, working directory, exit code, and bounded output as E1 evidence, whatever the outcome.
+
+| Gate outcome | Finding state | Commit |
+|--------------|---------------|--------|
+| exit 0 | `verified` | Only if `--commit` was also passed |
+| nonzero exit | `fixed`, verification `failed` | Never |
+| no usable gate | `fixed`, verification `unavailable` | Never |
+
+A commit requires fix mode, explicit `--commit`, and a zero exit — all three. When permitted, make exactly one commit for the batch and name the closed finding IDs in the message. Leave edits uncommitted in every other case and say so explicitly, so the user can inspect the working tree.
+
+Report `issues_fixed` as the count of `verified` findings only. Edited-but-unverified findings are not fixed.
 
 ### Phase 5: Scoped Re-Grind
 
@@ -240,13 +271,19 @@ GRIMES_RESULT: {
   "max_iterations": <maximum allowed iterations>,
   "verdict": "GREEN|YELLOW|RED",
   "issues_found": <count of total issues identified>,
-  "issues_fixed": <count of issues remediated>,
+  "issues_fixed": <count of VERIFIED closures only; never the count of edits>,
+  "verification": {
+    "status": "passed|failed|unavailable|not_applicable",
+    "command": "<exact command, or null>",
+    "exit_code": <integer, or null>,
+    "selected_by": "explicit|repo_check|documented_command|none"
+  },
   "grime_findings": [
     {
       "grime_id": "grime-xxx-123",
       "category": "Category name",
       "severity": "P0|P1|P2|P3",
-      "status": "FIXED|UNFIXED",
+      "status": "VERIFIED|FIXED|UNFIXED",
       "evidence": "Specific code path, scenario, or evidence",
       "fix_applied": "Description of fix applied, or null if unfixed"
     }

@@ -117,7 +117,9 @@ When your provider supports arguments, you can skip the interactive prompts:
 | `target` | What to grind (file path, directory, description, or "this") |
 | `--scope recent-changes\|whole-repo` | Shorthand scope |
 | `--categories core-quality,security-privacy,architecture-ops,code-structure` | Category groups to run |
-| `--mode fix\|report` | `fix` applies fixes; `report` documents only |
+| `--mode report\|fix` | `report` documents only and edits nothing (default); `fix` applies fixes, then verifies |
+| `--verify-command <cmd>` | Gate run once over a fix batch; without a usable gate nothing is committed |
+| `--commit` | Authorizes one commit of the verified batch; requires `--mode fix` and a passing gate |
 | `--max-iterations N` | Maximum iterations (default: 5) |
 | `--auto-loop` | Continue until GREEN verdict |
 | `--with-api-review` | Enable Phase 2 API correctness review |
