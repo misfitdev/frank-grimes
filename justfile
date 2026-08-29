@@ -34,8 +34,12 @@ preview:
     cd docs && python3 -m http.server 8080
 
 # Lint, format-check, validate, and run contract tests
-check: lint fmt-check validate test-fix-gate
+check: lint fmt-check validate test-fix-gate test-adjudication
 
 # Run the fix-gate contract tests
 test-fix-gate:
     ./tests/test-fix-gate.sh
+
+# Run the independent adjudication contract tests
+test-adjudication:
+    ./tests/test-adjudication.sh

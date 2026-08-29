@@ -24,5 +24,8 @@
   "commands": [
     "./adapters/claude-code/commands/"
   ],
+  "agents": [
+    "./adapters/claude-code/agents/grimey-verifier.md"
+  ],
   "hooks": "./adapters/claude-code/hooks.json"
 }

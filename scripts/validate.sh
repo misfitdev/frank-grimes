@@ -259,6 +259,7 @@ echo ""
 echo "--- Adapter Completeness ---"
 
 # Plugin manifests
+check test -f "$PROJECT_ROOT/adapters/claude-code/agents/grimey-verifier.md" "Claude Code: independent verifier subagent exists"
 check test -f "$PROJECT_ROOT/.claude-plugin/plugin.json" "Claude Code: .claude-plugin/plugin.json exists"
 check test -f "$PROJECT_ROOT/.claude-plugin/marketplace.json" "Claude Code: .claude-plugin/marketplace.json exists"
 check test -f "$PROJECT_ROOT/.codex-plugin/plugin.json" "Codex: .codex-plugin/plugin.json exists"

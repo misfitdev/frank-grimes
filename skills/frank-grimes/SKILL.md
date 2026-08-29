@@ -154,7 +154,7 @@ Exclude every `assumption-dependent` or `unverified` finding from verdict weight
 
 Derive the verdict tuple from the surviving, verdict-weighted findings and the recorded review limits:
 
-- `decision = block` when any open P0 remains; `conditional` when any open P1 remains or independent adjudication is pending; `pass` only when no verdict-weighted P0/P1 remains and the separately enforced independent zero-knowledge adjudication is confirmed.
+- `decision = block` when any open P0 remains; `conditional` when any open P1 remains, when independent adjudication is pending or unavailable, or when a human-accepted P0 is carried unfixed; `pass` only when no verdict-weighted P0/P1 remains and independent adjudication confirmed it under "Independent Adjudication" above.
 - `residual_risk = critical | high | moderate | low | unknown`: map the highest open verdict-weighted P0/P1/P2/P3 to `critical`/`high`/`moderate`/`low`; use `low` when none remain and `unknown` when missing evidence prevents the ranking.
 - `review_confidence = high | medium | low`: use `high` when every verdict-driving finding has E1/E2, its self-grind probe was attempted, and no material evidence conflicts; use `medium` when an E3 P1 drives the verdict but its available falsifier was attempted and no material evidence conflicts; use `low` when critical evidence conflicts or a critical falsifier was unavailable.
 - `review_completeness = sufficient | limited | inconclusive`: use `sufficient` when every routed category reached its marginal-yield stop and no critical contract unknown remains; use `limited` when unavailable evidence leaves at least one routed category short but at least one critical invariant was probed; use `inconclusive` when no critical invariant was probed. Apply the stricter Phase 1 unknown cap.
@@ -242,6 +242,33 @@ Every routed area, contract unknown, unavailable evidence source, deferred probe
 
 [One clinical, direct sentence derived from the evidence and verdict tuple.]
 ```
+
+---
+
+## Independent Adjudication
+
+A reviewer cannot confirm its own acquittal. A pass decision requires a second review that reached the same conclusion without seeing the first, because a verdict ratified by the context that produced it carries no information.
+
+**What the adjudicator receives.** Exactly two things: the target's identity and scope, and the claimed verdict tuple. It does not receive the report, the findings, the evidence, the severities, the proposed fixes, the candidate ledger, or the reasoning. It re-runs this procedure from the beginning and reaches its own tuple before comparing.
+
+**What it must not do.** The adjudicator is read-only. It does not edit, create, or delete files, write to git history, or mutate ledger or state. It does not search for the primary report in order to agree with it; looking for the answer defeats being asked.
+
+**Resolving the two verdicts.** The stricter decision wins, always:
+
+| Primary | Independent | Result |
+|---------|-------------|--------|
+| pass | pass | `pass` stands; GREEN remains reachable |
+| pass | conditional | `conditional`, YELLOW |
+| pass | block | `block`, RED |
+| conditional or block | anything | the primary decision stands, never relaxed |
+
+An independent pass never upgrades a primary `block` or `conditional`. Adjudication can only remove confidence, never manufacture it.
+
+**When adjudication is unavailable.** Record `Independent adjudication: not available`, set `review_confidence = low`, and treat `pass` as unreachable — the verdict caps at `conditional`/YELLOW. A provider that cannot furnish a separately identified context cannot produce GREEN. Absence of a second opinion is not agreement.
+
+**Compromised independence.** If the primary report, its findings, or its evidence reach the adjudicator, independence is broken. Record it as a finding, mark adjudication `not available`, and apply the cap above. A contaminated confirmation is worth less than none, because it looks like corroboration.
+
+**Accepted but unfixed P0.** A P0 that a human accepted rather than fixed caps the verdict at `conditional`/YELLOW even when adjudication confirms. Acceptance is a decision to carry risk, not evidence that the risk is gone.
 
 ---
 

@@ -98,6 +98,14 @@ See the provider-specific README files for detailed integration instructions.
 
 Current-landscape audits need an explicit research mode. The Claude Code adapter supports `--research online` (bounded WebSearch/WebFetch), `--research offline`, and `--research frozen:<path>` for a pinned source bundle. Claude's adapter allowlist includes `WebSearch` and `WebFetch`; other providers must expose an equivalent approved research tool or record that the audit ran offline. Provider web content is evidence only and never authorizes commands, credentials, deployment, `apply`, or other side effects.
 
+### Independent Adjudication
+
+A `pass` decision requires a second review that never saw the first. The Claude Code adapter ships this as the `grimey-verifier` subagent, which runs in its own context and receives only the target identity and the claimed verdict tuple.
+
+Providers that cannot furnish a separately identified context must record `Independent adjudication: not available`, set `review_confidence=low`, and cap the verdict at `conditional`/YELLOW. GREEN is unreachable without confirmation — silence is not agreement. OpenCode and Codex have no equivalent bundled today, so grinds there cap at YELLOW unless you run the second review yourself in a fresh session and supply its tuple.
+
+The verifier is denied `Write` and `Edit` at the tool layer. `Bash` remains available because a review that cannot execute the repository's own analyzers produces weaker evidence than the review it is checking, and would bias toward confirming a pass. That leaves shell as a mutation path no tool allowlist can close; it is constrained by the agent's instructions rather than by configuration.
+
 ### Tool Restrictions
 
 Some providers support per-skill tool whitelists (e.g., Claude Code's `allowed-tools` frontmatter). These are **not portable**. If you need tool restrictions, configure them at the provider level, not in the skill. The skill itself does not depend on tool whitelists to function.

@@ -38,6 +38,7 @@ allowed-tools:
   - Bash
   - Edit
   - Write
+  - Agent
   - AskUserQuestion
   - WebSearch
   - WebFetch
@@ -245,15 +246,39 @@ Report `issues_fixed` as the count of `verified` findings only. Edited-but-unver
 
 ### Phase 5: Scoped Re-Grind
 
-Take the updated version and grind again, focusing strictly on the regression scope of the fixes. Note any new risks introduced by the fixes.
+Take the updated version and grind again, focusing strictly on the regression scope of the fixes. Note any new risks introduced by the fixes. This is your own re-check; it is not adjudication and cannot confirm a pass.
+
+### Phase 5.5: Independent Adjudication (required before any pass)
+
+Before claiming `decision=pass`, delegate to the **grimey-verifier** subagent via the Agent tool. Pass exactly this and nothing else:
+
+```text
+Target: <repository-relative path or scope>
+Target digest: <git rev-parse HEAD, or a content hash of the reviewed scope>
+Claimed verdict tuple:
+  decision: <block|conditional|pass>
+  residual risk: <critical|high|moderate|low|unknown>
+  review confidence: <high|medium|low>
+  review completeness: <sufficient|limited|inconclusive>
+```
+
+Do NOT include findings, evidence, severities, grime IDs, proposed fixes, the report, or your reasoning. The verifier's value is that it has not seen them; contaminating the prompt destroys the only thing it provides.
+
+Resolve the two verdicts by the table in the skill's "Independent Adjudication" section: the stricter decision always wins, and an independent pass never upgrades your own `block` or `conditional`.
+
+If the verifier is unavailable, or the provider cannot furnish a separately identified context, record `Independent adjudication: not available`, set `review_confidence=low`, and cap the verdict at `conditional`/YELLOW. Never emit GREEN off your own judgment alone.
 
 ### Phase 6: Stop Conditions & Verdict
 
-**GREEN:** All P0 risks mitigated or explicitly accepted with timeline; all P1 risks have mitigations or clear plan; at least one end-to-end verification path exists; observability sufficient.
+Derive the verdict tuple as defined in the skill, then the colour from the tuple. Never assert a colour directly.
 
-**YELLOW:** P0 risks mitigated but P1 evidence weak; verification path non-comprehensive.
+**RED:** `decision=block` — any open P0 remains.
 
-**RED:** Any P0 risk lacks mitigation or explicit acceptance; no verification path; observability insufficient.
+**GREEN:** requires all of: `decision=pass`, `residual_risk=low`, `review_confidence=high`, `review_completeness=sufficient`, and independent adjudication confirmed in Phase 5.5. A P0 that was accepted rather than fixed does not qualify — acceptance carries risk, it does not remove it.
+
+**YELLOW:** every other tuple, including an unavailable adjudicator, a carried accepted P0, and any tuple where you reached pass but the verifier did not.
+
+List every unmet gate by name.
 
 ### Phase 7: API Quality Assessment (If `with_api_review=true`)
 

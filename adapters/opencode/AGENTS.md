@@ -60,3 +60,9 @@ Model selection is configured at the agent or project level in OpenCode. The ski
 ## Frontmatter Compatibility
 
 OpenCode honors `name` and `description` in skill frontmatter. Other fields (`allowed-tools`, `model`, `arguments`, etc.) are silently ignored. The skill's `skills/frank-grimes/SKILL.md` uses only the portable subset.
+
+## Independent Adjudication
+
+A `pass` verdict requires a second review that never saw the first. OpenCode has no bundled equivalent of the Claude adapter's `grimey-verifier` subagent, so a grind here records `Independent adjudication: not available`, sets `review_confidence=low`, and caps at `conditional`/YELLOW.
+
+To reach a pass, run the grind a second time in a fresh session given only the target and the claimed verdict tuple — never the first report — and resolve the two by the stricter decision.
