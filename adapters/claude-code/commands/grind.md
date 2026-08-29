@@ -219,9 +219,13 @@ GRIMES_RESULT: {
 }
 ```
 
-Then update the state file at `.grimes-state.json`: set `last_verdict`, `issues_found`, `issues_fixed`, `last_commit`, `last_grind_timestamp`. Preserve all other fields.
+Then update the state file at `.grimes-state.json`: set `last_verdict`, `issues_found`, `issues_fixed`, `new_p0_p1`, `last_commit`, `last_grind_timestamp`. Preserve all other fields, and never write `iteration` — that field belongs to the hook.
 
-**If `auto_loop=true` and verdict is RED or YELLOW and current iteration < max_iterations:** Start the next iteration immediately. Carry forward unfixed findings as `previous_context` and increment `iteration`. Repeat from Phase 1 with narrowed focus on remaining P0/P1 issues.
+`new_p0_p1` is the count of P0/P1 findings this iteration surfaced that the previous iteration did not. It is how the hook knows whether another pass is yielding anything; report `0` honestly when an iteration turned up nothing new.
+
+**Do not start the next iteration yourself, and do not change `iteration`.** The stop hook owns the loop: it decides whether another pass happens, increments the counter, and re-injects the prompt. Two components incrementing the same counter skips iterations and corrupts the cap that makes the loop terminate.
+
+End your turn after emitting the result. If another iteration is warranted, the hook will start it.
 
 ---
 

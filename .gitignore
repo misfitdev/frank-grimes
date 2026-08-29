@@ -65,3 +65,6 @@ audit/
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# Quarantined loop state kept for diagnosis, not for sharing
+.grimes/quarantine/

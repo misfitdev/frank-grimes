@@ -1,13 +1,15 @@
 # Stop Hook Integration
 
-The Grimes Grind auto-loop uses a stop hook to intercept exit attempts and continue iterating until a GREEN verdict is reached or maximum iterations are exhausted.
+The Grimes Grind auto-loop uses a stop hook to intercept exit attempts and continue iterating. The hook owns the loop: it decides whether another pass happens, increments the counter, and re-injects the prompt. The grind itself must never advance the iteration.
+
+Iteration stops when a pass is confirmed, when an iteration surfaces no new P0/P1 findings, or when the cap is reached. Verdict rules live in the skill, not here.
 
 ## How It Works
 
 1. During a grind, the agent writes state to `.grimes-state.json` in the project root
 2. On session stop, the agent's hook system calls `hooks/stop.sh`
 3. The hook reads the state file and decides:
-   - **Exit 0**: Allow the session to end (GREEN verdict, max iterations reached, or auto-loop disabled)
+   - **Exit 0**: Allow the session to end (pass confirmed, no new P0/P1 findings, max iterations reached, or auto-loop disabled)
    - **Exit 2**: Block exit and re-inject the grind prompt (continue iterating)
 4. If continuing, the hook increments the iteration counter and outputs the next prompt
 
