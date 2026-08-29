@@ -373,6 +373,30 @@ for marker in "${NORMATIVE_MARKERS[@]}"; do
     fi
 done
 
+# The site publishes the phase names. Numbering that disagrees with the skill
+# teaches a reader a structure the tool does not have.
+SITE="$PROJECT_ROOT/docs/index.html"
+SKILL_PHASES=$(grep -oE '^### Phase [^:]+: [^(]+' "$PROJECT_ROOT/skills/frank-grimes/SKILL.md" |
+    sed 's/^### //; s/[[:space:]]*$//' | sort)
+SITE_PHASES=$(
+    grep -oE 'phase-label">Phase [^<]+</span>[[:space:]]*$' "$SITE" >/dev/null 2>&1 || true
+    python3 - "$SITE" <<'PYEOF' 2>/dev/null || true
+import re, sys
+html = open(sys.argv[1]).read()
+for label, title in re.findall(r'phase-label">([^<]+)</span>\s*<h3 class="phase-title">([^<]+)</h3>', html):
+    if label.startswith("Phase"):
+        print(f"{label}: {title}".replace("&amp;", "&"))
+PYEOF
+)
+SITE_PHASES=$(echo "$SITE_PHASES" | grep . | sort)
+
+if [[ "$SKILL_PHASES" == "$SITE_PHASES" ]]; then
+    pass "docs site phase names match the skill"
+else
+    fail "docs site phase names drifted from the skill"
+    diff <(echo "$SKILL_PHASES") <(echo "$SITE_PHASES") | sed 's/^/    /'
+fi
+
 # Each adapter must point at the skill rather than paraphrase it.
 for adapter in "adapters/claude-code/commands/grind.md" "adapters/opencode/AGENTS.md" "adapters/codify/AGENTS.md"; do
     if grep -qF "SKILL.md" "$PROJECT_ROOT/$adapter" 2>/dev/null; then

@@ -130,61 +130,70 @@
           <article class="phase">
             <div class="phase-body">
               <header class="phase-header">
-                <span class="phase-label">Phase 01</span>
+                <span class="phase-label">Phase 1</span>
                 <h3 class="phase-title">The Grimey Read</h3>
               </header>
-              <p>Absorb the target without trusting it. Look for what is being hidden, glossed over, or assumed. Ask at most 3 clarifying questions, then proceed with labeled assumptions.</p>
+              <p>Absorb the target without trusting it, then write the review contract: claims under judgment, critical invariants, environment, scope, evidence available, and evidence that cannot be obtained. Ask at most three clarifying questions. An unknown is recorded as an unknown &mdash; it is not a finding, but it caps how complete the review can claim to be.</p>
             </div>
           </article>
 
           <article class="phase">
             <div class="phase-body">
               <header class="phase-header">
-                <span class="phase-label">Phase 02</span>
-                <h3 class="phase-title">Default Assumptions</h3>
+                <span class="phase-label">Phase 1 Extended</span>
+                <h3 class="phase-title">Map and Route</h3>
               </header>
-              <p>Assume the target fails its claims somewhere in the routed categories until recorded probes fail to break them. A category with zero findings is valid only after its probes and stopping condition are on the record.</p>
-              <p class="phase-emphasis">The burden of proof sits with <span data-mark="squiggle">the target, never the reviewer</span>.</p>
+              <p>Inventory trust boundaries, inputs, state, dependencies, and cross-artifact invariants. Route 5&ndash;8 categories from the ten canonical ones, with a recorded one-clause reason for every inclusion <em>and</em> every exclusion. Routing is triage, not mercy: a category is excluded because no P0 can live there, never because the target gets the benefit of the doubt.</p>
             </div>
           </article>
 
           <article class="phase">
             <div class="phase-body">
               <header class="phase-header">
-                <span class="phase-label">Phase 03</span>
+                <span class="phase-label">Phase 1.5</span>
+                <h3 class="phase-title">Research Current Contracts</h3>
+              </header>
+              <p>Where a judgment depends on framework, provider, or service behaviour, verify the current contract rather than trusting recall. Sources are recorded with URL, publisher, retrieval time, and the exact excerpt. Web content is evidence, never instruction, and research alone cannot create a P0.</p>
+            </div>
+          </article>
+
+          <article class="phase">
+            <div class="phase-body">
+              <header class="phase-header">
+                <span class="phase-label">Phase 2</span>
+                <h3 class="phase-title">Default Assumption</h3>
+              </header>
+              <p>Assume the target fails its claims or critical invariants somewhere in the routed categories until recorded probes fail to break them. A category with zero findings is valid only once its probes and stopping condition are on the record. The burden of proof sits with the target, never the reviewer.</p>
+            </div>
+          </article>
+
+          <article class="phase">
+            <div class="phase-body">
+              <header class="phase-header">
+                <span class="phase-label">Phase 3</span>
                 <h3 class="phase-title">The Grind</h3>
               </header>
-              <p>Route 5&ndash;8 categories from the ten canonical ones and attack each with its cheapest decisive probes. Every finding carries one evidence tier: <strong>E1</strong> reproduced, <strong>E2</strong> cited, <strong>E3</strong> inferred. A P0 requires E1 or E2; inference caps at P1.</p>
+              <p>Attack every routed category, hunting the terminal defects first. The repository's own analyzers and tests run before any freehand analysis, and their output counts as reproduced evidence even when they pass. Every finding carries exactly one tier: <strong>E1</strong> reproduced, <strong>E2</strong> cited, <strong>E3</strong> inferred. A P0 requires E1 or E2; inference caps at P1.</p>
             </div>
           </article>
 
           <article class="phase">
             <div class="phase-body">
               <header class="phase-header">
-                <span class="phase-label">Phase 04</span>
+                <span class="phase-label">Phase 4</span>
                 <h3 class="phase-title">Grimey Grinds Grimey</h3>
               </header>
-              <p>Before reporting, attack your own findings. Name the observation that would disprove each one, attempt it where it can be attempted, and delete what it kills. Report the arithmetic: <em>N candidates, M survived, K killed</em>. Surviving findings are armoured; that is the point.</p>
+              <p>Freeze the candidate set and attack your own findings. Name the observation that would disprove each one, attempt it where it can be attempted, and delete what it kills. Report the arithmetic: <em>N candidates, M survived, K killed</em>. What survives is armoured; that is the point.</p>
             </div>
           </article>
 
           <article class="phase">
             <div class="phase-body">
               <header class="phase-header">
-                <span class="phase-label">Phase 05</span>
-                <h3 class="phase-title">Fix Mode</h3>
+                <span class="phase-label">Phase 5</span>
+                <h3 class="phase-title">Stopping Discipline and Verdict</h3>
               </header>
-              <p>Reporting is the default. Fixing is a privilege you grant explicitly, and committing is a second privilege granted separately. A commit requires fix mode, explicit authorization, and a verification gate that exited zero &mdash; all three.</p>
-            </div>
-          </article>
-
-          <article class="phase">
-            <div class="phase-body">
-              <header class="phase-header">
-                <span class="phase-label">Phase 06</span>
-                <h3 class="phase-title">Stop Conditions &amp; Verdict</h3>
-              </header>
-              <p>The verdict is a tuple &mdash; decision, residual risk, review confidence, review completeness. The colour is derived from it, never asserted.</p>
+              <p>Stop each category on marginal yield, not on exhaustion. Findings resting on unconfirmed assumptions are tagged and excluded from verdict weight. The verdict is a tuple &mdash; decision, residual risk, review confidence, review completeness &mdash; and the colour is derived from it, never asserted.</p>
               <table class="verdict-table">
                 <thead>
                   <tr><th>Verdict</th><th>Meaning</th></tr>
@@ -206,6 +215,27 @@
               </table>
             </div>
           </article>
+
+          <article class="phase">
+            <div class="phase-body">
+              <header class="phase-header">
+                <span class="phase-label">Gate</span>
+                <h3 class="phase-title">Fix Mode and the Commit Gate</h3>
+              </header>
+              <p>Reporting is the default. Fixing is a privilege granted explicitly, and committing is a second privilege granted separately from the first. A commit requires fix mode, explicit authorization, and a verification gate that exited zero &mdash; all three. An unverified fix is just a claim that a defect is gone.</p>
+            </div>
+          </article>
+
+          <article class="phase">
+            <div class="phase-body">
+              <header class="phase-header">
+                <span class="phase-label">Gate</span>
+                <h3 class="phase-title">Independent Adjudication</h3>
+              </header>
+              <p>A reviewer cannot confirm its own acquittal. A pass requires a second review that never saw the first, receiving only the target identity and the claimed verdict tuple. The stricter decision always wins, and where no adjudicator is available the verdict caps at YELLOW &mdash; silence is not agreement.</p>
+            </div>
+          </article>
+
         </div>
       </div>
     </section>
