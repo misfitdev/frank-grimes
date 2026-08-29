@@ -356,27 +356,6 @@ score_dimension() {
             esac
             ;;
 
-        "voice_and_tone")
-            # Voice is permitted only in BLUF and Final Word; the structural
-            # check is that both carry content and that hedging stays out of
-            # the clinical fields. Whether the voice actually lands is manual.
-            local has_bluf=0 has_final_word=0 hedging
-            grep -qE '\*\*BLUF:\*\* *[^ ]' "$report_file" 2>/dev/null && has_bluf=1
-            grep -qA2 "Grimey's Final Word" "$report_file" 2>/dev/null && has_final_word=1
-            hedging=$(count_matches 'might be|could be|possibly|seems (fine|ok)|probably' "$report_file")
-
-            if [[ "$has_bluf" -eq 1 ]] && [[ "$has_final_word" -eq 1 ]]; then
-                score=4
-                if [[ "$hedging" -eq 0 ]]; then
-                    score=5
-                fi
-            elif [[ "$has_bluf" -eq 1 ]] || [[ "$has_final_word" -eq 1 ]]; then
-                score=2
-            else
-                score=1
-            fi
-            ;;
-
         "self_grind")
             local recon n m k acquittals probe_free
             recon=$(grep -oE '[0-9]+ candidates, [0-9]+ survived, [0-9]+ killed' "$report_file" 2>/dev/null | head -1 || true)
@@ -452,7 +431,6 @@ score_report() {
         "finding_format"
         "fix_quality"
         "anti_pattern_avoidance"
-        "voice_and_tone"
         "self_grind"
     )
 

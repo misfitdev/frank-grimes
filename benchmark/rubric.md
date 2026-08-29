@@ -201,28 +201,7 @@ Does the grind avoid the known anti-patterns?
 
 ---
 
-### 9. Voice and Tone (0-5)
-
-Does the output sound like Grimey—clinical, direct, unforgiving—without obscuring the instructions?
-
-| Score | Criteria |
-|-------|----------|
-| 0 | No distinct voice; reads like generic code review |
-| 1 | Voice is present but flat; lacks the clinical pessimism |
-| 2 | Voice is recognizable but inconsistent; sometimes too soft, sometimes too aggressive |
-| 3 | Voice is consistent; clinical, direct, and unforgiving |
-| 4 | Voice is strong; the satire is present but never obscures the findings |
-| 5 | Voice is exemplary; every section carries the Grimey tone without sacrificing clarity |
-
-**What to look for:**
-- Clinical, direct language
-- No softening of findings to spare feelings
-- Anger at indifference to incompetence, not at incompetence itself
-- Satire present but never obscuring instructions, safety constraints, or verification requirements
-
----
-
-### 10. Self-Grind and Earned Acquittal (0-5)
+### 9. Self-Grind and Earned Acquittal (0-5)
 
 Did the grind attack its own findings, and are its clean claims backed by a probe that was actually performed?
 
@@ -257,11 +236,12 @@ An acquittal that nobody tried to falsify is the worst failure available to a ju
 | Finding Format Compliance | 5 |
 | Fix Quality | 5 |
 | Anti-Pattern Avoidance | 5 |
-| Voice and Tone | 5 |
 | Self-Grind and Earned Acquittal | 5 |
-| **Total** | **50** |
+| **Total** | **45** |
 
-**Normalized score:** (Total / 50) × 100 = Percentage
+**Normalized score:** (Total / 45) × 100 = Percentage
+
+Grimey's voice is not scored. It exists because it is fun to read, and paying points for it would buy persona at the expense of findings. The skill still confines it to the BLUF and Final Word; that placement is enforced by the report template, not by the rubric.
 
 **Interpretation:**
 - 0-40%: Poor — the grind is not functioning as intended
@@ -276,10 +256,10 @@ When comparing two versions of the skill:
 
 1. Run the benchmark against both versions
 2. Compare scores dimension by dimension
-3. Look for patterns: did one version improve evidence quality but degrade voice?
+3. Look for patterns: did one version improve evidence quality but degrade routing discipline?
 4. The total score is a summary, but dimension-level comparison is where the insights are
 
-A "better" skill is one that improves the total score without degrading any single dimension by more than 1 point. A skill that improves evidence quality by 2 points but drops voice by 2 points is a trade-off that needs evaluation.
+A "better" skill is one that improves the total score without degrading any single dimension by more than 1 point. A skill that improves evidence quality by 2 points but drops self-grind by 2 points is a trade-off that needs evaluation.
 
 Scores are comparable only within a rubric version. This rubric scores the evidence-tier report shape; it replaced Category Coverage with Routing Discipline and Origin Assessment with Self-Grind and Earned Acquittal, so totals do not compare against runs scored before that change.
 
@@ -289,8 +269,8 @@ Scores are comparable only within a rubric version. This rubric scores the evide
 
 Two consequences of that limit:
 
-- **Severity Assessment tops out at 4 automatically.** The fifth point requires judging whether a P0/P1 split is defensible, which no grep can do. A perfect report scores 44/45 in report mode, not 45/45.
-- **Fix Quality is `N/A` in report mode** and drops out of the denominator, so report-mode totals are out of 45.
+- **Severity Assessment tops out at 4 automatically.** The fifth point requires judging whether a P0/P1 split is defensible, which no grep can do. A perfect report scores 39/40 in report mode, not 40/40.
+- **Fix Quality is `N/A` in report mode** and drops out of the denominator, so report-mode totals are out of 40.
 
 Score a saved report without re-running an agent:
 
