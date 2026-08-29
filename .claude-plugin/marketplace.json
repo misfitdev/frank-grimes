@@ -1,5 +1,6 @@
 {
   "name": "misfitdev",
+  "description": "Review tooling from Misfit Development, built on the assumption that everything is broken until a probe proves otherwise.",
   "owner": {
     "name": "Misfit Development",
     "email": "code@misfit.dev",
