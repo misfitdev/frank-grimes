@@ -1,0 +1,15 @@
+{
+  "name": "misfitdev",
+  "owner": {
+    "name": "Misfit Development",
+    "email": "code@misfit.dev",
+    "url": "https://github.com/misfitdev"
+  },
+  "plugins": [
+    {
+      "name": "frank-grimes",
+      "source": "./",
+      "description": "A clinical, pessimistic iteration loop for systematically destroying, rebuilding, and hardening ideas. Assumes everything is broken until proven otherwise."
+    }
+  ]
+}

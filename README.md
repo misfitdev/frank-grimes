@@ -33,52 +33,63 @@ The core deliverable is a **Grimes Report** that tells you:
 
 ## Installation
 
-Frank Grimes is provider-neutral. The core skill (`skill/SKILL.md`) and stop hook (`hooks/stop.sh`) work with any agent that can load markdown skills and execute bash scripts.
+Frank Grimes is provider-neutral. The core skill (`skills/frank-grimes/SKILL.md`) and stop hook (`hooks/stop.sh`) work with any agent that can load markdown skills and execute bash scripts. Providers with a plugin system can install the whole thing in one step; the rest load the skill directly.
+
+`jq` is required for the stop hook in every setup below.
 
 ### Quick Start (Any Provider)
 
-1. Load the skill: `skill/SKILL.md`
-2. Ensure `jq` is installed (required for the stop hook)
+1. Load the skill: `skills/frank-grimes/SKILL.md`
+2. Ensure `jq` is installed
 3. Invoke the grind on your target
 
 ### Provider-Specific Setup
 
 #### Claude Code
 
-```bash
-# Copy adapter files to your project's .claude/ directory
-cp -r adapters/claude-code/* .claude/
+Install as a plugin. This repository is also its own marketplace, so it ships the slash commands and the stop hook alongside the skill:
 
-# Or symlink the skill
+```
+/plugin marketplace add misfitdev/frank-grimes
+/plugin install frank-grimes@misfitdev
+```
+
+Then invoke with `/frank-grimes:grind <target>`. Plugin components are namespaced, which is where the `frank-grimes:` prefix comes from.
+
+To load only the skill, without the commands or the loop hook, symlink it instead and invoke with `/grind`:
+
+```bash
 mkdir -p .claude/skills
-ln -s ../../skill .claude/skills/frank-grimes
+ln -s ../../skills/frank-grimes .claude/skills/frank-grimes
 ```
-
-Then invoke with `/frank-grimes:grind <target>`.
-
-#### OpenCode
-
-```bash
-# Symlink the skill into OpenCode's skill path
-mkdir -p .opencode/skills
-ln -s ../../skill .opencode/skills/frank-grimes
-```
-
-OpenCode reads `.opencode/skills/`, `.claude/skills/`, and `.agents/skills/`. Any of these works.
 
 #### Codex
 
+Install as a plugin from the plugin directory, or point Codex at this repository as a local marketplace source. Skill-only setup:
+
 ```bash
-# Symlink the skill into Codex's skill path
 mkdir -p .agents/skills
-ln -s ../../skill .agents/skills/frank-grimes
+ln -s ../../skills/frank-grimes .agents/skills/frank-grimes
 ```
+
+Invoke with `$frank-grimes`, or let the description match your request.
+
+#### OpenCode
+
+OpenCode has no plugin format for bundling a skill, so symlink it:
+
+```bash
+mkdir -p .opencode/skills
+ln -s ../../skills/frank-grimes .opencode/skills/frank-grimes
+```
+
+OpenCode reads `.opencode/skills/`, `.claude/skills/`, and `.agents/skills/`. Any of these works.
 
 #### Other Providers
 
 Any agent that supports markdown skills and bash hooks can use Frank Grimes:
 
-1. Load `skill/SKILL.md` as a skill or system prompt
+1. Load `skills/frank-grimes/SKILL.md` as a skill or system prompt
 2. Configure your agent's stop hook to call `hooks/stop.sh`
 3. Ensure `jq` is installed
 

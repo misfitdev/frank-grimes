@@ -46,7 +46,7 @@ The fixture harness is intentionally offline. It is useful for controlled A/B ch
 
 1. Run the benchmark against the current skill: `./benchmark/runner.sh --all`
 2. Save the results: `cp -r benchmark/results benchmark/results-baseline`
-3. Modify `skill/SKILL.md`
+3. Modify `skills/frank-grimes/SKILL.md`
 4. Run the benchmark again: `./benchmark/runner.sh --all`
 5. Compare: `./benchmark/runner.sh --all --compare`
 

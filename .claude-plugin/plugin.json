@@ -1,12 +1,14 @@
 {
-  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "$schema": "https://json.schemastore.org/claude-code-plugin.json",
   "name": "frank-grimes",
+  "displayName": "Frank Grimes",
   "version": "1.0.0",
   "description": "A clinical, pessimistic iteration loop for systematically destroying, rebuilding, and hardening ideas. Assumes everything is broken until proven otherwise.",
   "author": {
     "name": "Misfit Development",
     "email": "code@misfit.dev"
   },
+  "homepage": "https://misfitdev.github.io/frank-grimes/",
   "repository": "https://github.com/misfitdev/frank-grimes",
   "license": "PolyForm Noncommercial",
   "keywords": [
@@ -18,5 +20,9 @@
     "iteration",
     "critique",
     "falsification"
-  ]
+  ],
+  "commands": [
+    "./adapters/claude-code/commands/"
+  ],
+  "hooks": "./adapters/claude-code/hooks.json"
 }

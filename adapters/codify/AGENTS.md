@@ -8,7 +8,7 @@ Codex reads skills from `.agents/skills/<name>/` in the project directory (walki
 
 ```bash
 mkdir -p .agents/skills
-ln -s ../../skill .agents/skills/frank-grimes
+ln -s ../../skills/frank-grimes .agents/skills/frank-grimes
 ```
 
 This creates a symlink so the skill lives in one place (`skill/`) and Codex finds it.
@@ -49,7 +49,7 @@ Model selection is configured at the config level in Codex. The skill does not s
 
 ## Frontmatter Compatibility
 
-Codex honors `name` and `description` in skill frontmatter. Other fields are silently ignored. The skill's `skill/SKILL.md` uses only the portable subset.
+Codex honors `name` and `description` in skill frontmatter. Other fields are silently ignored. The skill's `skills/frank-grimes/SKILL.md` uses only the portable subset.
 
 ## MCP Tool Naming
 

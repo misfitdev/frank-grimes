@@ -1,14 +1,24 @@
 # Provider Adapters
 
-Frank Grimes is provider-neutral at its core: the skill (`skill/SKILL.md`) and the stop hook (`hooks/stop.sh`) work with any agent that can load markdown skills and execute bash scripts. The adapters in this directory make integration with specific providers trivial.
+Frank Grimes is provider-neutral at its core: the skill (`skills/frank-grimes/SKILL.md`) and the stop hook (`hooks/stop.sh`) work with any agent that can load markdown skills and execute bash scripts. The adapters in this directory make integration with specific providers trivial.
 
 ## Structure
 
+Plugin manifests live at the repository root because both plugin formats require a fixed path and resolve every other path relative to it:
+
 ```
+.claude-plugin/
+├── plugin.json            # Claude Code plugin manifest
+└── marketplace.json       # Catalog, so this repo installs itself
+.codex-plugin/
+└── plugin.json            # Codex plugin manifest
+skills/
+└── frank-grimes/          # The skill both formats discover
+    ├── SKILL.md
+    └── references/
 adapters/
 ├── README.md              # This file
 ├── claude-code/           # Claude Code integration
-│   ├── plugin.json
 │   ├── hooks.json
 │   └── commands/
 │       ├── grind.md
@@ -22,17 +32,26 @@ adapters/
     └── README.md
 ```
 
+The Claude manifest points `commands` and `hooks` back into `adapters/claude-code/`, so provider-specific material stays in this directory rather than spreading across the root.
+
 ## Quick Start
 
 ### Claude Code
 
-Copy the Claude Code adapter into your project's `.claude/` directory:
+Install as a plugin:
 
-```bash
-cp -r adapters/claude-code/* .claude/
+```
+/plugin marketplace add misfitdev/frank-grimes
+/plugin install frank-grimes@misfitdev
 ```
 
-Or install as a plugin by pointing Claude Code at this repository.
+This registers the skill, the `grind`/`help`/`cancel` commands, and the Stop hook that drives the loop. Commands are namespaced under the plugin name: `/frank-grimes:grind`.
+
+Copying the adapter into `.claude/` still works for skill-and-command use, but the Stop hook resolves `${CLAUDE_PLUGIN_ROOT}` and only fires under a plugin install:
+
+```bash
+cp -r adapters/claude-code/commands .claude/
+```
 
 ### OpenCode
 
@@ -41,7 +60,7 @@ OpenCode reads skills from multiple paths. Symlink the skill into one of them:
 ```bash
 # Option 1: Project-level (recommended)
 mkdir -p .opencode/skills
-ln -s ../../skill .opencode/skills/frank-grimes
+ln -s ../../skills/frank-grimes .opencode/skills/frank-grimes
 
 # Option 2: User-level
 mkdir -p ~/.config/opencode/skills
@@ -52,18 +71,22 @@ OpenCode also reads `.claude/skills/` and `.agents/skills/`, so symlinking to an
 
 ### Codex
 
-Codex reads skills from `.agents/skills/`. Symlink the skill:
+Codex installs plugins from the plugin directory shared with ChatGPT, or from a local marketplace source pointed at this repository. `.codex-plugin/plugin.json` declares the same `skills/` directory Claude uses.
+
+Codex also reads skills directly from `.agents/skills/`, which needs no manifest:
 
 ```bash
 mkdir -p .agents/skills
-ln -s ../../skill .agents/skills/frank-grimes
+ln -s ../../skills/frank-grimes .agents/skills/frank-grimes
 ```
+
+Codex rejects a manifest carrying a `hooks` field, so the grind loop's Stop hook is not part of the Codex plugin. Configure it at the Codex level as described in `codify/AGENTS.md`.
 
 ### Other Providers
 
 Any agent that can load a markdown skill and execute a bash script can use Frank Grimes:
 
-1. Load `skill/SKILL.md` as a skill or system prompt
+1. Load `skills/frank-grimes/SKILL.md` as a skill or system prompt
 2. Configure your agent's stop hook to call `hooks/stop.sh`
 3. Ensure `jq` is installed for the stop hook
 
@@ -97,7 +120,7 @@ The skill does not specify a model. Model selection is a provider-level concern.
 To add support for a new provider:
 
 1. Create `adapters/<provider>/`
-2. Document how to load the skill (`skill/SKILL.md`) on that provider
+2. Document how to load the skill (`skills/frank-grimes/SKILL.md`) on that provider
 3. Document how to configure the stop hook (`hooks/stop.sh`) on that provider
 4. Include any provider-specific manifest or configuration files needed
 5. Update this README with the new provider

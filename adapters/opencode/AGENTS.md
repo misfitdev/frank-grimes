@@ -18,7 +18,7 @@ User-level paths:
 
 ```bash
 mkdir -p .opencode/skills
-ln -s ../../skill .opencode/skills/frank-grimes
+ln -s ../../skills/frank-grimes .opencode/skills/frank-grimes
 ```
 
 This creates a symlink so the skill lives in one place (`skill/`) and OpenCode finds it.
@@ -59,4 +59,4 @@ Model selection is configured at the agent or project level in OpenCode. The ski
 
 ## Frontmatter Compatibility
 
-OpenCode honors `name` and `description` in skill frontmatter. Other fields (`allowed-tools`, `model`, `arguments`, etc.) are silently ignored. The skill's `skill/SKILL.md` uses only the portable subset.
+OpenCode honors `name` and `description` in skill frontmatter. Other fields (`allowed-tools`, `model`, `arguments`, etc.) are silently ignored. The skill's `skills/frank-grimes/SKILL.md` uses only the portable subset.

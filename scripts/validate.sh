@@ -75,8 +75,8 @@ echo ""
 # ============================================
 echo "--- Directory Structure ---"
 
-check test -d "$PROJECT_ROOT/skill" "skill/ directory exists"
-check test -f "$PROJECT_ROOT/skill/SKILL.md" "skill/SKILL.md exists"
+check test -d "$PROJECT_ROOT/skills/frank-grimes" "skills/frank-grimes/ directory exists"
+check test -f "$PROJECT_ROOT/skills/frank-grimes/SKILL.md" "skills/frank-grimes/SKILL.md exists"
 check test -d "$PROJECT_ROOT/hooks" "hooks/ directory exists"
 check test -f "$PROJECT_ROOT/hooks/stop.sh" "hooks/stop.sh exists"
 check test -d "$PROJECT_ROOT/adapters" "adapters/ directory exists"
@@ -95,9 +95,36 @@ echo ""
 # ============================================
 echo "--- JSON Validation ---"
 
-if command -v jq &> /dev/null; then
-    check jq empty "$PROJECT_ROOT/adapters/claude-code/plugin.json" "plugin.json is valid JSON"
+if command -v jq &>/dev/null; then
+    check jq empty "$PROJECT_ROOT/.claude-plugin/plugin.json" "Claude plugin.json is valid JSON"
+    check jq empty "$PROJECT_ROOT/.claude-plugin/marketplace.json" "Claude marketplace.json is valid JSON"
+    check jq empty "$PROJECT_ROOT/.codex-plugin/plugin.json" "Codex plugin.json is valid JSON"
     check jq empty "$PROJECT_ROOT/adapters/claude-code/hooks.json" "hooks.json is valid JSON"
+
+    # Both manifests namespace their components off name, and Claude pins the
+    # cached copy to version, so a stale version string blocks user updates.
+    for manifest in ".claude-plugin/plugin.json" ".codex-plugin/plugin.json"; do
+        if [[ "$(jq -r '.name' "$PROJECT_ROOT/$manifest")" == "frank-grimes" ]]; then
+            pass "$manifest declares name 'frank-grimes'"
+        else
+            fail "$manifest name is not 'frank-grimes'"
+        fi
+    done
+
+    CLAUDE_VERSION=$(jq -r '.version' "$PROJECT_ROOT/.claude-plugin/plugin.json")
+    CODEX_VERSION=$(jq -r '.version' "$PROJECT_ROOT/.codex-plugin/plugin.json")
+    if [[ "$CLAUDE_VERSION" == "$CODEX_VERSION" ]]; then
+        pass "plugin manifests agree on version $CLAUDE_VERSION"
+    else
+        fail "plugin manifest versions differ: Claude $CLAUDE_VERSION, Codex $CODEX_VERSION"
+    fi
+
+    # Codex rejects a manifest carrying unsupported fields.
+    if jq -e 'has("hooks")' "$PROJECT_ROOT/.codex-plugin/plugin.json" >/dev/null; then
+        fail ".codex-plugin/plugin.json contains 'hooks' (rejected by Codex validation)"
+    else
+        pass ".codex-plugin/plugin.json omits the unsupported 'hooks' field"
+    fi
 else
     warn "jq not found - skipping JSON validation"
 fi
@@ -119,7 +146,7 @@ echo ""
 # ============================================
 echo "--- SKILL.md Frontmatter Validation ---"
 
-SKILL_MD="$PROJECT_ROOT/skill/SKILL.md"
+SKILL_MD="$PROJECT_ROOT/skills/frank-grimes/SKILL.md"
 
 if [[ -f "$SKILL_MD" ]]; then
     # Extract frontmatter between first --- markers
@@ -187,17 +214,17 @@ echo ""
 # ============================================
 echo "--- Provider Neutrality and Coverage ---"
 
-# Every provider loads skill/ verbatim, so naming one there breaks the others.
+# Every provider loads skills/ verbatim, so naming one there breaks the others.
 # Provider-specific setup belongs in adapters/ and README.md, which must cover
 # each supported platform rather than omit it.
 SUPPORTED_PROVIDERS=("Claude Code" "OpenCode" "Codex")
 
-SKILL_LEAK=$(grep -rniE 'claude|codex|opencode|anthropic|openai' "$PROJECT_ROOT/skill" || true)
+SKILL_LEAK=$(grep -rniE 'claude|codex|opencode|anthropic|openai' "$PROJECT_ROOT/skills" || true)
 if [[ -n "$SKILL_LEAK" ]]; then
-    fail "skill/ names a specific provider:"
+    fail "skills/ names a specific provider:"
     echo "$SKILL_LEAK"
 else
-    pass "skill/ is provider-neutral"
+    pass "skills/ is provider-neutral"
 fi
 
 for doc in "README.md" "adapters/README.md"; do
@@ -221,8 +248,12 @@ echo ""
 # ============================================
 echo "--- Adapter Completeness ---"
 
+# Plugin manifests
+check test -f "$PROJECT_ROOT/.claude-plugin/plugin.json" "Claude Code: .claude-plugin/plugin.json exists"
+check test -f "$PROJECT_ROOT/.claude-plugin/marketplace.json" "Claude Code: .claude-plugin/marketplace.json exists"
+check test -f "$PROJECT_ROOT/.codex-plugin/plugin.json" "Codex: .codex-plugin/plugin.json exists"
+
 # Claude Code adapter
-check test -f "$PROJECT_ROOT/adapters/claude-code/plugin.json" "Claude Code: plugin.json exists"
 check test -f "$PROJECT_ROOT/adapters/claude-code/hooks.json" "Claude Code: hooks.json exists"
 check test -f "$PROJECT_ROOT/adapters/claude-code/commands/grind.md" "Claude Code: commands/grind.md exists"
 check test -f "$PROJECT_ROOT/adapters/claude-code/commands/help.md" "Claude Code: commands/help.md exists"
@@ -242,6 +273,7 @@ echo ""
 echo "--- Stop Hook Integration Check ---"
 
 # Verify stop.sh references project-local state file, not hardcoded cache path
+# shellcheck disable=SC2088  # the tilde is a literal to search for, not a path to expand
 if grep -q '~/.cache/claude-plugins' "$PROJECT_ROOT/hooks/stop.sh"; then
     fail "stop.sh contains hardcoded cache path (~/.cache/claude-plugins)"
 else
@@ -253,6 +285,14 @@ if grep -q '.grimes-state.json' "$PROJECT_ROOT/hooks/stop.sh"; then
     pass "stop.sh references .grimes-state.json (project-local)"
 else
     fail "stop.sh does not reference .grimes-state.json"
+fi
+
+# An installed plugin runs from a versioned cache directory, so a hook path
+# relative to the working directory silently stops firing.
+if grep -q 'CLAUDE_PLUGIN_ROOT' "$PROJECT_ROOT/adapters/claude-code/hooks.json"; then
+    pass "hooks.json resolves stop.sh through \${CLAUDE_PLUGIN_ROOT}"
+else
+    fail "hooks.json does not resolve stop.sh through \${CLAUDE_PLUGIN_ROOT}"
 fi
 
 echo ""

@@ -1,0 +1,39 @@
+{
+  "name": "frank-grimes",
+  "version": "1.0.0",
+  "description": "A clinical, pessimistic iteration loop for systematically destroying, rebuilding, and hardening ideas. Assumes everything is broken until proven otherwise.",
+  "author": {
+    "name": "Misfit Development",
+    "email": "code@misfit.dev",
+    "url": "https://github.com/misfitdev"
+  },
+  "homepage": "https://misfitdev.github.io/frank-grimes/",
+  "repository": "https://github.com/misfitdev/frank-grimes",
+  "license": "PolyForm Noncommercial",
+  "keywords": [
+    "code-review",
+    "security",
+    "pre-mortem",
+    "red-team",
+    "quality",
+    "iteration",
+    "critique",
+    "falsification"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Frank Grimes",
+    "shortDescription": "Assumes your work is broken and makes you prove otherwise",
+    "longDescription": "Frank Grimes runs a disciplined falsification review. It writes a review contract, routes 5-8 attack categories, collects reproduced or cited evidence for every accusation, grinds its own findings to kill the false positives, and returns a verdict with residual risk, confidence, and completeness. Acquittals must be earned by a probe that was actually performed.",
+    "developerName": "Misfit Development",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive"
+    ],
+    "defaultPrompt": [
+      "Grind the changes on this branch",
+      "Red team this architecture proposal",
+      "Pre-mortem this deployment plan"
+    ]
+  }
+}

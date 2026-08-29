@@ -93,7 +93,7 @@
             <span class="step-label">01</span>
             <div class="step-body">
               <h3>Load the skill</h3>
-              <p>The portable skill lives in <code class="code-inline">skill/SKILL.md</code>. Load it into your agent's skill system. See <a href="#providers">Integration</a> for provider-specific setup.</p>
+              <p>The portable skill lives in <code class="code-inline">skills/frank-grimes/SKILL.md</code>. Load it into your agent's skill system. See <a href="#providers">Integration</a> for provider-specific setup.</p>
             </div>
           </li>
           <li data-mark="bang">
@@ -223,7 +223,7 @@
             </header>
             <div class="integration-body">
               <pre class="code-block"><code>mkdir -p .claude/skills
-ln -s ../../skill .claude/skills/frank-grimes</code></pre>
+ln -s ../../skills/frank-grimes .claude/skills/frank-grimes</code></pre>
               <p>Invoke with <code class="code-inline">/frank-grimes:grind &lt;target&gt;</code>.</p>
             </div>
           </article>
@@ -235,7 +235,7 @@ ln -s ../../skill .claude/skills/frank-grimes</code></pre>
             </header>
             <div class="integration-body">
               <pre class="code-block"><code>mkdir -p .opencode/skills
-ln -s ../../skill .opencode/skills/frank-grimes</code></pre>
+ln -s ../../skills/frank-grimes .opencode/skills/frank-grimes</code></pre>
               <p>OpenCode also reads <code class="code-inline">.claude/skills/</code> and <code class="code-inline">.agents/skills/</code>.</p>
             </div>
           </article>
@@ -247,13 +247,13 @@ ln -s ../../skill .opencode/skills/frank-grimes</code></pre>
             </header>
             <div class="integration-body">
               <pre class="code-block"><code>mkdir -p .agents/skills
-ln -s ../../skill .agents/skills/frank-grimes</code></pre>
+ln -s ../../skills/frank-grimes .agents/skills/frank-grimes</code></pre>
             </div>
           </article>
         </div>
 
         <div class="integration-note">
-          <p><strong>Other providers:</strong> Any agent that supports markdown skills and bash hooks can use Frank Grimes. Load <code class="code-inline">skill/SKILL.md</code> as a skill, configure your stop hook to call <code class="code-inline">hooks/stop.sh</code>, and ensure <code class="code-inline">jq</code> is installed. See <a href="adapters/">adapters documentation</a> for details.</p>
+          <p><strong>Other providers:</strong> Any agent that supports markdown skills and bash hooks can use Frank Grimes. Load <code class="code-inline">skills/frank-grimes/SKILL.md</code> as a skill, configure your stop hook to call <code class="code-inline">hooks/stop.sh</code>, and ensure <code class="code-inline">jq</code> is installed. See <a href="adapters/">adapters documentation</a> for details.</p>
         </div>
       </div>
     </section>
@@ -309,7 +309,7 @@ ln -s ../../skill .agents/skills/frank-grimes</code></pre>
           <div class="final-meta">
             <p>Frank Grimes is named after the character from <em>The Simpsons</em>, S8E23 "Homer's Enemy".</p>
             <p>Methodology inspired by pre-mortems, red teaming, and threat modeling.</p>
-            <p class="final-links"><a href="https://github.com/misfitdev/frank-grimes" class="final-link is-primary">View on GitHub</a> <a href="skill/SKILL.md" class="final-link">Read the skill</a></p>
+            <p class="final-links"><a href="https://github.com/misfitdev/frank-grimes" class="final-link is-primary">View on GitHub</a> <a href="skills/frank-grimes/SKILL.md" class="final-link">Read the skill</a></p>
           </div>
         </div>
       </div>
