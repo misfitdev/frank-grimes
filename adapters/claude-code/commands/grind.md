@@ -11,7 +11,7 @@ arguments:
     description: "Restrict routing to specific canonical categories (COR, INT, SEC, REL, OPS, PER, VER, MNT, DEP, HUM). Default: the skill routes 5-8 itself."
     required: false
   - name: mode
-    description: "Output mode: 'report' (report findings only, no edits — default) or 'fix' (apply fixes; requires a verification gate before any commit)"
+    description: "Output mode: 'report' (report findings only, no edits; default) or 'fix' (apply fixes; requires a verification gate before any commit)"
     required: false
   - name: verify-command
     description: "Command used to verify fixes before committing. Without a usable gate, fix mode edits but never commits."
@@ -46,9 +46,9 @@ allowed-tools:
 Execute a Grimes Grind on the target using the grimey methodology.
 
 **Arguments:**
-- `target` / `scope`: What to review — file path, directory, `recent-changes`, `whole-repo`, or a description
+- `target` / `scope`: What to review: file path, directory, `recent-changes`, `whole-repo`, or a description
 - `categories`: Restrict routing to canonical categories from COR, INT, SEC, REL, OPS, PER, VER, MNT, DEP, HUM (default: the skill routes 5-8 itself)
-- `mode`: `report` (default) or `fix` — `fix` also requires a verification gate, and `--commit` before anything is committed
+- `mode`: `report` (default) or `fix`. `fix` also requires a verification gate, and `--commit` before anything is committed
 - `max-iterations`: Stop after N iterations (default 5)
 - `auto-loop`: Iterate while passes still yield new P0/P1 findings (default false)
 - `research`: `online` (default when available), `offline`, or `frozen:<path>` for a pinned research bundle
@@ -105,7 +105,7 @@ Execute a Grimes Grind on the target using the grimey methodology.
 - **If `$ARGUMENTS` contains `--categories` or `categories`:** treat the value as a restriction on what the skill may route, using the canonical codes `COR`, `INT`, `SEC`, `REL`, `OPS`, `PER`, `VER`, `MNT`, `DEP`, `HUM`. Record that the user narrowed the routing, since it caps coverage.
 - **Otherwise:** pass no restriction and let the skill route from the contract and inventory.
 
-Routing is the skill's job: it selects 5-8 categories from the ten and records a reason for every inclusion and exclusion. Do not ask the user to pre-enable a fixed set — a list chosen before the target is read is not routing, and padding findings to fill it is the anti-pattern the skill exists to prevent.
+Routing is the skill's job: it selects 5-8 categories from the ten and records a reason for every inclusion and exclusion. Do not ask the user to pre-enable a fixed set: a list chosen before the target is read is not routing, and padding findings to fill it is the anti-pattern the skill exists to prevent.
 
 ### 0.3 Mode
 
@@ -142,7 +142,7 @@ Once scope, categories, and mode are determined, **execute the Grimes Grind inli
 **Resolved configuration:**
 - **Target / Scope:** (from step 0.1)
 - **Category restriction:** (from step 0.2, or none)
-- **Mode:** (from step 0.3) — `fix` = apply edits; `report` = document only, no edits
+- **Mode:** (from step 0.3): `fix` = apply edits; `report` = document only, no edits
 - **Max iterations:** from `$ARGUMENTS` or default 5
 - **Auto-loop:** from `$ARGUMENTS` or default false
 - **Research mode:** from `$ARGUMENTS` or default `online` when WebSearch/WebFetch are available; otherwise `offline` with the limitation recorded
@@ -153,7 +153,7 @@ Once scope, categories, and mode are determined, **execute the Grimes Grind inli
 
 ## 2.0 EXECUTE THE METHODOLOGY
 
-The methodology is defined once, in `skills/frank-grimes/SKILL.md`. Read it and follow it. Do not restate its phases, categories, evidence tiers, register schema, or verdict rules here — a second copy drifts from the first, and the copy is always the one that goes stale.
+The methodology is defined once, in `skills/frank-grimes/SKILL.md`. Read it and follow it. Do not restate its phases, categories, evidence tiers, register schema, or verdict rules here; a second copy drifts from the first, and the copy is always the one that goes stale.
 
 This section covers only what this adapter is responsible for: invoking the skill with the resolved configuration, and the two places where a provider capability is required.
 
@@ -188,7 +188,7 @@ Resolve the two verdicts by the skill's table: the stricter decision wins, and a
 
 ## 3.0 STRUCTURED RETURN
 
-After Phase 6 (and Phase 7 if enabled), output the following structured result. This is non-negotiable — it enables auto-loop orchestration:
+After Phase 6 (and Phase 7 if enabled), output the following structured result. This is non-negotiable: it enables auto-loop orchestration:
 
 ```
 GRIMES_RESULT: {
@@ -218,7 +218,7 @@ GRIMES_RESULT: {
 }
 ```
 
-Then update the state file at `.grimes-state.json`: set `last_verdict`, `issues_found`, `issues_fixed`, `new_p0_p1`, `last_commit`, `last_grind_timestamp`. Preserve all other fields, and never write `iteration` — that field belongs to the hook.
+Then update the state file at `.grimes-state.json`: set `last_verdict`, `issues_found`, `issues_fixed`, `new_p0_p1`, `last_commit`, `last_grind_timestamp`. Preserve all other fields, and never write `iteration`; that field belongs to the hook.
 
 `new_p0_p1` is the count of P0/P1 findings this iteration surfaced that the previous iteration did not. It is how the hook knows whether another pass is yielding anything; report `0` honestly when an iteration turned up nothing new.
 

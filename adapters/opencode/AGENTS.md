@@ -65,4 +65,4 @@ OpenCode honors `name` and `description` in skill frontmatter. Other fields (`al
 
 A `pass` verdict requires a second review that never saw the first. OpenCode has no bundled equivalent of the Claude adapter's `grimey-verifier` subagent, so a grind here records `Independent adjudication: not available`, sets `review_confidence=low`, and caps at `conditional`/YELLOW.
 
-To reach a pass, run the grind a second time in a fresh session given only the target and the claimed verdict tuple — never the first report — and resolve the two by the stricter decision.
+To reach a pass, run the grind a second time in a fresh session given only the target and the claimed verdict tuple (never the first report), and resolve the two by the stricter decision.

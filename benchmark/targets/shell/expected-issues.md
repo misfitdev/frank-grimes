@@ -6,7 +6,7 @@ This file documents the flaws that a good Grimes Grind should find in `bad-scrip
 
 1. **Hardcoded production server credentials** - `scp` and `ssh` use `root@prod-server` with no key management, no SSH config, no credential handling. If this script is committed, the server address is exposed.
 
-2. **No input validation on VERSION** - `$VERSION` reaches `git tag -a "v$VERSION"` (line 30) with no format check. The variable is quoted, so this is not command injection — the shell passes the whole string as one argument. The defect is that an invalid tag name makes `git tag` fail, and with no `set -e` (see #4) the script carries on and reports success.
+2. **No input validation on VERSION** - `$VERSION` reaches `git tag -a "v$VERSION"` (line 30) with no format check. The variable is quoted, so this is not command injection: the shell passes the whole string as one argument. The defect is that an invalid tag name makes `git tag` fail, and with no `set -e` (see #4) the script carries on and reports success.
 
 3. **Running as root on production** - `ssh root@prod-server` and `scp` to root's home directory. No principle of least privilege.
 

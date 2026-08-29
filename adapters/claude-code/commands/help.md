@@ -25,21 +25,21 @@ Confidence is not assumed; it is earned by surviving a relentless, adversarial c
 ## Quick Start
 
 ```bash
-# Interactive — prompts for scope
+# Interactive: prompts for scope
 /frank-grimes:grind
 
-# Direct — skip prompts by specifying the target
+# Direct: skip prompts by specifying the target
 /frank-grimes:grind ./src/auth.ts --auto-loop
 ```
 
-When invoked without arguments, Grimes asks for the scope and defaults to report mode. Category routing is not a question — the skill selects 5-8 of the ten categories from the target's own shape and records why for all ten.
+When invoked without arguments, Grimes asks for the scope and defaults to report mode. Category routing is not a question; the skill selects 5-8 of the ten categories from the target's own shape and records why for all ten.
 
 ## Verdicts
 
 The colour is derived from the verdict tuple, never asserted. See the skill for the derivation.
 
-- **RED:** `decision=block` — an open P0 remains
-- **YELLOW:** anything unconfirmed — including a carried accepted P0, or no available adjudicator
+- **RED:** `decision=block`, an open P0 remains
+- **YELLOW:** anything unconfirmed, including a carried accepted P0, or no available adjudicator
 - **GREEN:** the full tuple plus an independent adjudicator that reached the same conclusion without seeing the report
 
 ## Command Reference

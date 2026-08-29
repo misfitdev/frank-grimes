@@ -3,9 +3,9 @@
 <img src="docs/img/grimey.png" alt="Grimey logo" width="25%">
 
 > "I've had to work hard every day of my life, and what do I have to show for it? This briefcase, and this haircut."
-> — Frank Grimes
+> Frank Grimes
 
-A pessimistic iteration loop for systematically destroying, rebuilding, and hardening ideas. Named after Frank Grimes ("Grimey") from The Simpsons — the only character who actually *analyzed* what was wrong and refused to let it slide.
+A pessimistic iteration loop for systematically destroying, rebuilding, and hardening ideas. Named after Frank Grimes ("Grimey") from The Simpsons, the only character who actually *analyzed* what was wrong and refused to let it slide.
 
 ## Philosophy
 
@@ -19,7 +19,7 @@ The Grimes Grind assumes your idea, code, plan, or design is:
 - Not production-ready
 - Unmaintainable
 
-The burden of proof sits with the target, never the reviewer. A clean verdict is earned by surviving probes that were actually run — not granted because nothing turned up.
+The burden of proof sits with the target, never the reviewer. A clean verdict is earned by surviving probes that were actually run, not granted because nothing turned up.
 
 ## What It Does
 
@@ -104,9 +104,9 @@ Load the Frank Grimes skill and run a grind on your target.
 ```
 
 The skill will guide you through:
-1. **Scope** — What are you reviewing? (file, directory, recent changes, description)
-2. **Routing** — Which categories the target's shape actually warrants (the skill decides, and records why for all ten)
-3. **Mode** — Report only (default), or fix behind a verification gate
+1. **Scope**: What are you reviewing? (file, directory, recent changes, description)
+2. **Routing**: Which categories the target's shape actually warrants (the skill decides, and records why for all ten)
+3. **Mode**: Report only (default), or fix behind a verification gate
 
 ### Command-Line Options
 
@@ -160,9 +160,9 @@ A grind absorbs the target and writes a review contract, routes 5-8 categories f
 
 P0 requires E1 or E2. E3 caps at P1. A finding whose falsifier could not be attempted caps at P2.
 
-The verdict is a tuple — `{decision, residual_risk, review_confidence, review_completeness}` — and the colour is derived from it, never asserted. GREEN additionally requires an independent adjudicator, running in a context that never saw the first report, to reach the same conclusion. Where no adjudicator is available, a grind caps at YELLOW.
+The verdict is a tuple, `{decision, residual_risk, review_confidence, review_completeness}`, and the colour is derived from it, never asserted. GREEN additionally requires an independent adjudicator, running in a context that never saw the first report, to reach the same conclusion. Where no adjudicator is available, a grind caps at YELLOW.
 
-Fixing is opt-in and reporting is the default. A commit requires fix mode, explicit `--commit`, and a verification gate that exited zero — all three.
+Fixing is opt-in and reporting is the default. A commit requires fix mode, explicit `--commit`, and a verification gate that exited zero: all three.
 
 ## The Grimes Report
 
@@ -192,7 +192,7 @@ Every grind produces a structured report. The full template lives in the skill; 
 ### Grimey's Final Word
 ```
 
-Two sections carry most of the weight. **Self-Grind Reconciliation** reports what the review killed in its own findings, and the arithmetic has to close — a candidate absent from `N = M + K` cannot appear in the report. **Survived Scrutiny** admits an entry only when a specific probe was performed and its result recorded; a claim nobody tried to falsify goes to **Not Examined** instead, which is a confession of coverage limits rather than a pass.
+Two sections carry most of the weight. **Self-Grind Reconciliation** reports what the review killed in its own findings, and the arithmetic has to close: a candidate absent from `N = M + K` cannot appear in the report. **Survived Scrutiny** admits an entry only when a specific probe was performed and its result recorded; a claim nobody tried to falsify goes to **Not Examined** instead, which is a confession of coverage limits rather than a pass.
 
 ## Auto-Loop
 
@@ -236,7 +236,7 @@ See `hooks/README.md` for detailed integration instructions.
 
 ## Dependencies
 
-- `jq` — Required for the stop hook to parse state JSON
+- `jq`: required for the stop hook to parse state JSON
 
 Install on macOS: `brew install jq`
 Install on Ubuntu/Debian: `apt-get install jq`
@@ -286,7 +286,7 @@ The `benchmark/` directory contains a framework for validating grind quality acr
 | Anti-Pattern Avoidance | No Grimey Theater, Optimism Creep, or unearned acquittals |
 | Self-Grind and Earned Acquittal | Reconciliation closes; acquittals name a performed probe |
 
-Grimey's voice is deliberately not scored — it exists because it is fun to read, and paying points for persona buys theater at the expense of findings.
+Grimey's voice is deliberately not scored: it exists because it is fun to read, and paying points for persona buys theater at the expense of findings.
 
 See `benchmark/rubric.md` for the full rubric and scoring criteria.
 
@@ -295,8 +295,8 @@ See `benchmark/rubric.md` for the full rubric and scoring criteria.
 The skill warns against these failure modes:
 
 - **Grimey Theater**: Going through motions without genuine skepticism
-- **Optimism Creep**: "It'll probably be fine" — NO. Prove it.
-- **Authority Deference**: "The LLM said so" — Verify anyway.
+- **Optimism Creep**: "It'll probably be fine." No. Prove it.
+- **Authority Deference**: "The LLM said so." Verify anyway.
 - **Perfection Paralysis**: Never shipping because something might be wrong
 - **Orphaned Risks**: Accepted risks with no owner
 
@@ -309,4 +309,4 @@ The skill warns against these failure modes:
 ---
 
 *"You know what makes me mad? Not just that this is broken - it's that someone shipped it thinking it was fine. That's the real failure."*
-— The Spirit of Grimey
+The Spirit of Grimey

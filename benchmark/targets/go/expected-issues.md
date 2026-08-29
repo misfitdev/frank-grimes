@@ -4,7 +4,7 @@ This file documents the flaws that a good Grimes Grind should find in the Go ser
 
 ## Terminal Defects (P0)
 
-1. **The service does not compile** - `main.go:102` reads `err = db.Exec("INSERT INTO users (name, email) VALUES ($1, $2)", u.Name, u.Email).Error`. On a `*sql.DB` from `database/sql`, `Exec` returns `(sql.Result, error)`, and `sql.Result` has no `.Error` field — that is GORM syntax on a stdlib handle. The compiler rejects it: `multiple-value db.Exec(...) in single-value context`. The neighbouring UPDATE and DELETE branches use the correct `_, err = db.Exec(...)` form, so this is inconsistent within its own file. Reproducible as E1 with `go build`. A grind that reports style issues in a package that cannot build has misread the target.
+1. **The service does not compile** - `main.go:102` reads `err = db.Exec("INSERT INTO users (name, email) VALUES ($1, $2)", u.Name, u.Email).Error`. On a `*sql.DB` from `database/sql`, `Exec` returns `(sql.Result, error)`, and `sql.Result` has no `.Error` field, which is GORM syntax on a stdlib handle. The compiler rejects it: `multiple-value db.Exec(...) in single-value context`. The neighbouring UPDATE and DELETE branches use the correct `_, err = db.Exec(...)` form, so this is inconsistent within its own file. Reproducible as E1 with `go build`. A grind that reports style issues in a package that cannot build has misread the target.
 
 ## Security Issues (P0/P1)
 

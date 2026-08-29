@@ -187,8 +187,8 @@ score_dimension() {
 
         "routing_discipline")
             local included excluded routed
-            included=$(count_occurrences 'included [—-]' "$report_file")
-            excluded=$(count_occurrences 'excluded [—-]' "$report_file")
+            included=$(count_occurrences 'included[ ]*[:-]' "$report_file")
+            excluded=$(count_occurrences 'excluded[ ]*[:-]' "$report_file")
             routed=$((included + excluded))
 
             if [[ "$included" -eq 0 ]]; then

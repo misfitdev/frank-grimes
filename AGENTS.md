@@ -5,7 +5,7 @@ This project uses **bd** (beads) for issue tracking. Run `bd prime` for full wor
 > **Architecture in one line:** Issues live in a local Dolt database
 > (`.beads/dolt/`); cross-machine sync uses `bd dolt push/pull` (a
 > git-compatible protocol), stored under `refs/dolt/data` on your git
-> remote — separate from `refs/heads/*` where your code lives.
+> remote, separate from `refs/heads/*` where your code lives.
 > `.beads/issues.jsonl` is a passive export, not the wire protocol.
 >
 > See [SYNC_CONCEPTS.md](https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md)
@@ -141,7 +141,7 @@ just bench-all    # run the benchmark against every target
 
 ## Architecture Overview
 
-`skills/frank-grimes/SKILL.md` is the sole normative methodology; nothing else may restate its phases, categories, evidence tiers, or verdict rules. `proto/frank_grimes/v2/contracts.proto` is the sole normative machine contract, enforced by the `grimes-contract` codec. Adapters under `adapters/` carry provider-specific wiring only — arguments, tools, and transport. `hooks/stop.sh` owns the iteration loop.
+`skills/frank-grimes/SKILL.md` is the sole normative methodology; nothing else may restate its phases, categories, evidence tiers, or verdict rules. `proto/frank_grimes/v2/contracts.proto` is the sole normative machine contract, enforced by the `grimes-contract` codec. Adapters under `adapters/` carry provider-specific wiring only: arguments, tools, and transport. `hooks/stop.sh` owns the iteration loop.
 
 ## Conventions & Patterns
 

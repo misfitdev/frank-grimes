@@ -34,7 +34,7 @@ scorer has drifted from the template again.
 - Evidence unobtainable: runtime execution; the sandbox is read-only and the script deletes files
 - Unknowns: whether CI passes a constrained argument set
 
-Categories: COR included — deletion path is computed from input. INT included — arguments cross a trust boundary unvalidated. SEC included — remote code execution is reachable. REL included — failure mid-install leaves a partial toolchain. OPS included — no logging of what was deleted. PER excluded — no loop over unbounded input. VER excluded — no tests ship with the target. MNT excluded — a rewrite supersedes style concerns. DEP excluded — the single remote dependency is covered under SEC. HUM excluded — no interactive operator surface.
+Categories: COR included: deletion path is computed from input. INT included: arguments cross a trust boundary unvalidated. SEC included: remote code execution is reachable. REL included: failure mid-install leaves a partial toolchain. OPS included: no logging of what was deleted. PER excluded: no loop over unbounded input. VER excluded: no tests ship with the target. MNT excluded: a rewrite supersedes style concerns. DEP excluded: the single remote dependency is covered under SEC. HUM excluded: no interactive operator surface.
 
 ### Self-Grind Reconciliation
 
@@ -48,9 +48,9 @@ Categories: COR included — deletion path is computed from input. INT included 
 
 ### Terminal Risks
 
-1. `bad-script.sh:22` — `rm -rf "$1"/*` deletes whatever path the caller passes. E2. A caller passing `/` or an empty string escapes the build directory entirely. P0.
-2. `bad-script.sh:58` — `curl -sSL "$TOOLCHAIN_URL" | sh` executes the response body with no checksum or signature check. E2. Anyone able to answer that host executes code as the invoking user. P0.
-3. `bad-script.sh:31` — the trap that restores the previous directory is installed after the `cd`, so an early failure leaves the caller in the build directory. E1, reproduced with `bash -n` plus a traced dry run. P1.
+1. `bad-script.sh:22`: `rm -rf "$1"/*` deletes whatever path the caller passes. E2. A caller passing `/` or an empty string escapes the build directory entirely. P0.
+2. `bad-script.sh:58`: `curl -sSL "$TOOLCHAIN_URL" | sh` executes the response body with no checksum or signature check. E2. Anyone able to answer that host executes code as the invoking user. P0.
+3. `bad-script.sh:31`: the trap that restores the previous directory is installed after the `cd`, so an early failure leaves the caller in the build directory. E1, reproduced with `bash -n` plus a traced dry run. P1.
 
 ### Risk Register
 

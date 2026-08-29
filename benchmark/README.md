@@ -57,8 +57,8 @@ A report that arrives as a continuation fragment is a failed delivery, not a bad
 
 Distinguish the two failure modes when a run fails:
 
-- **Malformed report** — the agent returned normally but the text is a fragment. Reported by the runner as `malformed report: <reasons>`.
-- **Transport failure** — the agent CLI itself errored. The report file will be missing entirely rather than partial.
+- **Malformed report**: the agent returned normally but the text is a fragment. Reported by the runner as `malformed report: <reasons>`.
+- **Transport failure**: the agent CLI itself errored. The report file will be missing entirely rather than partial.
 
 ## A/B Testing
 

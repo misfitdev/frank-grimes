@@ -65,11 +65,11 @@ This file documents the flaws that a good Grimes Grind should find in the web en
 A grind that reports any of these has produced a false positive, and precision is scored against it:
 
 - **Missing CSRF protection.** Authentication is a bearer token read from the `Authorization` header (`server.js:96`). Browsers do not attach that automatically, so there is no cross-site request forgery surface. CSRF applies to ambient credentials such as cookies, and none are used.
-- **A race on `nextId++`.** The POST handler (`server.js:29-39`) is entirely synchronous — no `await`, no callback, no I/O between reading `nextId` and pushing the user. Node runs it to completion before the next request is dequeued, so two requests cannot interleave there. Reporting a data race in single-threaded synchronous JavaScript is a category error.
+- **A race on `nextId++`.** The POST handler (`server.js:29-39`) is entirely synchronous: no `await`, no callback, no I/O between reading `nextId` and pushing the user. Node runs it to completion before the next request is dequeued, so two requests cannot interleave there. Reporting a data race in single-threaded synchronous JavaScript is a category error.
 - **Plaintext password comparison being a timing attack.** It is a real defect for other reasons (hardcoded credential, no hashing), but a timing side channel on a hardcoded constant discloses nothing an attacker cannot read in the source.
 
 ## What a Good Grind Should Find
 
-The gold roots are the unverified JWT (`server.js:98-102`, signature never checked — any client forges a token by base64-encoding a payload) and the hardcoded `password123` (`server.js:71`). Both are P0 and both are E2-citable.
+The gold roots are the unverified JWT (`server.js:98-102`, signature never checked, so any client forges a token by base64-encoding a payload) and the hardcoded `password123` (`server.js:71`). Both are P0 and both are E2-citable.
 
 Judge by precision rather than count. Twenty findings are not better than eight if the extra twelve are padding, duplicate symptoms of one root cause, or unevidenced. Expected verdict is RED (`decision=block`).

@@ -72,7 +72,7 @@ just bench-all    # run the benchmark against every target
 
 ## Architecture Overview
 
-`skills/frank-grimes/SKILL.md` is the sole normative methodology; nothing else may restate its phases, categories, evidence tiers, or verdict rules. `proto/frank_grimes/v2/contracts.proto` is the sole normative machine contract, enforced by the `grimes-contract` codec. Adapters under `adapters/` carry provider-specific wiring only — arguments, tools, and transport. `hooks/stop.sh` owns the iteration loop.
+`skills/frank-grimes/SKILL.md` is the sole normative methodology; nothing else may restate its phases, categories, evidence tiers, or verdict rules. `proto/frank_grimes/v2/contracts.proto` is the sole normative machine contract, enforced by the `grimes-contract` codec. Adapters under `adapters/` carry provider-specific wiring only: arguments, tools, and transport. `hooks/stop.sh` owns the iteration loop.
 
 ## Conventions & Patterns
 

@@ -2,7 +2,7 @@
 
 Read only the cards routed by Phase 1. A probe is an action plus a recorded result, not a question left unanswered. Probes are ordered options governed by Phase 5's marginal-yield rule, not a completion checklist. Commands below are selection rules: execute only checked-in commands or tools already available in the environment, never install a tool or use the network for a local probe. Current-landscape research is governed separately by the research phase and [references/research.md](research.md).
 
-## COR — Correctness and invariants
+## COR: Correctness and invariants
 
 **Enumerate:** stated outputs, state transitions, boundary conditions, cross-file invariants, and the call paths that can violate them.
 
@@ -17,7 +17,7 @@ Read only the cards routed by Phase 1. A probe is an action plus a recorded resu
 
 **False-accusation trap:** treating a surprising implementation as incorrect without first establishing the contract, reachable path, and required result.
 
-## INT — Interfaces, input handling, and data integrity
+## INT: Interfaces, input handling, and data integrity
 
 **Enumerate:** entry points, parsers, serializers, validation order, type/unit/encoding boundaries, persistence writes, and producer-consumer pairs.
 
@@ -32,7 +32,7 @@ Read only the cards routed by Phase 1. A probe is an action plus a recorded resu
 
 **False-accusation trap:** calling absence of validation at one layer a defect when an enforced upstream boundary is both in scope and demonstrably unavoidable.
 
-## SEC — Security, privacy, and compliance
+## SEC: Security, privacy, and compliance
 
 **Enumerate:** trust boundaries, identities, authorization decisions, attacker-controlled data, secrets, sensitive data, privileged sinks, retention/audit claims, and tenant boundaries.
 
@@ -48,7 +48,7 @@ Read only the cards routed by Phase 1. A probe is an action plus a recorded resu
 
 **False-accusation trap:** asserting exploitability from a dangerous-looking sink without proving attacker control, reachability, missing mediation, and relevant deployment conditions.
 
-## REL — Reliability, error handling, concurrency, and resource lifecycle
+## REL: Reliability, error handling, concurrency, and resource lifecycle
 
 **Enumerate:** failure sources, error paths, timeouts, retry ownership, idempotency, concurrency/ordering assumptions, resource acquisition/release, shutdown, and partial-state behavior.
 
@@ -64,7 +64,7 @@ Read only the cards routed by Phase 1. A probe is an action plus a recorded resu
 
 **False-accusation trap:** treating a language pattern as universally unsafe without demonstrating ownership, lifetime, concurrency, and an actual bad path.
 
-## OPS — Operability, observability, deployment, and recovery
+## OPS: Operability, observability, deployment, and recovery
 
 **Enumerate:** deploy steps, configuration rollout, health signals, logs/metrics/traces, alert ownership, rollback/recovery paths, migrations, and failure visibility.
 
@@ -79,7 +79,7 @@ Read only the cards routed by Phase 1. A probe is an action plus a recorded resu
 
 **False-accusation trap:** imposing service-level observability or rollback requirements on a target whose review contract has no deployed runtime or mutable operational state.
 
-## PER — Performance, scalability, and cost
+## PER: Performance, scalability, and cost
 
 **Enumerate:** workload dimensions, asymptotic operations, fan-out, allocation/storage growth, external calls, contention points, quotas, and cost multipliers.
 
@@ -94,7 +94,7 @@ Read only the cards routed by Phase 1. A probe is an action plus a recorded resu
 
 **False-accusation trap:** declaring a bottleneck or cost crisis from big-O intuition alone without a relevant workload, measured behavior, or a reachable unbounded path.
 
-## VER — Verification and testability
+## VER: Verification and testability
 
 **Enumerate:** critical invariants, tests mapped to them, assertions, fixtures, negative paths, determinism controls, integration boundaries, and release gates.
 
@@ -109,7 +109,7 @@ Read only the cards routed by Phase 1. A probe is an action plus a recorded resu
 
 **False-accusation trap:** equating test count, file presence, or coverage percentage with verification of the actual critical invariant.
 
-## MNT — Maintainability, configuration, duplication, and change safety
+## MNT: Maintainability, configuration, duplication, and change safety
 
 **Enumerate:** sources of truth, repeated policy/logic, configuration ownership, coupling, generated versus maintained artifacts, dead paths, and change surfaces for critical behavior.
 
@@ -124,7 +124,7 @@ Read only the cards routed by Phase 1. A probe is an action plus a recorded resu
 
 **False-accusation trap:** reporting duplication, a hard-coded value, or non-idiomatic style without showing divergent ownership, a real change hazard, or an enforced repository rule. Trace precedence before accusing: a caller deliberately overriding a default leaves one effective value and is not split ownership without contrary contract evidence.
 
-## DEP — Dependencies, supply chain, and external contracts
+## DEP: Dependencies, supply chain, and external contracts
 
 **Enumerate:** direct dependencies, lockfiles, vendored/generated inputs, version constraints, licenses when claimed, external APIs, feature flags, and fallback behavior.
 
@@ -139,7 +139,7 @@ Read only the cards routed by Phase 1. A probe is an action plus a recorded resu
 
 **False-accusation trap:** claiming a version, API, license, or vulnerability fact from memory when it is not established by the scoped local artifacts and available offline data.
 
-## HUM — Human factors, misuse, and operational process
+## HUM: Human factors, misuse, and operational process
 
 **Enumerate:** actors, permissions, incentives, handoffs, high-consequence actions, defaults, warnings, approval/override paths, cognitive load, and recovery from operator error.
 

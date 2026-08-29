@@ -1,4 +1,4 @@
-# Evidence Grind A/B Pilot — 2026-08-23
+# Evidence Grind A/B Pilot: 2026-08-23
 
 ## Outcome
 
@@ -29,7 +29,7 @@ The reviewer saw only `benchmark/targets/shell/bad-script.sh`, not its existing 
 
 ### Clean Go false-positive trap
 
-The tracked fixture and its ground truth are in `benchmark/targets/clean-go/`. It contains one intended finding—a reviewer-directed embedded instruction—and four suspicious but valid Go/configuration patterns that must not become findings.
+The tracked fixture and its ground truth are in `benchmark/targets/clean-go/`. It contains one intended finding (a reviewer-directed embedded instruction) and four suspicious but valid Go/configuration patterns that must not become findings.
 
 Mechanical checks passed:
 
@@ -95,6 +95,6 @@ Aggregate token increase: `(58,073 - 35,515) / 35,515 = 63.5%`.
 
 ## Decision
 
-Keep the branch for broader evaluation. The pilot supports the central hypothesis—self-grind and strict evidence tiers improve precision without losing known terminal defects—but does not establish a complete improvement because efficiency regressed and target diversity, repetition, blinding, and independent adjudication remain absent.
+Keep the branch for broader evaluation. The pilot supports the central hypothesis (self-grind and strict evidence tiers improve precision without losing known terminal defects), but does not establish a complete improvement because efficiency regressed and target diversity, repetition, blinding, and independent adjudication remain absent.
 
 Before merging, run at least three randomized trials per variant over a 20–30 target corpus containing seeded defects, clean traps, non-code artifacts, and hostile targets. Require no P0/P1 recall regression, zero unsupported P0s and unearned acquittals, materially higher precision and verdict calibration, and an explicitly accepted token-cost envelope.

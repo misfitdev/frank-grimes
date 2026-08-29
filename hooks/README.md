@@ -98,7 +98,7 @@ If your provider doesn't support hooks, you can simulate the loop by:
 
 ## Dependencies
 
-- `jq` — Required for JSON parsing in the stop hook
+- `jq`: required for JSON parsing in the stop hook
 
 Install on macOS: `brew install jq`
 Install on Ubuntu/Debian: `apt-get install jq`

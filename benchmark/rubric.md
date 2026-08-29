@@ -18,9 +18,9 @@ Does every finding carry exactly one evidence tier, and does the tier hold up?
 | 5 | Tier discipline is exemplary; E1 records include exit codes and bounded output, E3 names its falsifier, and severity caps are respected throughout |
 
 **Required record per tier:**
-- **E1 — reproduced:** executed action or command, exit code or status, result excerpt
-- **E2 — cited:** repository-relative `path:line` and an exact quote in which the defect is visible
-- **E3 — inferred:** explicit assumption, observed facts used, and a named falsifying observation
+- **E1 (reproduced):** executed action or command, exit code or status, result excerpt
+- **E2 (cited):** repository-relative `path:line` and an exact quote in which the defect is visible
+- **E3 (inferred):** explicit assumption, observed facts used, and a named falsifying observation
 
 **Severity caps:** P0 requires E1 or E2. E3 caps at P1. An unverified finding caps at P2.
 
@@ -47,7 +47,7 @@ Routing selects 5-8 categories from `COR`, `INT`, `SEC`, `REL`, `OPS`, `PER`, `V
 | 5 | Every exclusion demonstrates that a P0 cannot live in that category; every inclusion owns a distinct plausible P0 hypothesis |
 
 **What to look for:**
-- All ten categories accounted for as `included — reason` or `excluded — reason`
+- All ten categories accounted for as `included: reason` or `excluded: reason`
 - Exclusions justified by the target's actual shape, not by charity toward it
 - One primary category per root cause; secondary tags do not spawn extra findings
 - No filler findings manufactured to populate a routed category
@@ -244,11 +244,11 @@ An acquittal that nobody tried to falsify is the worst failure available to a ju
 Grimey's voice is not scored. It exists because it is fun to read, and paying points for it would buy persona at the expense of findings. The skill still confines it to the BLUF and Final Word; that placement is enforced by the report template, not by the rubric.
 
 **Interpretation:**
-- 0-40%: Poor — the grind is not functioning as intended
-- 40-60%: Marginal — some dimensions work, others don't
-- 60-80%: Good — the grind produces usable output
-- 80-90%: Very Good — the grind is solid across most dimensions
-- 90-100%: Excellent — the grind is operating at high quality
+- 0-40%: Poor, the grind is not functioning as intended
+- 40-60%: Marginal, some dimensions work, others don't
+- 60-80%: Good, the grind produces usable output
+- 80-90%: Very Good, the grind is solid across most dimensions
+- 90-100%: Excellent, the grind is operating at high quality
 
 ## Using the Rubric for A/B Testing
 
