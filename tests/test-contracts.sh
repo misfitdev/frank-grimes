@@ -180,7 +180,10 @@ ENVELOPE="$(mktemp)"
     "$BIN" encode-result "$VALID_RESULT"
 } >"$ENVELOPE"
 
-if "$BIN" decode-result "$ENVELOPE" | grep -q 'run_id: "run-001"'; then
+# prototext's whitespace is intentionally randomized per binary build
+# (google.golang.org/protobuf/internal/detrand), so match on content, not
+# exact spacing.
+if "$BIN" decode-result "$ENVELOPE" | grep -qE 'run_id: *"run-001"'; then
     pass "last complete envelope is extracted from surrounding prose"
 else
     fail "envelope extraction failed"
