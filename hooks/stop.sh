@@ -29,11 +29,11 @@ LOG_FILE="${LOG_DIR}/hook.log"
 mkdir -p "$LOG_DIR"
 
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >>"$LOG_FILE"
 }
 
 # Validate jq is available
-if ! command -v jq &> /dev/null; then
+if ! command -v jq &>/dev/null; then
     log "ERROR: jq not found. Auto-loop feature requires jq."
     echo "ERROR: jq is required for auto-loop feature. Install with: brew install jq (macOS) or apt-get install jq (Linux)" >&2
     exit 0
@@ -124,7 +124,7 @@ log "BLOCKING EXIT and continuing to iteration $((ITERATION + 1))"
 NEXT_ITERATION=$((ITERATION + 1))
 
 # Update state
-if ! echo "$STATE" | jq ".iteration = $NEXT_ITERATION" > "$STATE_FILE.tmp"; then
+if ! echo "$STATE" | jq ".iteration = $NEXT_ITERATION" >"$STATE_FILE.tmp"; then
     log "ERROR: Failed to update state file"
     echo "ERROR: Failed to update grind state. Allowing exit." >&2
     rm -f "$STATE_FILE.tmp"
@@ -136,7 +136,7 @@ echo "Grimes Grind: Iteration $NEXT_ITERATION of $MAX_ITERATIONS. Last verdict: 
 
 # Re-inject the grind prompt
 log "Re-injecting grind prompt for iteration $NEXT_ITERATION"
-cat << EOF
+cat <<EOF
 Grimes Grind: Continue Disciplined Falsification Review
 
 Target: $TARGET

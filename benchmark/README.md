@@ -9,6 +9,9 @@ benchmark/
 ├── README.md              # Benchmark documentation
 ├── rubric.md              # Scoring rubric (the standard)
 ├── runner.sh              # Executes a grind against a target and scores the output
+├── fixtures/
+│   ├── conforming-report.md    # Scores near maximum; guards against scorer drift
+│   └── nonconforming-report.md # Scores poorly; guards against a scorer that stops discriminating
 ├── targets/
 │   ├── shell/
 │   │   ├── bad-script.sh      # A deliberately bad shell script
@@ -40,7 +43,12 @@ The fixture harness is intentionally offline. It is useful for controlled A/B ch
 
 # Compare results (after making skill changes)
 ./benchmark/runner.sh --all --compare
+
+# Score a report you already have, without running an agent
+./benchmark/runner.sh --score benchmark/fixtures/conforming-report.md
 ```
+
+The scorer greps for the report template's section names and field labels, so changing the template in `skills/frank-grimes/SKILL.md` without updating `runner.sh` silently zeroes whole dimensions. `scripts/validate.sh` scores both fixtures on every `just validate` and fails if the conforming report drops below 90% or the non-conforming one rises above 50%.
 
 ## A/B Testing
 

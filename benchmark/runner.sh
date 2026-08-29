@@ -9,6 +9,7 @@
 #   ./benchmark/runner.sh <target-path>    # Run against a single target
 #   ./benchmark/runner.sh --all            # Run against all targets
 #   ./benchmark/runner.sh --all --compare  # Compare with baseline results
+#   ./benchmark/runner.sh --score <report> # Score a saved report, no agent run
 #
 # The runner expects an AI agent to execute the grind. This script:
 # 1. Sets up the target in a temporary directory
@@ -24,8 +25,6 @@
 set -euo pipefail
 
 BENCHMARK_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$BENCHMARK_DIR/.." && pwd)"
-RUBBER="$BENCHMARK_DIR/rubric.md"
 RESULTS_DIR="$BENCHMARK_DIR/results"
 BASELINE_DIR="$RESULTS_DIR/baseline"
 
@@ -45,6 +44,7 @@ warn() { echo -e "${YELLOW}WARN${NC}: $*"; }
 ALL=false
 COMPARE=false
 TARGET=""
+SCORE_ONLY=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -56,6 +56,10 @@ while [[ $# -gt 0 ]]; do
             COMPARE=true
             shift
             ;;
+        --score)
+            SCORE_ONLY="$2"
+            shift 2
+            ;;
         *)
             TARGET="$1"
             shift
@@ -64,7 +68,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Check for jq
-if ! command -v jq &> /dev/null; then
+if ! command -v jq &>/dev/null; then
     echo "ERROR: jq is required for the benchmark runner"
     exit 1
 fi
@@ -93,65 +97,93 @@ list_targets() {
     echo ""
 }
 
+# grep -c prints 0 and exits 1 when nothing matches, so `|| echo 0` appends a
+# second line and every arithmetic test downstream fails. Always count here.
+count_matches() {
+    local pattern="$1"
+    local file="$2"
+    grep -cE "$pattern" "$file" 2>/dev/null || true
+}
+
+# Counts every occurrence, not every matching line. Routing reasons are often
+# written as one prose paragraph, where a line count reports 1 for all ten.
+count_occurrences() {
+    local pattern="$1"
+    local file="$2"
+    grep -oE "$pattern" "$file" 2>/dev/null | wc -l | tr -d ' '
+}
+
+# Register rows are table lines carrying a stable ID and a severity cell.
+count_register_rows() {
+    count_matches '^\|[^|]*grime-[a-z0-9]+[^|]*\|.*\| *P[0-3] *\|' "$1"
+}
+
 score_dimension() {
     local dimension="$1"
     local report_file="$2"
     local target_type="$3"
 
-    # This is a heuristic scoring function. In a full implementation,
-    # this would use an LLM to evaluate the report against the rubric.
-    # For now, we check for the presence of key elements.
+    # Structural scoring only. This checks that the report carries the fields
+    # the rubric requires; it cannot judge whether a quote proves its finding
+    # or whether a severity is defensible. See "Scope of the Automated Scorer".
 
     local score=0
-    local max_score=5
 
     case "$dimension" in
         "evidence_quality")
-            # Check for specific evidence patterns
-            if grep -q '### Issue:' "$report_file" 2>/dev/null; then
-                local issue_count=$(grep -c '### Issue:' "$report_file" 2>/dev/null || echo 0)
-                if [[ "$issue_count" -ge 10 ]]; then
-                    score=4
-                elif [[ "$issue_count" -ge 5 ]]; then
-                    score=3
-                elif [[ "$issue_count" -ge 2 ]]; then
-                    score=2
-                else
-                    score=1
-                fi
-                # Check for evidence field
-                if grep -q '**Evidence:**' "$report_file" 2>/dev/null; then
+            local rows e1 e2 e3 tiered
+            rows=$(count_register_rows "$report_file")
+            e1=$(count_matches '\bE1\b' "$report_file")
+            e2=$(count_matches '\bE2\b' "$report_file")
+            e3=$(count_matches '\bE3\b' "$report_file")
+            tiered=$((e1 + e2 + e3))
+
+            if [[ "$rows" -eq 0 ]] || [[ "$tiered" -eq 0 ]]; then
+                score=0
+            elif [[ "$tiered" -lt "$rows" ]]; then
+                # Fewer tier mentions than findings: some finding cites none.
+                score=1
+            else
+                score=3
+                # E2 without a path:line locator is an unverifiable citation.
+                if grep -qE '[A-Za-z0-9_./-]+:[0-9]+' "$report_file" 2>/dev/null; then
                     score=$((score + 1))
                 fi
-            else
-                score=0
+                # E1 is only reproduced if a status or exit code was recorded.
+                if grep -qiE 'exit code|exit status|status [0-9]' "$report_file" 2>/dev/null; then
+                    score=$((score + 1))
+                fi
             fi
             ;;
 
-        "category_coverage")
-            # Count distinct categories mentioned
-            local categories=$(grep -oP '\*\*Category:\*\* \K.*' "$report_file" 2>/dev/null | sort -u | wc -l || echo 0)
-            if [[ "$categories" -ge 10 ]]; then
-                score=5
-            elif [[ "$categories" -ge 7 ]]; then
-                score=4
-            elif [[ "$categories" -ge 5 ]]; then
-                score=3
-            elif [[ "$categories" -ge 3 ]]; then
-                score=2
-            elif [[ "$categories" -ge 1 ]]; then
-                score=1
-            else
+        "routing_discipline")
+            local included excluded routed
+            included=$(count_occurrences 'included [—-]' "$report_file")
+            excluded=$(count_occurrences 'excluded [—-]' "$report_file")
+            routed=$((included + excluded))
+
+            if [[ "$included" -eq 0 ]]; then
                 score=0
+            elif [[ "$excluded" -eq 0 ]]; then
+                # Inclusions without exclusions: routing was never defended.
+                score=2
+            elif [[ "$included" -lt 5 ]] || [[ "$included" -gt 8 ]]; then
+                # Outside the 5-8 band. Breadth is a routing failure, not rigor.
+                score=2
+            elif [[ "$routed" -ge 10 ]]; then
+                score=5
+            else
+                score=3
             fi
             ;;
 
         "severity_assessment")
             # Check for proper severity distribution
-            local p0_count=$(grep -c '**Severity:** P0' "$report_file" 2>/dev/null || echo 0)
-            local p1_count=$(grep -c '**Severity:** P1' "$report_file" 2>/dev/null || echo 0)
-            local p2_count=$(grep -c '**Severity:** P2' "$report_file" 2>/dev/null || echo 0)
-            local p3_count=$(grep -c '**Severity:** P3' "$report_file" 2>/dev/null || echo 0)
+            local p0_count p1_count p2_count p3_count
+            p0_count=$(count_matches '\| *P0 *\|' "$report_file")
+            p1_count=$(count_matches '\| *P1 *\|' "$report_file")
+            p2_count=$(count_matches '\| *P2 *\|' "$report_file")
+            p3_count=$(count_matches '\| *P3 *\|' "$report_file")
 
             if [[ "$p0_count" -gt 0 ]] && [[ "$p1_count" -gt 0 ]] && [[ "$p2_count" -gt 0 ]]; then
                 score=4
@@ -165,48 +197,56 @@ score_dimension() {
 
             # Check that P0 is not overused
             if [[ "$p0_count" -gt "$p1_count" ]] && [[ "$p0_count" -gt 2 ]]; then
-                score=$((score - 1))  # Penalize P0 overuse
+                score=$((score - 1)) # Penalize P0 overuse
             fi
             ;;
 
         "verdict_accuracy")
-            if grep -q '### Verdict:' "$report_file" 2>/dev/null; then
-                local verdict=$(grep '### Verdict:' "$report_file" | head -1 | sed 's/### Verdict: //')
-                if [[ "$verdict" == *"RED"* ]] || [[ "$verdict" == *"YELLOW"* ]] || [[ "$verdict" == *"GREEN"* ]]; then
-                    score=3
-                    # Check for justification
-                    if grep -q 'BLUF' "$report_file" 2>/dev/null; then
-                        score=4
-                    fi
-                    # Check for stop condition reference
-                    if grep -qi 'P0.*mitigat' "$report_file" 2>/dev/null; then
-                        score=5
-                    fi
-                else
+            local tuple=0
+            grep -qi '^- \*\*Decision:\*\*' "$report_file" 2>/dev/null && ((tuple++))
+            grep -qi '^- \*\*Residual risk:\*\*' "$report_file" 2>/dev/null && ((tuple++))
+            grep -qi '^- \*\*Review confidence:\*\*' "$report_file" 2>/dev/null && ((tuple++))
+            grep -qi '^- \*\*Review completeness:\*\*' "$report_file" 2>/dev/null && ((tuple++))
+
+            if [[ "$tuple" -eq 0 ]]; then
+                # A bare color with no tuple behind it is an asserted verdict.
+                if grep -qE 'RED|YELLOW|GREEN' "$report_file" 2>/dev/null; then
                     score=1
+                else
+                    score=0
                 fi
+            elif [[ "$tuple" -lt 4 ]]; then
+                score=2
             else
-                score=0
+                score=3
+                if grep -qi 'Derived color' "$report_file" 2>/dev/null; then
+                    score=$((score + 1))
+                fi
+                if grep -qi 'Unmet gates' "$report_file" 2>/dev/null; then
+                    score=$((score + 1))
+                fi
             fi
             ;;
 
         "report_structure")
             local sections=0
-            grep -q '### Verdict:' "$report_file" 2>/dev/null && ((sections++))
+            grep -qE '^### Verdict' "$report_file" 2>/dev/null && ((sections++))
             grep -q 'BLUF' "$report_file" 2>/dev/null && ((sections++))
-            grep -q 'Top 3 Risks' "$report_file" 2>/dev/null && ((sections++))
-            grep -q 'Origin Assessment' "$report_file" 2>/dev/null && ((sections++))
+            grep -q 'Review Contract and Routing' "$report_file" 2>/dev/null && ((sections++))
+            grep -q 'Self-Grind Reconciliation' "$report_file" 2>/dev/null && ((sections++))
+            grep -q 'Terminal Risks' "$report_file" 2>/dev/null && ((sections++))
             grep -q 'Risk Register' "$report_file" 2>/dev/null && ((sections++))
             grep -q 'Survived Scrutiny' "$report_file" 2>/dev/null && ((sections++))
+            grep -q 'Not Examined' "$report_file" 2>/dev/null && ((sections++))
             grep -q "Grimey's Final Word" "$report_file" 2>/dev/null && ((sections++))
 
-            if [[ "$sections" -ge 7 ]]; then
+            if [[ "$sections" -ge 9 ]]; then
                 score=5
-            elif [[ "$sections" -ge 5 ]]; then
+            elif [[ "$sections" -ge 7 ]]; then
                 score=4
-            elif [[ "$sections" -ge 4 ]]; then
+            elif [[ "$sections" -ge 5 ]]; then
                 score=3
-            elif [[ "$sections" -ge 2 ]]; then
+            elif [[ "$sections" -ge 3 ]]; then
                 score=2
             elif [[ "$sections" -ge 1 ]]; then
                 score=1
@@ -215,33 +255,28 @@ score_dimension() {
             fi
             ;;
 
-        "issue_format")
-            local issues_with_grime_id=$(grep -c '**Grime ID:**' "$report_file" 2>/dev/null || echo 0)
-            local issues_with_evidence=$(grep -c '**Evidence:**' "$report_file" 2>/dev/null || echo 0)
-            local issues_with_category=$(grep -c '**Category:**' "$report_file" 2>/dev/null || echo 0)
-            local issues_with_severity=$(grep -c '**Severity:**' "$report_file" 2>/dev/null || echo 0)
+        "finding_format")
+            local rows populated ratio
+            rows=$(count_register_rows "$report_file")
 
-            local total_issues=$(grep -c '### Issue:' "$report_file" 2>/dev/null || echo 0)
-
-            if [[ "$total_issues" -eq 0 ]]; then
+            if [[ "$rows" -eq 0 ]]; then
                 score=0
             else
-                local compliant=$((issues_with_grime_id + issues_with_evidence + issues_with_category + issues_with_severity))
-                local max_compliant=$((total_issues * 4))
+                # A compliant row carries a category, a tier, and an assumption
+                # status alongside its ID and severity.
+                populated=$(count_matches '^\|[^|]*grime-[a-z0-9]+[^|]*\|.*\|.*(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM).*\|.*(E1|E2|E3).*\|.*\| *P[0-3] *\|.*(confirmed|unconfirmed|none).*\|' "$report_file")
+                ratio=$((populated * 100 / rows))
 
-                if [[ "$max_compliant" -gt 0 ]]; then
-                    local ratio=$((compliant * 100 / max_compliant))
-                    if [[ "$ratio" -ge 90 ]]; then
-                        score=5
-                    elif [[ "$ratio" -ge 75 ]]; then
-                        score=4
-                    elif [[ "$ratio" -ge 50 ]]; then
-                        score=3
-                    elif [[ "$ratio" -ge 25 ]]; then
-                        score=2
-                    else
-                        score=1
-                    fi
+                if [[ "$ratio" -ge 90 ]]; then
+                    score=5
+                elif [[ "$ratio" -ge 75 ]]; then
+                    score=4
+                elif [[ "$ratio" -ge 50 ]]; then
+                    score=3
+                elif [[ "$ratio" -ge 25 ]]; then
+                    score=2
+                else
+                    score=1
                 fi
             fi
             ;;
@@ -249,9 +284,10 @@ score_dimension() {
         "fix_quality")
             # Only scored if mode=fix (check for Fix sections)
             if grep -q '### Fix for' "$report_file" 2>/dev/null; then
-                local fix_count=$(grep -c '### Fix for' "$report_file" 2>/dev/null || echo 0)
+                local fix_count fixes_with_verification
+                fix_count=$(count_matches '^### Fix for' "$report_file")
                 if [[ "$fix_count" -gt 0 ]]; then
-                    local fixes_with_verification=$(grep -c '**Verification:**' "$report_file" 2>/dev/null || echo 0)
+                    fixes_with_verification=$(count_matches '\*\*Verification:\*\*' "$report_file")
                     if [[ "$fixes_with_verification" -ge "$fix_count" ]]; then
                         score=5
                     elif [[ "$fixes_with_verification" -ge $((fix_count / 2)) ]]; then
@@ -263,62 +299,80 @@ score_dimension() {
                     score=1
                 fi
             else
-                score="N/A"  # Report mode, not applicable
+                score="N/A" # Report mode, not applicable
             fi
             ;;
 
         "anti_pattern_avoidance")
-            # Check for anti-pattern indicators
-            local optimism_creed=0
-            if grep -qi 'probably be fine' "$report_file" 2>/dev/null; then
-                optimism_creed=1
-            fi
+            local optimism authority unearned hits=0
 
-            local authority_deference=0
-            if grep -qi 'LLM said' "$report_file" 2>/dev/null || grep -qi 'AI-generated.*fine' "$report_file" 2>/dev/null; then
-                authority_deference=1
-            fi
+            optimism=$(count_matches '(probably|should be|likely) (be )?(fine|ok|okay|safe)|it will be fine' "$report_file")
+            authority=$(count_matches 'LLM said|AI-generated.*fine|the model (says|said)' "$report_file")
+            # An acquittal phrased as an impression is the unearned kind; the
+            # skill requires a performed probe and its recorded result.
+            unearned=$(count_matches 'looks (fine|sound|good|correct)|appears (fine|sound|correct|safe)|seems (fine|sound|correct)' "$report_file")
 
-            if [[ "$optimism_creed" -eq 0 ]] && [[ "$authority_deference" -eq 0 ]]; then
-                score=5
-            elif [[ "$optimism_creed" -eq 0 ]] || [[ "$authority_deference" -eq 0 ]]; then
-                score=3
-            else
-                score=1
-            fi
+            [[ "$optimism" -gt 0 ]] && ((hits++))
+            [[ "$authority" -gt 0 ]] && ((hits++))
+            [[ "$unearned" -gt 0 ]] && ((hits++))
+
+            case "$hits" in
+                0) score=5 ;;
+                1) score=3 ;;
+                2) score=1 ;;
+                *) score=0 ;;
+            esac
             ;;
 
         "voice_and_tone")
-            # Check for Grimey voice indicators
-            local has_clinical=0
-            local has_final_word=0
+            # Voice is permitted only in BLUF and Final Word; the structural
+            # check is that both carry content and that hedging stays out of
+            # the clinical fields. Whether the voice actually lands is manual.
+            local has_bluf=0 has_final_word=0 hedging
+            grep -qE '\*\*BLUF:\*\* *[^ ]' "$report_file" 2>/dev/null && has_bluf=1
+            grep -qA2 "Grimey's Final Word" "$report_file" 2>/dev/null && has_final_word=1
+            hedging=$(count_matches 'might be|could be|possibly|seems (fine|ok)|probably' "$report_file")
 
-            if grep -qi 'broken' "$report_file" 2>/dev/null; then
-                has_clinical=1
-            fi
-
-            if grep -q "Grimey's Final Word" "$report_file" 2>/dev/null; then
-                has_final_word=1
-            fi
-
-            if [[ "$has_clinical" -eq 1 ]] && [[ "$has_final_word" -eq 1 ]]; then
+            if [[ "$has_bluf" -eq 1 ]] && [[ "$has_final_word" -eq 1 ]]; then
                 score=4
-            elif [[ "$has_clinical" -eq 1 ]] || [[ "$has_final_word" -eq 1 ]]; then
+                if [[ "$hedging" -eq 0 ]]; then
+                    score=5
+                fi
+            elif [[ "$has_bluf" -eq 1 ]] || [[ "$has_final_word" -eq 1 ]]; then
                 score=2
             else
                 score=1
             fi
             ;;
 
-        "origin_assessment")
-            if grep -q 'Origin Assessment' "$report_file" 2>/dev/null; then
-                if grep -q '\[x\]' "$report_file" 2>/dev/null || grep -q '\[ \]' "$report_file" 2>/dev/null; then
-                    score=4
-                else
-                    score=2
-                fi
-            else
+        "self_grind")
+            local recon n m k acquittals probe_free
+            recon=$(grep -oE '[0-9]+ candidates, [0-9]+ survived, [0-9]+ killed' "$report_file" 2>/dev/null | head -1 || true)
+
+            if [[ -z "$recon" ]]; then
                 score=0
+            else
+                n=$(echo "$recon" | awk '{print $1}')
+                m=$(echo "$recon" | awk '{print $3}')
+                k=$(echo "$recon" | awk '{print $5}')
+
+                if [[ $((m + k)) -ne "$n" ]]; then
+                    # Arithmetic that does not close means findings are unaccounted for.
+                    score=1
+                else
+                    score=3
+                    # Killed candidates must be listed with probe and result.
+                    if [[ "$k" -gt 0 ]] && grep -q 'Disproof Probe' "$report_file" 2>/dev/null; then
+                        score=$((score + 1))
+                    fi
+                    # Acquittals require a performed probe; unprobed claims
+                    # belong in Not Examined instead.
+                    acquittals=$(count_matches 'Specific Probe Performed' "$report_file")
+                    probe_free=$(count_matches 'looks (fine|sound|good)|appears (fine|sound|correct)' "$report_file")
+                    if [[ "$acquittals" -gt 0 ]] && [[ "$probe_free" -eq 0 ]]; then
+                        score=$((score + 1))
+                    fi
+                fi
             fi
             ;;
 
@@ -335,22 +389,24 @@ score_report() {
     local target_name="$2"
     local output_file="$3"
 
-    echo "{" > "$output_file"
-    echo "  \"target\": \"$target_name\"," >> "$output_file"
-    echo "  \"timestamp\": \"$TIMESTAMP\"," >> "$output_file"
-    echo "  \"scores\": {" >> "$output_file"
+    {
+        echo "{"
+        echo "  \"target\": \"$target_name\","
+        echo "  \"timestamp\": \"$TIMESTAMP\","
+        echo "  \"scores\": {"
+    } >"$output_file"
 
     local dimensions=(
         "evidence_quality"
-        "category_coverage"
+        "routing_discipline"
         "severity_assessment"
         "verdict_accuracy"
         "report_structure"
-        "issue_format"
+        "finding_format"
         "fix_quality"
         "anti_pattern_avoidance"
         "voice_and_tone"
-        "origin_assessment"
+        "self_grind"
     )
 
     local first=true
@@ -358,8 +414,8 @@ score_report() {
     local max_possible=0
 
     for dim in "${dimensions[@]}"; do
-        local score=$(score_dimension "$dim" "$report_file" "")
-        local dim_max=5
+        local score dim_max=5
+        score=$(score_dimension "$dim" "$report_file" "")
 
         # Fix quality is N/A for report mode
         if [[ "$score" == "N/A" ]]; then
@@ -367,29 +423,31 @@ score_report() {
         fi
 
         if [[ "$first" != true ]]; then
-            echo "," >> "$output_file"
+            echo "," >>"$output_file"
         fi
         first=false
 
-        echo "    \"$dim\": $score" >> "$output_file"
+        echo "    \"$dim\": $score" >>"$output_file"
         total_score=$((total_score + score))
         max_possible=$((max_possible + dim_max))
     done
 
-    echo "" >> "$output_file"
-    echo "  }," >> "$output_file"
-    echo "  \"total_score\": $total_score," >> "$output_file"
-    echo "  \"max_possible\": $max_possible," >> "$output_file"
+    {
+        echo ""
+        echo "  },"
+        echo "  \"total_score\": $total_score,"
+        echo "  \"max_possible\": $max_possible,"
+    } >>"$output_file"
 
     # Calculate percentage
     if [[ "$max_possible" -gt 0 ]]; then
         local percentage=$((total_score * 100 / max_possible))
-        echo "  \"percentage\": $percentage" >> "$output_file"
+        echo "  \"percentage\": $percentage" >>"$output_file"
     else
-        echo "  \"percentage\": 0" >> "$output_file"
+        echo "  \"percentage\": 0" >>"$output_file"
     fi
 
-    echo "}" >> "$output_file"
+    echo "}" >>"$output_file"
 }
 
 run_grind_manual() {
@@ -416,7 +474,7 @@ run_grind_manual() {
     echo ""
     echo "4. Return to this terminal and press Enter to continue scoring."
     echo ""
-    read -p "Press Enter when the grind is complete and the report is saved..."
+    read -r -p "Press Enter when the grind is complete and the report is saved..."
 
     if [[ ! -f "$work_dir/grind-output.md" ]]; then
         echo "ERROR: Grind output not found at $work_dir/grind-output.md"
@@ -439,14 +497,30 @@ run_grind_with_agent() {
     echo "  $work_dir/grind-output.md"
     echo ""
 
-    read -p "Press Enter when ready to continue..."
+    read -r -p "Press Enter when ready to continue..."
 }
 
 # ============================================
 # Main Execution
 # ============================================
 
-if [[ "$ALL" == true ]]; then
+if [[ -n "$SCORE_ONLY" ]]; then
+    # Score a saved report without re-running an agent. Used to check the
+    # scorer against benchmark/fixtures/ after the report template changes.
+    if [[ ! -f "$SCORE_ONLY" ]]; then
+        echo "ERROR: report not found: $SCORE_ONLY"
+        exit 1
+    fi
+
+    score_file=$(mktemp)
+    score_report "$SCORE_ONLY" "$(basename "$SCORE_ONLY")" "$score_file"
+
+    jq -r '.scores | to_entries[] | "  \(.key): \(.value)"' "$score_file"
+    echo ""
+    echo -e "Score: $(jq -r '.total_score' "$score_file")/$(jq -r '.max_possible' "$score_file") ($(jq -r '.percentage' "$score_file")%)"
+    rm -f "$score_file"
+
+elif [[ "$ALL" == true ]]; then
     info "Running benchmark against all targets..."
     echo ""
 
@@ -458,7 +532,7 @@ if [[ "$ALL" == true ]]; then
     )
 
     for target_entry in "${TARGETS[@]}"; do
-        IFS=':' read -r target_type target_name target_path <<< "$target_entry"
+        IFS=':' read -r target_type target_name target_path <<<"$target_entry"
 
         echo -e "${BLUE}========================================${NC}"
         echo -e "${BLUE}Target: $target_name ($target_type)${NC}"
@@ -485,8 +559,8 @@ if [[ "$ALL" == true ]]; then
 
             # Display score
             if [[ -f "$output_file" ]]; then
-                local percentage=$(jq -r '.percentage' "$output_file")
-                local total=$(jq -r '.total_score' "$output_file")
+                percentage=$(jq -r '.percentage' "$output_file")
+                total=$(jq -r '.total_score' "$output_file")
                 echo ""
                 echo -e "Score: ${total}/50 (${percentage}%)"
             fi
@@ -504,12 +578,12 @@ if [[ "$ALL" == true ]]; then
     echo ""
 
     for target_entry in "${TARGETS[@]}"; do
-        IFS=':' read -r target_type target_name target_path <<< "$target_entry"
+        IFS=':' read -r target_type target_name target_path <<<"$target_entry"
         work_dir="$RESULTS_DIR/$target_name-$TIMESTAMP"
         output_file="$work_dir/score.json"
 
         if [[ -f "$output_file" ]]; then
-            local percentage=$(jq -r '.percentage' "$output_file")
+            percentage=$(jq -r '.percentage' "$output_file")
             echo -e "$target_name: ${percentage}%"
         fi
     done
@@ -523,19 +597,19 @@ if [[ "$ALL" == true ]]; then
         echo ""
 
         for target_entry in "${TARGETS[@]}"; do
-            IFS=':' read -r target_type target_name target_path <<< "$target_entry"
+            IFS=':' read -r target_type target_name target_path <<<"$target_entry"
 
             baseline_file="$BASELINE_DIR/$target_name/*.json"
             current_file="$RESULTS_DIR/$target_name-$TIMESTAMP/score.json"
 
             if [[ -f "$current_file" ]]; then
-                local current_pct=$(jq -r '.percentage' "$current_file")
+                current_pct=$(jq -r '.percentage' "$current_file")
 
                 # Find baseline file
-                local baseline_match=$(ls $baseline_file 2>/dev/null | head -1)
+                baseline_match=$(find "$BASELINE_DIR" -name "$(basename "$baseline_file")" 2>/dev/null | head -1)
                 if [[ -n "$baseline_match" ]] && [[ -f "$baseline_match" ]]; then
-                    local baseline_pct=$(jq -r '.percentage' "$baseline_match")
-                    local diff=$((current_pct - baseline_pct))
+                    baseline_pct=$(jq -r '.percentage' "$baseline_match")
+                    diff=$((current_pct - baseline_pct))
 
                     if [[ "$diff" -gt 0 ]]; then
                         echo -e "$target_name: ${GREEN}+${diff}pp${NC} (baseline: ${baseline_pct}%, current: ${current_pct}%)"
@@ -576,8 +650,8 @@ elif [[ -n "$TARGET" ]]; then
         score_report "$report_file" "$target_name" "$output_file"
 
         if [[ -f "$output_file" ]]; then
-            local percentage=$(jq -r '.percentage' "$output_file")
-            local total=$(jq -r '.total_score' "$output_file")
+            percentage=$(jq -r '.percentage' "$output_file")
+            total=$(jq -r '.total_score' "$output_file")
             echo ""
             echo -e "Score: ${total}/50 (${percentage}%)"
         fi

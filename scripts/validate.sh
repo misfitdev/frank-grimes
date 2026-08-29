@@ -297,6 +297,30 @@ else
     fail "stop.sh does not reference .grimes-state.json"
 fi
 
+# The scorer greps for the report template's section names and field labels, so
+# editing the template silently breaks scoring. The fixtures are the tripwire:
+# a conforming report must score high and a theatrical one must not.
+if command -v jq &>/dev/null; then
+    CONFORMING=$("$PROJECT_ROOT/benchmark/runner.sh" --score "$PROJECT_ROOT/benchmark/fixtures/conforming-report.md" 2>/dev/null | grep -oE '\([0-9]+%\)' | tr -d '()%')
+    NONCONFORMING=$("$PROJECT_ROOT/benchmark/runner.sh" --score "$PROJECT_ROOT/benchmark/fixtures/nonconforming-report.md" 2>/dev/null | grep -oE '\([0-9]+%\)' | tr -d '()%')
+
+    if [[ "${CONFORMING:-0}" -ge 90 ]]; then
+        pass "conforming fixture scores ${CONFORMING}% (>= 90)"
+    else
+        fail "conforming fixture scores ${CONFORMING:-0}%; scorer has drifted from the report template"
+    fi
+
+    if [[ "${NONCONFORMING:-100}" -le 50 ]]; then
+        pass "non-conforming fixture scores ${NONCONFORMING}% (<= 50)"
+    else
+        fail "non-conforming fixture scores ${NONCONFORMING:-100}%; scorer no longer discriminates"
+    fi
+else
+    warn "jq not found - skipping benchmark scorer regression check"
+fi
+
+echo ""
+
 # An installed plugin runs from a versioned cache directory, so a hook path
 # relative to the working directory silently stops firing.
 if grep -q 'CLAUDE_PLUGIN_ROOT' "$PROJECT_ROOT/adapters/claude-code/hooks.json"; then
