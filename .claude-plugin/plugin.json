@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin.json",
   "name": "frank-grimes",
   "displayName": "Frank Grimes",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "A clinical, pessimistic iteration loop for systematically destroying, rebuilding, and hardening ideas. Assumes everything is broken until proven otherwise.",
   "author": {
     "name": "Misfit Development",
