@@ -1,10 +1,13 @@
 [tools]
 jq = "latest"
 shellcheck = "latest"
-shfmt = "latest"
 just = "latest"
-# Pinned: the contract's generated bindings must be byte-identical across
-# machines, and codegen output moves with the toolchain.
+# Pinned: the contract's generated bindings and the formatted shell scripts are
+# committed and must be byte-identical across machines, and both move with the
+# toolchain. protoc-gen-go is the plugin buf.gen.yaml resolves off PATH; without
+# a pin it is whatever the machine happens to have installed.
 go = "1.25"
 buf = "1.70.0"
 protoc = "36.0"
+protoc-gen-go = "1.36.12"
+shfmt = "3.13.1"

@@ -311,20 +311,23 @@ if command -v buf &>/dev/null; then
         fail "buf lint fails"
     fi
 
-    if command -v go &>/dev/null; then
-        GEN_BEFORE=$(find "$PROJECT_ROOT/gen" -name '*.go' -exec shasum {} \; 2>/dev/null | shasum | cut -d' ' -f1)
-        if (cd "$PROJECT_ROOT" && PATH="$PATH:$(go env GOPATH)/bin" buf generate) &>/dev/null; then
-            GEN_AFTER=$(find "$PROJECT_ROOT/gen" -name '*.go' -exec shasum {} \; 2>/dev/null | shasum | cut -d' ' -f1)
-            if [[ "$GEN_BEFORE" == "$GEN_AFTER" ]]; then
-                pass "generated bindings match the contract"
-            else
-                fail "generated bindings drifted from the contract; run 'just gen' and commit"
-            fi
-        else
-            warn "buf generate failed - skipping codegen drift check"
-        fi
+    echo "toolchain: $(go version 2>/dev/null || echo 'go not found') | $(buf --version 2>/dev/null) | protoc $(protoc --version 2>/dev/null | cut -d' ' -f2) | $(protoc-gen-go --version 2>&1 || echo 'protoc-gen-go not found')"
+
+    # GOPATH/bin is deliberately not added to PATH here: that is where an
+    # unpinned ad-hoc `go install protoc-gen-go` lands, and letting it resolve
+    # is the drift this check exists to catch.
+    if ! command -v protoc-gen-go &>/dev/null; then
+        fail "protoc-gen-go not found; run 'mise install' to get the pinned version"
+    elif ! (cd "$PROJECT_ROOT" && git rev-parse --is-inside-work-tree) &>/dev/null; then
+        warn "not a git work tree - skipping codegen drift check"
+    elif ! (cd "$PROJECT_ROOT" && buf generate) &>/dev/null; then
+        fail "buf generate failed"
+    # --porcelain rather than `git diff` so a newly generated untracked file
+    # counts as drift too.
+    elif [[ -n "$(cd "$PROJECT_ROOT" && git status --porcelain -- gen)" ]]; then
+        fail "generated bindings drifted from the contract; run 'just gen' and commit"
     else
-        warn "go not found - skipping codegen drift check"
+        pass "generated bindings match the contract"
     fi
 else
     warn "buf not found - skipping contract lint"
