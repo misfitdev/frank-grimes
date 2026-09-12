@@ -530,6 +530,22 @@ fi
 
 echo ""
 
+# The aggregate gate is worth nothing if nothing runs it. A workflow that fires
+# only on a release tag lets every intermediate commit through unchecked, which
+# is how toolchain and codegen drift reached a release before.
+GATE_WORKFLOW=""
+for wf in "$PROJECT_ROOT"/.github/workflows/*.yml; do
+    if grep -q 'pull_request' "$wf" && grep -q 'just check' "$wf"; then
+        GATE_WORKFLOW="$(basename "$wf")"
+        break
+    fi
+done
+if [[ -n "$GATE_WORKFLOW" ]]; then
+    pass "the aggregate gate runs on pull requests ($GATE_WORKFLOW)"
+else
+    fail "no workflow runs 'just check' on pull_request"
+fi
+
 # An installed plugin runs from a versioned cache directory, so a hook path
 # relative to the working directory silently stops firing.
 if grep -q 'CLAUDE_PLUGIN_ROOT' "$PROJECT_ROOT/adapters/claude-code/hooks.json"; then
