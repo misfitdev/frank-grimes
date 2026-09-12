@@ -73,3 +73,4 @@ test-contracts:
 # Build the contract codec
 build:
     go build -o bin/grimes-contract ./cmd/grimes-contract
+    go build -o bin/grimes ./cmd/grimes
