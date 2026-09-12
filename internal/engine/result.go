@@ -21,7 +21,7 @@ func (e *Engine) assemble(
 	oscillation bool,
 ) *pb.GrimesResult {
 	return &pb.GrimesResult{
-		SchemaMajor:       2,
+		SchemaMajor:       contracts.SchemaMajor,
 		RunId:             e.RunID,
 		ProducerRole:      pb.ProducerRole_PRODUCER_ROLE_ORCHESTRATOR,
 		Target:            target,

@@ -106,6 +106,14 @@ assert_eq "$ID_DOC" "$ID_DOC_CASE" "section spacing does not change identity"
 ID_DOC_S2=$("$BIN" id --category=SEC --document=bad-script.sh --section=2 --evidence='rm -rf "$1"/*' | grep '^id:')
 assert_ne "$ID_DOC" "$ID_DOC_S2" "a different clause is a different finding"
 
+# flag.Uint accepts more than the contract's uint32 holds, and the conversion
+# would truncate 4294967297 to 1 and fingerprint a different claim.
+if "$BIN" id --category=SEC --argument=plan --step=4294967297 --evidence=x 2>/dev/null; then
+    fail "a step above uint32 was accepted"
+else
+    pass "a step above uint32 is refused rather than truncated"
+fi
+
 # An anchor is required, and only one of them.
 if "$BIN" id --category=SEC --evidence=x 2>/dev/null; then
     fail "an anchorless id was accepted"

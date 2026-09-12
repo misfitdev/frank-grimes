@@ -329,6 +329,21 @@ if command -v buf &>/dev/null; then
 
     echo "toolchain: $(go version 2>/dev/null || echo 'go not found') | $(buf --version 2>/dev/null) | protoc $(protoc --version 2>/dev/null | cut -d' ' -f2) | $(protoc-gen-go --version 2>&1 || echo 'protoc-gen-go not found')"
 
+    # Existence is not the guarantee. buf resolves the plugin off PATH, so an
+    # unpinned copy earlier in PATH produces different bindings while still
+    # satisfying a presence check.
+    if command -v mise &>/dev/null && command -v protoc-gen-go &>/dev/null; then
+        PINNED="$(mise which protoc-gen-go 2>/dev/null || true)"
+        RESOLVED="$(command -v protoc-gen-go)"
+        if [[ -z "$PINNED" ]]; then
+            warn "mise does not manage protoc-gen-go; codegen would use $RESOLVED"
+        elif [[ "$PINNED" == "$RESOLVED" ]]; then
+            pass "protoc-gen-go resolves to the pinned binary"
+        else
+            fail "protoc-gen-go resolves to $RESOLVED, not the pinned $PINNED"
+        fi
+    fi
+
     # GOPATH/bin is deliberately not added to PATH here: that is where an
     # unpinned ad-hoc `go install protoc-gen-go` lands, and letting it resolve
     # is the drift this check exists to catch.

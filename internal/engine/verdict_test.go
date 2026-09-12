@@ -116,6 +116,39 @@ func TestDeriveAcceptedP0CapsAtConditional(t *testing.T) {
 	if d.Counts.GetOpenP0() != 0 {
 		t.Errorf("open_p0 = %d, want 0 for an accepted finding", d.Counts.GetOpenP0())
 	}
+	// Carrying a P0 is not low residual risk. Reporting the decision as
+	// conditional while the risk reads low would describe the same finding two
+	// contradictory ways.
+	if d.Verdict.GetResidualRisk() != pb.ResidualRisk_RESIDUAL_RISK_CRITICAL {
+		t.Errorf("residual risk = %v, want critical for a carried P0", d.Verdict.GetResidualRisk())
+	}
+	if d.Color == pb.LegacyColor_LEGACY_COLOR_GREEN {
+		t.Error("a carried P0 reached GREEN")
+	}
+}
+
+// A false positive is not carried risk: it was disproved, so it must not rank.
+func TestDeriveFalsePositiveCarriesNoRisk(t *testing.T) {
+	in := clean()
+	in.Candidates = []Candidate{{
+		Severity: pb.Severity_SEVERITY_P0, Status: pb.FindingStatus_FINDING_STATUS_FALSE_POSITIVE,
+		Tier: pb.EvidenceTier_EVIDENCE_TIER_E1, ProbeAttempted: true,
+	}}
+	if got := Derive(in).Verdict.GetResidualRisk(); got != pb.ResidualRisk_RESIDUAL_RISK_LOW {
+		t.Errorf("residual risk = %v, want low for a disproved finding", got)
+	}
+}
+
+// A verified fix is not carried risk either.
+func TestDeriveVerifiedCarriesNoRisk(t *testing.T) {
+	in := clean()
+	in.Candidates = []Candidate{{
+		Severity: pb.Severity_SEVERITY_P0, Status: pb.FindingStatus_FINDING_STATUS_VERIFIED,
+		Tier: pb.EvidenceTier_EVIDENCE_TIER_E1, ProbeAttempted: true,
+	}}
+	if got := Derive(in).Verdict.GetResidualRisk(); got != pb.ResidualRisk_RESIDUAL_RISK_LOW {
+		t.Errorf("residual risk = %v, want low for a verified fix", got)
+	}
 }
 
 func TestDeriveUnweightedFindingsExcluded(t *testing.T) {

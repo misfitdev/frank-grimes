@@ -4,16 +4,19 @@ package contracts
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 )
 
-// NUL separates fingerprint components so that no component's content can
-// impersonate a boundary between two others.
+// NUL joins the parts of a single component. It is not a component separator:
+// protobuf permits a NUL inside a string, so a separator a component can
+// contain is a separator a component can forge.
 const fieldSep = "\x00"
 
 // NormalizeEvidence renders evidence text comparable across runs: UTF-8, LF
@@ -88,14 +91,22 @@ func normalizeLabel(s string) string {
 func Fingerprint(category pb.Category, anchor *pb.Anchor, evidence string) []byte {
 	kind, text := AnchorKey(anchor)
 	h := sha256.New()
-	h.Write([]byte(CategoryName(category)))
-	h.Write([]byte(fieldSep))
-	h.Write([]byte(kind))
-	h.Write([]byte(fieldSep))
-	h.Write([]byte(text))
-	h.Write([]byte(fieldSep))
-	h.Write([]byte(NormalizeEvidence(evidence)))
+	writeComponent(h, CategoryName(category))
+	writeComponent(h, kind)
+	writeComponent(h, text)
+	writeComponent(h, NormalizeEvidence(evidence))
 	return h.Sum(nil)
+}
+
+// writeComponent length-prefixes a component so its content cannot reach across
+// its own boundary. Separators alone are not enough: an anchor holding a NUL
+// would otherwise hash identically to a shorter anchor plus a longer evidence
+// string, giving two different findings one identity.
+func writeComponent(h io.Writer, s string) {
+	var n [8]byte
+	binary.BigEndian.PutUint64(n[:], uint64(len(s)))
+	h.Write(n[:])
+	h.Write([]byte(s))
 }
 
 // RepoAnchor is the common case: a finding at a repository-relative path.

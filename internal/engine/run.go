@@ -182,7 +182,10 @@ func (e *Engine) review(ctx context.Context, target *pb.Target, categories []pb.
 
 // apply admits each proposed finding and records it against the ledger.
 func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, proposal *pb.GrimesResult, iteration uint32) (bool, error) {
-	oscillation := proposal.GetLedger().GetOscillationDetected()
+	// Oscillation comes from what the ledger records happening, never from the
+	// proposal: a provider that could set it would be deciding whether a pass
+	// is reachable.
+	oscillation := false
 	for _, snap := range proposal.GetFindings() {
 		if err := ctx.Err(); err != nil {
 			return false, err

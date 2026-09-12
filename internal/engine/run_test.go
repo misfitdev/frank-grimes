@@ -574,6 +574,41 @@ func TestRunIndependentBlockOverridesClean(t *testing.T) {
 	}
 }
 
+// Oscillation decides whether a pass is reachable, so a provider claiming it
+// would be deciding the verdict. It comes from what the ledger records.
+func TestRunIgnoresProviderOscillationClaim(t *testing.T) {
+	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: 2, Target: testTarget(t)}}
+	claimed := proposal(t)
+	e := newEngine(&fakeProvider{out: withOscillationClaim(t, claimed)}, l, &memState{}, nil)
+
+	result, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if result.GetLedger().GetOscillationDetected() {
+		t.Error("the engine adopted the provider's oscillation claim over a ledger with no regression")
+	}
+}
+
+// withOscillationClaim re-wraps provider output with the oscillation flag set.
+func withOscillationClaim(t *testing.T, raw []byte) []byte {
+	t.Helper()
+	payload, err := envelope.Extract(string(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &pb.GrimesResult{}
+	if err := contracts.UnmarshalCanonical(payload, r); err != nil {
+		t.Fatal(err)
+	}
+	r.Ledger.OscillationDetected = true
+	encoded, err := contracts.EncodeCanonical(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return []byte(envelope.Wrap(encoded))
+}
+
 // A fingerprint already fixed reappearing is a regression, which makes a pass
 // unreachable for the run.
 func TestRunRegressionSetsOscillation(t *testing.T) {

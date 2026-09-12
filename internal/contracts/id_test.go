@@ -133,12 +133,46 @@ func TestFingerprintTracksAnchorAndEvidence(t *testing.T) {
 	}
 }
 
-// The separator exists so no component's content can impersonate a boundary.
+// Components are length-prefixed so no component's content can reach across its
+// own boundary. Protobuf permits a NUL in a string, so a component that could
+// contain the separator could forge one.
 func TestFingerprintResistsComponentSmuggling(t *testing.T) {
-	a := fp(docAnchor("policy.md", "4.2"), ev)
-	b := fp(docAnchor("policy.md\x004.2", ""), ev)
-	if bytes.Equal(a, b) {
-		t.Error("a NUL inside a component forged a component boundary")
+	if bytes.Equal(fp(docAnchor("policy.md", "4.2"), ev), fp(docAnchor("policy.md\x004.2", ""), ev)) {
+		t.Error("a NUL inside an anchor forged a boundary within the anchor")
+	}
+
+	// The case a separator alone misses: the NUL moves the boundary between two
+	// adjacent components, so a longer anchor and a shorter evidence string hash
+	// the same as the reverse.
+	if bytes.Equal(fp(RepoAnchor("a\x00b"), "c"), fp(RepoAnchor("a"), "b\x00c")) {
+		t.Error("a NUL moved the boundary between the anchor and the evidence")
+	}
+
+	// The same shift across the kind and anchor boundary.
+	if bytes.Equal(fp(docAnchor("a", "b"), ev), fp(docAnchor("a\x00b", ""), ev)) {
+		t.Error("a NUL moved the boundary between the document and its section")
+	}
+}
+
+// A component's length is part of the hash, so adjacent components cannot be
+// re-partitioned without changing identity.
+func TestFingerprintComponentsAreLengthDelimited(t *testing.T) {
+	seen := map[string]string{}
+	for _, c := range []struct {
+		name   string
+		anchor *pb.Anchor
+		ev     string
+	}{
+		{"anchor ab, evidence c", RepoAnchor("ab"), "c"},
+		{"anchor a, evidence bc", RepoAnchor("a"), "bc"},
+		{"anchor a NUL b, evidence c", RepoAnchor("a\x00b"), "c"},
+		{"anchor a, evidence b NUL c", RepoAnchor("a"), "b\x00c"},
+	} {
+		key := string(fp(c.anchor, c.ev))
+		if prior, ok := seen[key]; ok {
+			t.Errorf("%q collides with %q", c.name, prior)
+		}
+		seen[key] = c.name
 	}
 }
 

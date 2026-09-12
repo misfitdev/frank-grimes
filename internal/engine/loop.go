@@ -111,6 +111,24 @@ func bindingFailure(state *pb.LoopState, result *pb.GrimesResult, resultDigest [
 		return fmt.Sprintf("result declares contract major %d, expected %d",
 			result.GetSchemaMajor(), contracts.SchemaMajor)
 	}
+	// The digest proves which result this is; these prove the state describes
+	// the same run of it. A state claiming iteration 5 over a result taken at
+	// iteration 1 would otherwise read as having reached the bound.
+	if result.GetIteration() != state.GetIteration() {
+		return fmt.Sprintf("result was taken at iteration %d, state claims %d",
+			result.GetIteration(), state.GetIteration())
+	}
+	if result.GetMaxIterations() != state.GetMaxIterations() {
+		return fmt.Sprintf("result was bounded at %d iterations, state claims %d",
+			result.GetMaxIterations(), state.GetMaxIterations())
+	}
+	if result.GetMode() != state.GetMode() {
+		return fmt.Sprintf("result was produced in %v, state claims %v",
+			result.GetMode(), state.GetMode())
+	}
+	if !bytes.Equal(result.GetLedger().GetDigestSha256(), state.GetLedgerDigestSha256()) {
+		return "result references a different ledger than the state recorded"
+	}
 	if result.GetProducerRole() != pb.ProducerRole_PRODUCER_ROLE_ORCHESTRATOR {
 		return "result was not produced by the orchestrator"
 	}

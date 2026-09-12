@@ -58,10 +58,15 @@ func loopResult(t *testing.T, mutate func(*pb.GrimesResult)) *pb.GrimesResult {
 	return r
 }
 
-// bind returns the state and result with the digest chain closed, which is the
-// only shape DecideLoop trusts.
+// bind returns the state and result agreeing about the run, which is the only
+// shape DecideLoop trusts: the state describes the run the result came from, so
+// every field they share has to match.
 func bind(t *testing.T, state *pb.LoopState, result *pb.GrimesResult) (*pb.LoopState, *pb.GrimesResult, []byte) {
 	t.Helper()
+	state.Iteration = result.GetIteration()
+	state.MaxIterations = result.GetMaxIterations()
+	state.Mode = result.GetMode()
+	state.LedgerDigestSha256 = result.GetLedger().GetDigestSha256()
 	digest, err := contracts.Digest(result)
 	if err != nil {
 		t.Fatal(err)
@@ -137,11 +142,31 @@ func TestDecideLoopBindingChecks(t *testing.T) {
 	}
 }
 
+// A state that disagrees with the result it points at is not a record of that
+// run, whatever its digest says.
+func TestDecideLoopRejectsDisagreeingState(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		mutate func(*pb.LoopState)
+	}{
+		{"iteration", func(s *pb.LoopState) { s.Iteration = 4 }},
+		{"max iterations", func(s *pb.LoopState) { s.MaxIterations = 9 }},
+		{"mode", func(s *pb.LoopState) { s.Mode = pb.Mode_MODE_FIX }},
+		{"ledger digest", func(s *pb.LoopState) { s.LedgerDigestSha256 = bytesOf(0xcd) }},
+	} {
+		s, r, digest := bind(t, loopState(t, nil), greenResult(t))
+		c.mutate(s)
+		if d := DecideLoop(s, r, digest); d.Outcome != OutcomeUnverified {
+			t.Errorf("%s: outcome = %v (%s), want unverified", c.name, d.Outcome, d.Reason)
+		}
+	}
+}
+
 func TestDecideLoopIterationLimit(t *testing.T) {
-	s, r, digest := bind(t, loopState(t, func(s *pb.LoopState) {
-		s.Iteration = 5
-		s.MaxIterations = 5
-	}), loopResult(t, nil))
+	s, r, digest := bind(t, loopState(t, nil), loopResult(t, func(r *pb.GrimesResult) {
+		r.Iteration = 5
+		r.MaxIterations = 5
+	}))
 	d := DecideLoop(s, r, digest)
 	if d.Outcome != OutcomeIterationLimit {
 		t.Errorf("outcome = %v (%s), want iteration_limit", d.Outcome, d.Reason)
@@ -149,9 +174,10 @@ func TestDecideLoopIterationLimit(t *testing.T) {
 }
 
 func TestDecideLoopYieldExhausted(t *testing.T) {
-	s, r, digest := bind(t,
-		loopState(t, func(s *pb.LoopState) { s.Iteration = 3 }),
-		loopResult(t, func(r *pb.GrimesResult) { r.MarginalYield = &pb.MarginalYield{CandidatesExamined: 4} }))
+	s, r, digest := bind(t, loopState(t, nil), loopResult(t, func(r *pb.GrimesResult) {
+		r.Iteration = 3
+		r.MarginalYield = &pb.MarginalYield{CandidatesExamined: 4}
+	}))
 	d := DecideLoop(s, r, digest)
 	if d.Outcome != OutcomeYieldExhausted {
 		t.Errorf("outcome = %v (%s), want yield_exhausted", d.Outcome, d.Reason)
@@ -161,9 +187,10 @@ func TestDecideLoopYieldExhausted(t *testing.T) {
 // The first iteration has no previous pass to compare against, so zero new
 // findings there is not an exhausted yield.
 func TestDecideLoopFirstIterationIgnoresYield(t *testing.T) {
-	s, r, digest := bind(t,
-		loopState(t, func(s *pb.LoopState) { s.Iteration = 1 }),
-		loopResult(t, func(r *pb.GrimesResult) { r.MarginalYield = &pb.MarginalYield{CandidatesExamined: 4} }))
+	s, r, digest := bind(t, loopState(t, nil), loopResult(t, func(r *pb.GrimesResult) {
+		r.Iteration = 1
+		r.MarginalYield = &pb.MarginalYield{CandidatesExamined: 4}
+	}))
 	if d := DecideLoop(s, r, digest); d.Outcome != OutcomeContinue {
 		t.Errorf("outcome = %v (%s), want continue", d.Outcome, d.Reason)
 	}
@@ -172,10 +199,7 @@ func TestDecideLoopFirstIterationIgnoresYield(t *testing.T) {
 // A pass outranks the iteration bound and the yield rule, so a confirmed pass
 // on the last iteration still reads as a pass.
 func TestDecideLoopPassOutranksLimit(t *testing.T) {
-	s, r, digest := bind(t, loopState(t, func(s *pb.LoopState) {
-		s.Iteration = 5
-		s.MaxIterations = 5
-	}), greenResult(t))
+	s, r, digest := bind(t, loopState(t, nil), greenResultAt(t, 5, 5))
 	if d := DecideLoop(s, r, digest); d.Outcome != OutcomeConfirmedPass {
 		t.Errorf("outcome = %v (%s), want confirmed_pass", d.Outcome, d.Reason)
 	}
@@ -262,6 +286,14 @@ func bytesOf(b byte) []byte {
 		out[i] = b
 	}
 	return out
+}
+
+func greenResultAt(t *testing.T, iteration, max uint32) *pb.GrimesResult {
+	t.Helper()
+	r := greenResult(t)
+	r.Iteration = iteration
+	r.MaxIterations = max
+	return r
 }
 
 func greenResult(t *testing.T) *pb.GrimesResult {

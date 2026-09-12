@@ -128,6 +128,55 @@ func TestParseRunResearchModes(t *testing.T) {
 	}
 }
 
+// A flag that is parsed and ignored is worse than one that is refused: the
+// caller believes they asked for something.
+func TestParseRunRejectsUnimplementedScope(t *testing.T) {
+	if _, err := parseRun(baseArgs("--scope", "whole-repo")); err == nil {
+		t.Fatal("want an error for --scope while collection cannot honour it")
+	}
+	// The default must not trip the same check.
+	if _, err := parseRun(baseArgs()); err != nil {
+		t.Errorf("default scope was rejected: %v", err)
+	}
+}
+
+// strings.Fields cannot express an argument containing a space, so arguments
+// that need one are passed individually.
+func TestParseRunRepeatableProviderArgs(t *testing.T) {
+	cfg, err := parseRun([]string{
+		"--provider-command", "/bin/echo",
+		"--provider-arg", "/tmp/config file.json",
+		"--provider-arg", "--flag=a b",
+		"src",
+	})
+	if err != nil {
+		t.Fatalf("parseRun: %v", err)
+	}
+	want := []string{"/bin/echo", "/tmp/config file.json", "--flag=a b"}
+	if len(cfg.ProviderCommand) != len(want) {
+		t.Fatalf("argv = %q, want %q", cfg.ProviderCommand, want)
+	}
+	for i := range want {
+		if cfg.ProviderCommand[i] != want[i] {
+			t.Errorf("argv[%d] = %q, want %q", i, cfg.ProviderCommand[i], want[i])
+		}
+	}
+}
+
+func TestParseRunAdjudicatorArgNeedsCommand(t *testing.T) {
+	if _, err := parseRun(baseArgs("--adjudicator-arg", "x")); err == nil {
+		t.Fatal("want an error for --adjudicator-arg without a command")
+	}
+}
+
+// The contract carries the bound as a uint32, so a larger value must be refused
+// rather than wrapped into a smaller limit.
+func TestParseRunRejectsIterationOverflow(t *testing.T) {
+	if _, err := parseRun(baseArgs("--max-iterations", "4294967296")); err == nil {
+		t.Fatal("want an error for an iteration bound above uint32")
+	}
+}
+
 func TestCodeForDecision(t *testing.T) {
 	for _, c := range []struct {
 		decision pb.Decision

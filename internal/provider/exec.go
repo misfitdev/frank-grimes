@@ -28,6 +28,9 @@ const DefaultMaxOutputBytes = 1 << 20
 // DefaultTimeout bounds a single provider invocation.
 const DefaultTimeout = 10 * time.Minute
 
+// stderrLimit bounds retained provider diagnostics.
+const stderrLimit = 8 << 10
+
 // Exec invokes Command with the request supplied through the environment.
 type Exec struct {
 	Command        []string
@@ -71,8 +74,10 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	if err != nil {
 		return nil, err
 	}
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
+	// Diagnostics are for the error message only, so keep a bounded tail rather
+	// than every byte a provider decides to emit.
+	stderr := &boundedBuffer{limit: stderrLimit}
+	cmd.Stderr = stderr
 
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("%w: %v", engine.ErrProviderFailed, err)
@@ -109,6 +114,31 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 // An adjudicator is given the target's identity and the claimed tuple and
 // nothing else: a reviewer that sees the findings is not an independent
 // reviewer.
+// boundedBuffer keeps the first limit bytes and counts the rest.
+type boundedBuffer struct {
+	limit   int
+	buf     bytes.Buffer
+	dropped int
+}
+
+func (b *boundedBuffer) Write(p []byte) (int, error) {
+	if room := b.limit - b.buf.Len(); room > 0 {
+		if len(p) <= room {
+			return b.buf.Write(p)
+		}
+		b.buf.Write(p[:room])
+	}
+	b.dropped += len(p) - max(0, b.limit-b.buf.Len())
+	return len(p), nil
+}
+
+func (b *boundedBuffer) String() string {
+	if b.dropped > 0 {
+		return fmt.Sprintf("%s ... (%d further bytes dropped)", b.buf.String(), b.dropped)
+	}
+	return b.buf.String()
+}
+
 func requestEnv(req engine.Request) []string {
 	env := []string{
 		"GRIMES_TARGET_ROOT=" + req.Target.GetRoot(),

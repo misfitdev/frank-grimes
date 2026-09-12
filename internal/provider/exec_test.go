@@ -105,15 +105,20 @@ func TestExecTimeout(t *testing.T) {
 // A shell provider that backgrounds work keeps the stdout pipe open; killing
 // only the direct child would leave the read blocked past the deadline.
 func TestExecTimeoutKillsProcessGroup(t *testing.T) {
+	// The descendant touches a file before sleeping, so the test can prove it
+	// really started rather than infer it from the parent's own output.
+	marker := filepath.Join(t.TempDir(), "descendant-started")
 	e := &Exec{
-		Command: script(t, "sleep 60 &\necho started\nwait\n"),
+		Command: script(t, "( : >\""+marker+"\"; sleep 60 ) &\necho started\nwait\n"),
 		Timeout: 500 * time.Millisecond,
 	}
+
 	done := make(chan error, 1)
 	go func() {
 		_, err := e.Review(context.Background(), primaryReq())
 		done <- err
 	}()
+
 	// Bounded well under WaitDelay: without the group kill, Wait only returns
 	// once that delay expires, which is the slow path this guards against.
 	select {
@@ -121,8 +126,18 @@ func TestExecTimeoutKillsProcessGroup(t *testing.T) {
 		if err == nil {
 			t.Fatal("want an error when the provider outruns its timeout")
 		}
+		if !errors.Is(err, engine.ErrProviderFailed) {
+			t.Errorf("error = %v, want ErrProviderFailed", err)
+		}
+		if !strings.Contains(err.Error(), "deadline exceeded") {
+			t.Errorf("error = %v, want it to name the deadline", err)
+		}
 	case <-time.After(3 * time.Second):
-		t.Fatal("Review blocked on a grandchild holding the pipe open")
+		t.Fatal("Review blocked on a descendant holding the pipe open")
+	}
+
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("the descendant never started, so termination was not exercised: %v", err)
 	}
 }
 

@@ -39,6 +39,15 @@ func count(cands []Candidate) *pb.FindingCounts {
 	return c
 }
 
+// carriesRisk reports whether a finding still leaves risk on the target.
+//
+// Accepting a risk is a decision to carry it, not evidence it is gone, so an
+// accepted finding ranks in residual risk even though it is not open. Counting
+// it as open instead would demand a block the decision rules do not produce.
+func carriesRisk(s pb.FindingStatus) bool {
+	return Open(s) || s == pb.FindingStatus_FINDING_STATUS_ACCEPTED
+}
+
 func decide(in DeriveInput, counts *pb.FindingCounts) pb.Decision {
 	if counts.GetOpenP0() > 0 {
 		return pb.Decision_DECISION_BLOCK
@@ -71,7 +80,7 @@ func residualRisk(in DeriveInput) pb.ResidualRisk {
 	}
 	highest := pb.Severity_SEVERITY_UNSPECIFIED
 	for _, c := range in.Candidates {
-		if !Weighted(c.Tags) || !Open(c.Status) {
+		if !Weighted(c.Tags) || !carriesRisk(c.Status) {
 			continue
 		}
 		if highest == pb.Severity_SEVERITY_UNSPECIFIED || c.Severity < highest {

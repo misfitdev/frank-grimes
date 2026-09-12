@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strings"
 
@@ -119,6 +120,9 @@ func cmdID(args []string) error {
 	}
 	if *category == "" {
 		return fmt.Errorf("--category is required")
+	}
+	if *step > math.MaxUint32 {
+		return fmt.Errorf("--step must not exceed %d", uint32(math.MaxUint32))
 	}
 	anchor, err := anchorFromFlags(*path, *document, *section, *argument, uint32(*step), *source)
 	if err != nil {
