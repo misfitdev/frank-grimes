@@ -3334,7 +3334,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x1cfinding.p0_requires_e1_or_e2\x12\x1dP0 requires E1 or E2 evidence\x1a7this.risk.severity != 1 || this.evidence.tier in [1, 2]\x1a\x81\x01\n" +
 	"\x15finding.e3_caps_at_p1\x124inferred evidence cannot support a severity above P1\x1a2this.evidence.tier != 3 || this.risk.severity != 1\"\xaa\x02\n" +
 	"\x06Ledger\x12*\n" +
-	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x01R\vschemaMajor\x12!\n" +
+	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
 	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x127\n" +
 	"\x06target\x18\x03 \x01(\v2\x17.frank_grimes.v2.TargetB\x06\xbaH\x03\xc8\x01\x01R\x06target\x12A\n" +
 	"\bfindings\x18\x04 \x03(\v2%.frank_grimes.v2.Ledger.FindingsEntryR\bfindings\x1aU\n" +

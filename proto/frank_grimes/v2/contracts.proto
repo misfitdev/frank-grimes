@@ -334,7 +334,7 @@ message Finding {
 }
 
 message Ledger {
-  uint32 schema_major = 1 [(buf.validate.field).uint32.const = 1];
+  uint32 schema_major = 1 [(buf.validate.field).uint32.const = 2];
   uint32 schema_minor = 2;
   Target target = 3 [(buf.validate.field).required = true];
   map<string, Finding> findings = 4;

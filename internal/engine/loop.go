@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
+	"github.com/misfitdev/frank-grimes/internal/contracts"
 )
 
 // LoopOutcome is what the loop decided to do.
@@ -106,8 +107,9 @@ func bindingFailure(state *pb.LoopState, result *pb.GrimesResult, resultDigest [
 	if !bytes.Equal(result.GetTarget().GetFingerprintSha256(), state.GetTarget().GetFingerprintSha256()) {
 		return "result reviewed a different target than the state was raised against"
 	}
-	if result.GetSchemaMajor() != 2 {
-		return fmt.Sprintf("result declares contract major %d, expected 2", result.GetSchemaMajor())
+	if result.GetSchemaMajor() != contracts.SchemaMajor {
+		return fmt.Sprintf("result declares contract major %d, expected %d",
+			result.GetSchemaMajor(), contracts.SchemaMajor)
 	}
 	if result.GetProducerRole() != pb.ProducerRole_PRODUCER_ROLE_ORCHESTRATOR {
 		return "result was not produced by the orchestrator"

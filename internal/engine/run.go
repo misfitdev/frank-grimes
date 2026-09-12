@@ -217,7 +217,7 @@ func (e *Engine) persist(ctx context.Context, target *pb.Target, mode pb.Mode, i
 		return err
 	}
 	return e.State.Save(ctx, &pb.LoopState{
-		SchemaMajor:        2,
+		SchemaMajor:        contracts.SchemaMajor,
 		RunId:              e.RunID,
 		Target:             target,
 		Mode:               mode,

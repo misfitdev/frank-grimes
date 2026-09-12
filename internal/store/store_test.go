@@ -23,7 +23,7 @@ func target() *pb.Target {
 func sampleLedger() *pb.Ledger {
 	ts := timestamppb.New(timeZero())
 	return &pb.Ledger{
-		SchemaMajor: 1,
+		SchemaMajor: 2,
 		Target:      target(),
 		Findings: map[string]*pb.Finding{
 			"FG-SEC-9a34db214c59": {
@@ -159,7 +159,7 @@ func TestFileLedgerCorruptQuarantinesAndFails(t *testing.T) {
 
 func TestFileLedgerRejectsInvalidOnSave(t *testing.T) {
 	l := NewFileLedger(t.TempDir())
-	// schema_major is const 1; 7 cannot be persisted.
+	// schema_major is a const rule; 7 cannot be persisted.
 	if _, err := l.Save(context.Background(), &pb.Ledger{SchemaMajor: 7, Target: target()}); err == nil {
 		t.Fatal("want an error saving a contract-invalid ledger")
 	}

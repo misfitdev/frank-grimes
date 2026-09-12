@@ -173,3 +173,8 @@ func Quarantine(path, reason string) (string, error) {
 		filepath.Base(path), time.Now().UTC().Format("20060102T150405Z"), os.Getpid(), reason))
 	return dest, os.Rename(path, dest)
 }
+
+// SchemaMajor is the contract major every persisted message declares. It is a
+// const rule in the .proto, so a mismatch is a rejection rather than a
+// migration.
+const SchemaMajor uint32 = 2

@@ -32,7 +32,7 @@ func (l *FileLedger) Load(ctx context.Context) (*pb.Ledger, error) {
 	}
 	data, err := os.ReadFile(l.Path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return &pb.Ledger{SchemaMajor: 1}, nil
+		return &pb.Ledger{SchemaMajor: contracts.SchemaMajor}, nil
 	}
 	if err != nil {
 		return nil, err

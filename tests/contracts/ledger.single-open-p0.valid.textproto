@@ -1,5 +1,5 @@
 # A ledger carrying one open P0 with the history entry that opened it.
-schema_major: 1
+schema_major: 2
 target { root: "/repo" scope: "bad-script.sh" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
 findings {
   key: "FG-SEC-9a34db214c59"

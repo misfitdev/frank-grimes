@@ -37,7 +37,7 @@ type memLedger struct {
 
 func (m *memLedger) Load(context.Context) (*pb.Ledger, error) {
 	if m.ledger == nil {
-		return &pb.Ledger{SchemaMajor: 1}, nil
+		return &pb.Ledger{SchemaMajor: 2}, nil
 	}
 	return m.ledger, nil
 }
@@ -117,7 +117,7 @@ func seededLedger(t *testing.T, status pb.FindingStatus) *pb.Ledger {
 	id := p0ID()
 	ts := timestamppb.New(testTime())
 	return &pb.Ledger{
-		SchemaMajor: 1,
+		SchemaMajor: 2,
 		Target:      testTarget(t),
 		Findings: map[string]*pb.Finding{
 			id: {
@@ -468,7 +468,7 @@ func TestRunFixModeRejected(t *testing.T) {
 
 // Without a second opinion the run cannot reach a pass, whatever the ledger says.
 func TestRunWithoutAdjudicatorCapsAtConditional(t *testing.T) {
-	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: 1, Target: testTarget(t)}}
+	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: 2, Target: testTarget(t)}}
 	e := newEngine(&fakeProvider{out: proposal(t)}, l, &memState{}, nil)
 
 	result, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
@@ -488,7 +488,7 @@ func TestRunWithoutAdjudicatorCapsAtConditional(t *testing.T) {
 
 // An adjudicator that fails is unavailable, not agreement.
 func TestRunAdjudicatorFailureIsNotAgreement(t *testing.T) {
-	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: 1, Target: testTarget(t)}}
+	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: 2, Target: testTarget(t)}}
 	e := newEngine(&fakeProvider{out: proposal(t)}, l, &memState{}, fixedAdjudicator{err: errors.New("unreachable")})
 
 	result, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
@@ -501,7 +501,7 @@ func TestRunAdjudicatorFailureIsNotAgreement(t *testing.T) {
 }
 
 func TestRunIndependentBlockOverridesClean(t *testing.T) {
-	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: 1, Target: testTarget(t)}}
+	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: 2, Target: testTarget(t)}}
 	e := newEngine(&fakeProvider{out: proposal(t)}, l, &memState{}, fixedAdjudicator{decision: pb.Decision_DECISION_BLOCK})
 
 	result, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)

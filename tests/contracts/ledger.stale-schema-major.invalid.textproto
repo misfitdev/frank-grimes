@@ -1,0 +1,5 @@
+# A ledger written against the previous contract major. Finding identity
+# changed with the anchor model, so the old ids cannot be trusted and the
+# record is rejected rather than migrated.
+schema_major: 1
+target { root: "/repo" scope: "bad-script.sh" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
