@@ -51,9 +51,12 @@ func rejectSwallowedFlags(fs *flag.FlagSet, args []string) error {
 		}
 		next := args[i+1]
 		name := strings.TrimLeft(next, "-")
-		if name == next || strings.ContainsAny(name, "= ") {
+		if name == next || strings.Contains(name, " ") {
 			continue
 		}
+		// An option carries its value in the same token, so compare the name
+		// alone: --auto-loop=true is as swallowed as --auto-loop.
+		name, _, _ = strings.Cut(name, "=")
 		if fs.Lookup(name) != nil {
 			return fmt.Errorf("%w: %s %s reads %s as the argument; write %s=%s to pass it through",
 				errUsage, tok, next, next, tok, next)

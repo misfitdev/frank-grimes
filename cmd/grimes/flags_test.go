@@ -170,6 +170,10 @@ func TestParseRunRejectsSwallowedOption(t *testing.T) {
 		{"--provider-command", "/bin/echo", "--provider-arg", "--auto-loop", "src"},
 		{"--provider-command", "/bin/echo", "--adjudicator-command", "/bin/echo", "--adjudicator-arg", "--format", "src"},
 		{"--provider-command", "/bin/echo", "--provider-arg", "--max-iterations", "src"},
+		// An option carrying its value in the same token is swallowed the same way.
+		{"--provider-command", "/bin/echo", "--provider-arg", "--auto-loop=true", "src"},
+		{"--provider-command", "/bin/echo", "--provider-arg", "--max-iterations=99", "src"},
+		{"--provider-command", "/bin/echo", "--provider-arg", "--dir=/tmp", "src"},
 	} {
 		if _, err := parseRun(args); !errors.Is(err, errUsage) {
 			t.Errorf("args %v: error = %v, want errUsage", args, err)
