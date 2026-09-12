@@ -464,6 +464,13 @@ func TestRunWithoutAutoLoopLeavesNoState(t *testing.T) {
 	l := &memLedger{ledger: seededLedger(t, pb.FindingStatus_FINDING_STATUS_OPEN)}
 	s := &memState{}
 	results := &memResults{}
+	// Seeded with state from an earlier run: starting from nil would let an
+	// implementation that never clears anything satisfy the assertions below.
+	s.state = &pb.LoopState{
+		SchemaMajor: contracts.SchemaMajor, RunId: "run-000", Target: testTarget(t),
+		Mode: pb.Mode_MODE_REPORT, Iteration: 1, MaxIterations: 5,
+		LedgerDigestSha256: make([]byte, 32), LastResultSha256: make([]byte, 32),
+	}
 	e := newEngine(&fakeProvider{out: proposal(t, p0ID())}, l, s, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
 	e.Results = results
 	e.AutoLoop = false
@@ -473,6 +480,9 @@ func TestRunWithoutAutoLoopLeavesNoState(t *testing.T) {
 	}
 	if s.saves != 0 {
 		t.Errorf("state saves = %d, want 0 without auto-loop", s.saves)
+	}
+	if s.clears != 1 {
+		t.Errorf("state clears = %d, want 1; stale state has to be discarded, not merely not written", s.clears)
 	}
 	if s.state != nil {
 		t.Error("a one-shot run left loop state behind")

@@ -163,6 +163,51 @@ func TestParseRunRepeatableProviderArgs(t *testing.T) {
 	}
 }
 
+// flag would consume a following option name as the argument, handing it to the
+// provider while leaving the engine's own option unset.
+func TestParseRunRejectsSwallowedOption(t *testing.T) {
+	for _, args := range [][]string{
+		{"--provider-command", "/bin/echo", "--provider-arg", "--auto-loop", "src"},
+		{"--provider-command", "/bin/echo", "--adjudicator-command", "/bin/echo", "--adjudicator-arg", "--format", "src"},
+		{"--provider-command", "/bin/echo", "--provider-arg", "--max-iterations", "src"},
+	} {
+		if _, err := parseRun(args); !errors.Is(err, errUsage) {
+			t.Errorf("args %v: error = %v, want errUsage", args, err)
+		}
+	}
+}
+
+// The = form is unambiguous, so an option name may be passed through on purpose.
+func TestParseRunAllowsExplicitOptionAsArgument(t *testing.T) {
+	cfg, err := parseRun([]string{"--provider-command", "/bin/echo", "--provider-arg=--auto-loop", "src"})
+	if err != nil {
+		t.Fatalf("parseRun: %v", err)
+	}
+	if cfg.AutoLoop {
+		t.Error("--provider-arg=--auto-loop set the engine's own auto-loop")
+	}
+	want := []string{"/bin/echo", "--auto-loop"}
+	if len(cfg.ProviderCommand) != len(want) || cfg.ProviderCommand[1] != want[1] {
+		t.Errorf("argv = %q, want %q", cfg.ProviderCommand, want)
+	}
+}
+
+// A value that merely begins with a dash is what the flag exists to carry.
+func TestParseRunKeepsDashedArgumentValues(t *testing.T) {
+	cfg, err := parseRun([]string{
+		"--provider-command", "/bin/echo",
+		"--provider-arg", "--flag=a b",
+		"--provider-arg", "--not-a-registered-option",
+		"src",
+	})
+	if err != nil {
+		t.Fatalf("parseRun: %v", err)
+	}
+	if len(cfg.ProviderCommand) != 3 {
+		t.Fatalf("argv = %q, want three elements", cfg.ProviderCommand)
+	}
+}
+
 func TestParseRunAdjudicatorArgNeedsCommand(t *testing.T) {
 	if _, err := parseRun(baseArgs("--adjudicator-arg", "x")); err == nil {
 		t.Fatal("want an error for --adjudicator-arg without a command")

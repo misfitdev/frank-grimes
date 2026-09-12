@@ -234,11 +234,16 @@ fi
 
 # A second target in the same directory must not inherit the first one's
 # findings: the contract pins the ledger to a single path.
-OTHER="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-red.sh" other-target 2>&1 || true)"
-if grep -qi 'different target' <<<"$OTHER"; then
+set +e
+OTHER="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-red.sh" other-target 2>&1)"
+OTHER_CODE=$?
+set -e
+# Both halves matter: printing the reason while exiting zero would still let a
+# caller treat the run as having succeeded.
+if [[ "$OTHER_CODE" == "1" ]] && grep -qi 'different target' <<<"$OTHER"; then
     pass "a ledger raised against another target is refused"
 else
-    fail "a second target silently reused the first target's ledger"
+    fail "a second target reused the first target's ledger (exit $OTHER_CODE)"
 fi
 rm -rf "$WS"
 

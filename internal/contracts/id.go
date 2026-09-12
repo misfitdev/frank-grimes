@@ -14,11 +14,6 @@ import (
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 )
 
-// NUL joins the parts of a single component. It is not a component separator:
-// protobuf permits a NUL inside a string, so a separator a component can
-// contain is a separator a component can forge.
-const fieldSep = "\x00"
-
 // NormalizeEvidence renders evidence text comparable across runs: UTF-8, LF
 // line endings, no trailing whitespace, no leading or trailing blank lines.
 // Line numbers are deliberately excluded by the caller, so that moving code
@@ -53,27 +48,37 @@ func NormalizePath(p string) string {
 	return p
 }
 
-// AnchorKey reduces an anchor to the kind tag and canonical text that identity
+// AnchorKey reduces an anchor to the kind tag and the canonical parts identity
 // is taken over.
 //
-// The kind tag is part of the key because the canonical forms are not
-// comparable across kinds: a path and a URI that read the same are different
-// places. Line, section, and step numbers are excluded, so content moving
-// within an artifact is not a new finding.
-func AnchorKey(a *pb.Anchor) (kind, text string) {
+// The parts are returned separately rather than joined. Joining them would need
+// a separator, and protobuf permits any byte inside a string, so a part could
+// contain whatever separator was chosen and impersonate a boundary.
+//
+// The kind tag is a part because the canonical forms are not comparable across
+// kinds: a path and a URI that read the same are different places. Line,
+// section, and step numbers are excluded, so content moving within an artifact
+// is not a new finding.
+func AnchorKey(a *pb.Anchor) (kind string, parts []string) {
 	switch at := a.GetAt().(type) {
 	case *pb.Anchor_RepoLine:
-		return "repo", NormalizePath(at.RepoLine.GetPath().GetValue())
+		return "repo", []string{NormalizePath(at.RepoLine.GetPath().GetValue())}
 	case *pb.Anchor_DocumentPart:
-		return "doc", NormalizePath(at.DocumentPart.GetDocument()) + fieldSep + normalizeLabel(at.DocumentPart.GetSection())
+		return "doc", []string{
+			NormalizePath(at.DocumentPart.GetDocument()),
+			normalizeLabel(at.DocumentPart.GetSection()),
+		}
 	case *pb.Anchor_ArgumentStep:
 		// The step number is the claim's identity here, not an offset into it:
 		// claim 3 of an argument is a different claim from claim 4.
-		return "arg", normalizeLabel(at.ArgumentStep.GetArgument()) + fieldSep + strconv.FormatUint(uint64(at.ArgumentStep.GetStep()), 10)
+		return "arg", []string{
+			normalizeLabel(at.ArgumentStep.GetArgument()),
+			strconv.FormatUint(uint64(at.ArgumentStep.GetStep()), 10),
+		}
 	case *pb.Anchor_RetrievedSource:
-		return "src", strings.TrimRight(at.RetrievedSource.GetUri(), "/")
+		return "src", []string{strings.TrimRight(at.RetrievedSource.GetUri(), "/")}
 	default:
-		return "none", ""
+		return "none", nil
 	}
 }
 
@@ -89,11 +94,13 @@ func normalizeLabel(s string) string {
 // machine. Positions within an artifact are not inputs, so a finding survives
 // the content above it moving.
 func Fingerprint(category pb.Category, anchor *pb.Anchor, evidence string) []byte {
-	kind, text := AnchorKey(anchor)
+	kind, parts := AnchorKey(anchor)
 	h := sha256.New()
 	writeComponent(h, CategoryName(category))
 	writeComponent(h, kind)
-	writeComponent(h, text)
+	for _, part := range parts {
+		writeComponent(h, part)
+	}
 	writeComponent(h, NormalizeEvidence(evidence))
 	return h.Sum(nil)
 }

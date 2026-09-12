@@ -148,9 +148,39 @@ func TestFingerprintResistsComponentSmuggling(t *testing.T) {
 		t.Error("a NUL moved the boundary between the anchor and the evidence")
 	}
 
-	// The same shift across the kind and anchor boundary.
-	if bytes.Equal(fp(docAnchor("a", "b"), ev), fp(docAnchor("a\x00b", ""), ev)) {
+	// A NUL moving the boundary between two nested parts of one anchor. The
+	// earlier form of this case compared ("a","b") against ("a\0b","") and
+	// passed only because the empty section left a trailing separator, so it
+	// could never have caught the collision below.
+	if bytes.Equal(fp(docAnchor("a\x00b", "c"), ev), fp(docAnchor("a", "b\x00c"), ev)) {
 		t.Error("a NUL moved the boundary between the document and its section")
+	}
+	if bytes.Equal(fp(argAnchor("a\x00b", 1), ev), fp(argAnchor("a", 0), "")) {
+		t.Error("a NUL moved the boundary between the argument and its step")
+	}
+}
+
+// Every anchor kind with more than one part must resist the same shift, so the
+// guarantee does not depend on which kind happens to be tested.
+func TestFingerprintNestedPartsAreDelimited(t *testing.T) {
+	seen := map[string]string{}
+	for _, c := range []struct {
+		name   string
+		anchor *pb.Anchor
+	}{
+		{"doc(ab, c)", docAnchor("ab", "c")},
+		{"doc(a, bc)", docAnchor("a", "bc")},
+		{"doc(a NUL b, c)", docAnchor("a\x00b", "c")},
+		{"doc(a, b NUL c)", docAnchor("a", "b\x00c")},
+		{"arg(ab, 1)", argAnchor("ab", 1)},
+		{"arg(a, 1)", argAnchor("a", 1)},
+		{"arg(a NUL 1, 1)", argAnchor("a\x001", 1)},
+	} {
+		key := string(fp(c.anchor, ev))
+		if prior, ok := seen[key]; ok {
+			t.Errorf("%s collides with %s", c.name, prior)
+		}
+		seen[key] = c.name
 	}
 }
 
@@ -191,9 +221,9 @@ func TestFindingIDFormat(t *testing.T) {
 }
 
 func TestAnchorKeyUnsetAnchor(t *testing.T) {
-	kind, text := AnchorKey(nil)
-	if kind != "none" || text != "" {
-		t.Errorf("AnchorKey(nil) = %q, %q; want \"none\", \"\"", kind, text)
+	kind, parts := AnchorKey(nil)
+	if kind != "none" || len(parts) != 0 {
+		t.Errorf("AnchorKey(nil) = %q, %q; want \"none\", no parts", kind, parts)
 	}
 }
 

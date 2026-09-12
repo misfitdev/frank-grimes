@@ -24,6 +24,44 @@ func (r *repeatedArg) Set(v string) error {
 	return nil
 }
 
+// argTakingFlags are the options whose value is an opaque argument, so a bare
+// option name following one of them is almost certainly a mistake.
+var argTakingFlags = []string{"provider-arg", "adjudicator-arg"}
+
+// rejectSwallowedFlags refuses `--provider-arg --auto-loop`, where the flag
+// package would consume --auto-loop as the argument and leave the engine's own
+// auto-loop off.
+//
+// The check lives here because Set cannot see how its value arrived: the flag
+// package calls it identically for the space-separated and the = form. Scanning
+// the raw arguments is what distinguishes them, so --provider-arg=--auto-loop
+// still passes an option name through deliberately.
+func rejectSwallowedFlags(fs *flag.FlagSet, args []string) error {
+	takesArg := func(tok string) bool {
+		for _, name := range argTakingFlags {
+			if tok == "-"+name || tok == "--"+name {
+				return true
+			}
+		}
+		return false
+	}
+	for i, tok := range args {
+		if !takesArg(tok) || i+1 >= len(args) {
+			continue
+		}
+		next := args[i+1]
+		name := strings.TrimLeft(next, "-")
+		if name == next || strings.ContainsAny(name, "= ") {
+			continue
+		}
+		if fs.Lookup(name) != nil {
+			return fmt.Errorf("%w: %s %s reads %s as the argument; write %s=%s to pass it through",
+				errUsage, tok, next, next, tok, next)
+		}
+	}
+	return nil
+}
+
 type config struct {
 	Target             string
 	Scope              string
@@ -65,6 +103,9 @@ func parseRun(args []string) (*config, error) {
 	format := fs.String("format", "envelope", "envelope or prototext")
 	dir := fs.String("dir", ".", "repository root")
 
+	if err := rejectSwallowedFlags(fs, args); err != nil {
+		return nil, err
+	}
 	if err := fs.Parse(args); err != nil {
 		return nil, errUsage
 	}
