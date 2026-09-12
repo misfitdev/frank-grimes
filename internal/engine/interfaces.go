@@ -80,6 +80,12 @@ type Ledger interface {
 	Save(ctx context.Context, l *pb.Ledger) ([]byte, error)
 }
 
+// ResultStore persists the derived result so the loop can verify it.
+type ResultStore interface {
+	Load(ctx context.Context) (*pb.GrimesResult, error)
+	Save(ctx context.Context, r *pb.GrimesResult) ([]byte, error)
+}
+
 // StateStore persists loop state between iterations.
 type StateStore interface {
 	Load(ctx context.Context) (*pb.LoopState, error)

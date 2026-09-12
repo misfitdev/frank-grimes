@@ -45,10 +45,11 @@ func (o LoopOutcome) String() string {
 // Terminal reports whether the loop ends here.
 func (o LoopOutcome) Terminal() bool { return o != OutcomeContinue && o != OutcomeNoRun }
 
-// LoopDecision is the outcome and why.
+// LoopDecision is the outcome, why, and the colour it was reached at.
 type LoopDecision struct {
 	Outcome LoopOutcome
 	Reason  string
+	Color   string
 }
 
 // DecideLoop decides whether a review may end, from a run record it verifies
@@ -69,13 +70,15 @@ func DecideLoop(state *pb.LoopState, result *pb.GrimesResult, resultDigest []byt
 		return LoopDecision{Outcome: OutcomeUnverified, Reason: reason}
 	}
 
+	color := colorName(result)
 	if result.GetLegacyColor() == pb.LegacyColor_LEGACY_COLOR_GREEN {
-		return LoopDecision{Outcome: OutcomeConfirmedPass, Reason: "independently confirmed pass"}
+		return LoopDecision{Outcome: OutcomeConfirmedPass, Reason: "independently confirmed pass", Color: color}
 	}
 	if state.GetIteration() >= state.GetMaxIterations() {
 		return LoopDecision{
 			Outcome: OutcomeIterationLimit,
-			Reason:  fmt.Sprintf("iteration limit of %d reached at %s", state.GetMaxIterations(), colorName(result)),
+			Reason:  fmt.Sprintf("iteration limit of %d reached at %s", state.GetMaxIterations(), color),
+			Color:   color,
 		}
 	}
 	// Re-grinding a target that produced nothing new restates the same findings.
@@ -83,11 +86,13 @@ func DecideLoop(state *pb.LoopState, result *pb.GrimesResult, resultDigest []byt
 		return LoopDecision{
 			Outcome: OutcomeYieldExhausted,
 			Reason:  fmt.Sprintf("iteration %d surfaced no new P0/P1", state.GetIteration()),
+			Color:   color,
 		}
 	}
 	return LoopDecision{
 		Outcome: OutcomeContinue,
-		Reason:  fmt.Sprintf("%s at iteration %d of %d", colorName(result), state.GetIteration(), state.GetMaxIterations()),
+		Reason:  fmt.Sprintf("%s at iteration %d of %d", color, state.GetIteration(), state.GetMaxIterations()),
+		Color:   color,
 	}
 }
 

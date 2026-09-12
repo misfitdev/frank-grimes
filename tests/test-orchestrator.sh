@@ -78,21 +78,24 @@ exit_code() {
 }
 
 echo ""
+# prototext's spacing is randomized per binary build
+# (google.golang.org/protobuf/internal/detrand), so match on content, not
+# exact spacing.
 echo "--- A provider cannot certify its own review ---"
 
 WS="$(workspace)"
 OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-green.sh" --format=prototext)"
-if echo "$OUT" | grep -q 'legacy_color: LEGACY_COLOR_GREEN'; then
+if echo "$OUT" | grep -qE 'legacy_color: +LEGACY_COLOR_GREEN'; then
     fail "engine adopted the provider's GREEN"
 else
     pass "a GREEN-claiming provider does not produce GREEN"
 fi
-if echo "$OUT" | grep -q 'producer_role: PRODUCER_ROLE_ORCHESTRATOR'; then
+if echo "$OUT" | grep -qE 'producer_role: +PRODUCER_ROLE_ORCHESTRATOR'; then
     pass "the emitted result is attributed to the orchestrator"
 else
     fail "result is not attributed to the orchestrator"
 fi
-if echo "$OUT" | grep -q 'unmet_gates: "adjudication"'; then
+if echo "$OUT" | grep -qE 'unmet_gates: +"adjudication"'; then
     pass "a run with no adjudicator names adjudication as unmet"
 else
     fail "a run with no adjudicator does not name adjudication"
@@ -172,7 +175,7 @@ WS="$(workspace)"
 OUT="$(run_grimes "$WS" \
     --provider-command="$FAKES/provider-green.sh" \
     --adjudicator-command="$FAKES/adjudicator-pass.sh" --format=prototext)"
-if echo "$OUT" | grep -q 'zero_knowledge: true'; then
+if echo "$OUT" | grep -qE 'zero_knowledge: +true'; then
     pass "an adjudicated run records the independent review"
 else
     fail "an adjudicated run does not record the independent review"
@@ -204,7 +207,7 @@ echo "--- State ---"
 
 WS="$(workspace)"
 run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" >/dev/null
-if "$GRIMES" state --dir="$WS" --show | grep -q 'run_id:'; then
+if "$GRIMES" state --dir="$WS" --show | grep -qE 'run_id: +'; then
     pass "state --show reports the run in progress"
 else
     fail "state --show does not report the run"

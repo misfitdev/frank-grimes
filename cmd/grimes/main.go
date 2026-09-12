@@ -26,15 +26,21 @@ Usage:
   grimes run <target> [flags]
       Run one review iteration. The provider proposes; the engine decides.
 
+  grimes loop [--dir=<repo>]
+      Decide whether a review may end, from a verified run record.
+      Exit 0 allows the session to end; exit 2 asks for another iteration.
+
   grimes state [--show|--clear]
       Inspect or discard loop state.
 
-Exit codes:
+Exit codes for run:
   0  pass
   3  conditional
   4  block
   1  operational failure
   2  usage
+
+loop follows the stop-hook contract instead: 0 allow exit, 2 continue.
 `
 
 // Exit codes carry the verdict so a caller can gate on it without parsing.
@@ -57,6 +63,8 @@ func main() {
 	switch os.Args[1] {
 	case "run":
 		code, err = cmdRun(os.Args[2:])
+	case "loop":
+		code, err = cmdLoop(os.Args[2:])
 	case "state":
 		code, err = cmdState(os.Args[2:])
 	case "-h", "--help", "help":
@@ -97,6 +105,7 @@ func cmdRun(args []string) (int, error) {
 		Adjudicator:   adjudicatorFor(cfg),
 		Gate:          engine.NotApplicableGate{},
 		Ledger:        store.NewFileLedger(cfg.Dir),
+		Results:       store.NewFileResultStore(cfg.Dir),
 		State:         store.NewFileStateStore(cfg.Dir),
 		Clock:         engine.SystemClock,
 		RunID:         runID(),

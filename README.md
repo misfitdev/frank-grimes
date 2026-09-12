@@ -203,28 +203,17 @@ When `--auto-loop` is enabled, the grind keeps iterating while each pass still s
 
 ### How It Works
 
-1. During the grind, state is written to `.grimes-state.json` in the project root
+1. The engine writes the run record to `.grimes/` as it reviews: loop state, the derived result, and the ledger
 2. On session stop, the agent's hook system calls `hooks/stop.sh`
-3. The hook reads the state and decides:
-   - **Exit 0**: Allow exit (pass confirmed, no new P0/P1 findings, iteration cap reached, or auto-loop disabled)
+3. The hook invokes `grimes loop`, which verifies the record and decides:
+   - **Exit 0**: Allow exit (pass confirmed, no new P0/P1 findings, iteration cap reached, or the record could not be verified)
    - **Exit 2**: Block exit and re-inject the grind prompt (continue iterating)
-4. If continuing, the hook increments the iteration counter
 
-### State File Format
+### The Run Record
 
-```json
-{
-  "iteration": 2,
-  "max_iterations": 5,
-  "last_verdict": "YELLOW",
-  "target": "./src/auth.py",
-  "auto_loop": true,
-  "issues_found": 8,
-  "issues_fixed": 3,
-  "last_commit": "abc1234",
-  "last_grind_timestamp": "2026-08-21T10:30:00Z"
-}
-```
+The record is protobuf and the engine writes it. A review cannot report its own verdict: the result is accepted only when its digest is the one the loop state recorded, its run identity and target fingerprint match, and it declares orchestrator authorship. A GREEN result additionally has to carry an independent review of the same target with no oscillation, which the contract enforces rather than the hook.
+
+A record that fails any of those checks is quarantined under `.grimes/quarantine/` and the session ends with no pass recorded. Inspect it with `grimes state --show`.
 
 ### Provider Hook Integration
 

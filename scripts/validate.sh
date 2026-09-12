@@ -289,11 +289,27 @@ else
     pass "stop.sh does not contain hardcoded cache path"
 fi
 
-# Verify stop.sh uses .grimes-state.json
-if grep -q '.grimes-state.json' "$PROJECT_ROOT/hooks/stop.sh"; then
-    pass "stop.sh references .grimes-state.json (project-local)"
+# Verify stop.sh reads the engine's run record
+if grep -q '.grimes/state.pb' "$PROJECT_ROOT/hooks/stop.sh"; then
+    pass "stop.sh reads the engine's run record"
 else
-    fail "stop.sh does not reference .grimes-state.json"
+    fail "stop.sh does not reference .grimes/state.pb"
+fi
+
+# The hook decides nothing. A verdict string compared in shell is the defect
+# that let a review certify its own pass.
+if grep -qE 'last_verdict|==[[:space:]]*"?(GREEN|RED|YELLOW)"?' "$PROJECT_ROOT/hooks/stop.sh"; then
+    fail "stop.sh compares a verdict string; the engine owns the verdict"
+else
+    pass "stop.sh does not compare a verdict string"
+fi
+
+# An installed hook runs from a versioned cache directory, so resolving the
+# repository from the script's own location finds the plugin, not the project.
+if grep -qE 'CLAUDE_PROJECT_DIR|GRIMES_PROJECT_DIR' "$PROJECT_ROOT/hooks/stop.sh"; then
+    pass "stop.sh resolves the repository from the environment"
+else
+    fail "stop.sh resolves the repository from its own path only"
 fi
 
 # The .proto is the sole normative machine contract. Generated bindings that

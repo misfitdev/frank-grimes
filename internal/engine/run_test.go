@@ -9,6 +9,7 @@ import (
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
 	"github.com/misfitdev/frank-grimes/internal/envelope"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -45,6 +46,18 @@ func (m *memLedger) Save(_ context.Context, l *pb.Ledger) ([]byte, error) {
 	m.saves++
 	m.ledger = l
 	return contracts.Digest(l)
+}
+
+type memResults struct {
+	result *pb.GrimesResult
+	saves  int
+}
+
+func (m *memResults) Load(context.Context) (*pb.GrimesResult, error) { return m.result, nil }
+func (m *memResults) Save(_ context.Context, r *pb.GrimesResult) ([]byte, error) {
+	m.saves++
+	m.result = r
+	return contracts.Digest(r)
 }
 
 type memState struct {
@@ -199,7 +212,8 @@ func proposal(t *testing.T, ids ...string) []byte {
 func newEngine(p Provider, l Ledger, s StateStore, a Adjudicator) *Engine {
 	return &Engine{
 		Collector: PathCollector{}, Provider: p, Broker: StrictBroker{},
-		Adjudicator: a, Gate: NotApplicableGate{}, Ledger: l, State: s,
+		Adjudicator: a, Gate: NotApplicableGate{}, Ledger: l,
+		Results: &memResults{}, State: s,
 		Clock: func() time.Time { return testTime() },
 		RunID: "run-001", MaxIterations: 5,
 	}
@@ -234,6 +248,34 @@ func TestRunEndToEndReportMode(t *testing.T) {
 	}
 	if s.saves != 1 {
 		t.Errorf("state saves = %d, want 1", s.saves)
+	}
+}
+
+// The hook verifies the result against the digest state recorded, so a state
+// naming a result that was never written would be unverifiable.
+func TestRunPersistsResultBeforeState(t *testing.T) {
+	l := &memLedger{ledger: seededLedger(t, pb.FindingStatus_FINDING_STATUS_OPEN)}
+	s := &memState{}
+	results := &memResults{}
+	e := newEngine(&fakeProvider{out: proposal(t, p0ID())}, l, s, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
+	e.Results = results
+
+	result, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if results.saves != 1 {
+		t.Fatalf("result saves = %d, want 1", results.saves)
+	}
+	want, err := contracts.Digest(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(s.state.GetLastResultSha256()) != string(want) {
+		t.Error("state records a digest that is not the persisted result")
+	}
+	if !proto.Equal(results.result, result) {
+		t.Error("persisted result differs from the one returned")
 	}
 }
 

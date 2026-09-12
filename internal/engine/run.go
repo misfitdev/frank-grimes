@@ -18,6 +18,7 @@ type Engine struct {
 	Adjudicator Adjudicator
 	Gate        GateRunner
 	Ledger      Ledger
+	Results     ResultStore
 	State       StateStore
 	Clock       Clock
 
@@ -208,8 +209,10 @@ func (e *Engine) adjudicate(ctx context.Context, target *pb.Target, claimed *pb.
 	return review, nil
 }
 
+// persist writes the result before the state that references it, so state
+// never names a result digest that is not on disk.
 func (e *Engine) persist(ctx context.Context, target *pb.Target, mode pb.Mode, iteration uint32, result *pb.GrimesResult, ledgerDigest []byte) error {
-	resultDigest, err := contracts.Digest(result)
+	resultDigest, err := e.Results.Save(ctx, result)
 	if err != nil {
 		return err
 	}
