@@ -289,11 +289,27 @@ else
     pass "stop.sh does not contain hardcoded cache path"
 fi
 
-# Verify stop.sh uses .grimes-state.json
-if grep -q '.grimes-state.json' "$PROJECT_ROOT/hooks/stop.sh"; then
-    pass "stop.sh references .grimes-state.json (project-local)"
+# Verify stop.sh reads the engine's run record
+if grep -q '.grimes/state.pb' "$PROJECT_ROOT/hooks/stop.sh"; then
+    pass "stop.sh reads the engine's run record"
 else
-    fail "stop.sh does not reference .grimes-state.json"
+    fail "stop.sh does not reference .grimes/state.pb"
+fi
+
+# The hook decides nothing. A verdict string compared in shell is the defect
+# that let a review certify its own pass.
+if grep -qE 'last_verdict|==[[:space:]]*"?(GREEN|RED|YELLOW)"?' "$PROJECT_ROOT/hooks/stop.sh"; then
+    fail "stop.sh compares a verdict string; the engine owns the verdict"
+else
+    pass "stop.sh does not compare a verdict string"
+fi
+
+# An installed hook runs from a versioned cache directory, so resolving the
+# repository from the script's own location finds the plugin, not the project.
+if grep -qE 'CLAUDE_PROJECT_DIR|GRIMES_PROJECT_DIR' "$PROJECT_ROOT/hooks/stop.sh"; then
+    pass "stop.sh resolves the repository from the environment"
+else
+    fail "stop.sh resolves the repository from its own path only"
 fi
 
 # The .proto is the sole normative machine contract. Generated bindings that
@@ -311,20 +327,38 @@ if command -v buf &>/dev/null; then
         fail "buf lint fails"
     fi
 
-    if command -v go &>/dev/null; then
-        GEN_BEFORE=$(find "$PROJECT_ROOT/gen" -name '*.go' -exec shasum {} \; 2>/dev/null | shasum | cut -d' ' -f1)
-        if (cd "$PROJECT_ROOT" && PATH="$PATH:$(go env GOPATH)/bin" buf generate) &>/dev/null; then
-            GEN_AFTER=$(find "$PROJECT_ROOT/gen" -name '*.go' -exec shasum {} \; 2>/dev/null | shasum | cut -d' ' -f1)
-            if [[ "$GEN_BEFORE" == "$GEN_AFTER" ]]; then
-                pass "generated bindings match the contract"
-            else
-                fail "generated bindings drifted from the contract; run 'just gen' and commit"
-            fi
+    echo "toolchain: $(go version 2>/dev/null || echo 'go not found') | $(buf --version 2>/dev/null) | protoc $(protoc --version 2>/dev/null | cut -d' ' -f2) | $(protoc-gen-go --version 2>&1 || echo 'protoc-gen-go not found')"
+
+    # Existence is not the guarantee. buf resolves the plugin off PATH, so an
+    # unpinned copy earlier in PATH produces different bindings while still
+    # satisfying a presence check.
+    if command -v mise &>/dev/null && command -v protoc-gen-go &>/dev/null; then
+        PINNED="$(mise which protoc-gen-go 2>/dev/null || true)"
+        RESOLVED="$(command -v protoc-gen-go)"
+        if [[ -z "$PINNED" ]]; then
+            warn "mise does not manage protoc-gen-go; codegen would use $RESOLVED"
+        elif [[ "$PINNED" == "$RESOLVED" ]]; then
+            pass "protoc-gen-go resolves to the pinned binary"
         else
-            warn "buf generate failed - skipping codegen drift check"
+            fail "protoc-gen-go resolves to $RESOLVED, not the pinned $PINNED"
         fi
+    fi
+
+    # GOPATH/bin is deliberately not added to PATH here: that is where an
+    # unpinned ad-hoc `go install protoc-gen-go` lands, and letting it resolve
+    # is the drift this check exists to catch.
+    if ! command -v protoc-gen-go &>/dev/null; then
+        fail "protoc-gen-go not found; run 'mise install' to get the pinned version"
+    elif ! (cd "$PROJECT_ROOT" && git rev-parse --is-inside-work-tree) &>/dev/null; then
+        warn "not a git work tree - skipping codegen drift check"
+    elif ! (cd "$PROJECT_ROOT" && buf generate) &>/dev/null; then
+        fail "buf generate failed"
+    # --porcelain rather than `git diff` so a newly generated untracked file
+    # counts as drift too.
+    elif [[ -n "$(cd "$PROJECT_ROOT" && git status --porcelain -- gen)" ]]; then
+        fail "generated bindings drifted from the contract; run 'just gen' and commit"
     else
-        warn "go not found - skipping codegen drift check"
+        pass "generated bindings match the contract"
     fi
 else
     warn "buf not found - skipping contract lint"
@@ -335,6 +369,41 @@ if grep -rq 'ledger.json' "$PROJECT_ROOT/hooks" "$PROJECT_ROOT/adapters" 2>/dev/
     fail "ledger.json referenced as input; the authoritative ledger is .grimes/ledger.pb"
 else
     pass "no component treats the JSON projection as control input"
+fi
+
+echo ""
+echo "--- Orchestrator ---"
+
+check test -d "$PROJECT_ROOT/cmd/grimes" "cmd/grimes/ exists"
+check test -f "$PROJECT_ROOT/internal/engine/verdict.go" "verdict derivation has a single home"
+check test -f "$PROJECT_ROOT/internal/adjudicate/resolve.go" "adjudication resolution has a single home"
+
+# A verdict decided in two places drifts, and the second copy is the one nobody
+# updates. Returning a colour is the derivation; reading one to format output is
+# not, so this looks for the assignment rather than the mention.
+DUPLICATES=""
+while IFS= read -r match; do
+    rel="${match%%:*}"
+    rel="${rel#"$PROJECT_ROOT"/}"
+    case "$rel" in
+        internal/engine/weight.go | *_test.go) continue ;;
+    esac
+    DUPLICATES="$DUPLICATES $rel"
+done < <(grep -rnE 'return pb\.LegacyColor_' \
+    "$PROJECT_ROOT/internal" "$PROJECT_ROOT/cmd" --include='*.go' 2>/dev/null || true)
+
+if [[ -n "$DUPLICATES" ]]; then
+    fail "colour derived outside internal/engine/weight.go:$DUPLICATES"
+else
+    pass "the legacy colour is derived in one place"
+fi
+
+# An adapter carries wiring, never methodology: a colour or decision decided
+# there is a second implementation of Phase 7.
+if grep -rqE 'LEGACY_COLOR_|DECISION_PASS' "$PROJECT_ROOT/adapters" "$PROJECT_ROOT/hooks" 2>/dev/null; then
+    fail "adapters or hooks name contract verdict values; the engine owns them"
+else
+    pass "no adapter or hook decides a verdict"
 fi
 
 echo ""
@@ -460,6 +529,22 @@ else
 fi
 
 echo ""
+
+# The aggregate gate is worth nothing if nothing runs it. A workflow that fires
+# only on a release tag lets every intermediate commit through unchecked, which
+# is how toolchain and codegen drift reached a release before.
+GATE_WORKFLOW=""
+for wf in "$PROJECT_ROOT"/.github/workflows/*.yml; do
+    if grep -q 'pull_request' "$wf" && grep -q 'just check' "$wf"; then
+        GATE_WORKFLOW="$(basename "$wf")"
+        break
+    fi
+done
+if [[ -n "$GATE_WORKFLOW" ]]; then
+    pass "the aggregate gate runs on pull requests ($GATE_WORKFLOW)"
+else
+    fail "no workflow runs 'just check' on pull_request"
+fi
 
 # An installed plugin runs from a versioned cache directory, so a hook path
 # relative to the working directory silently stops firing.

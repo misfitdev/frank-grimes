@@ -1,0 +1,19 @@
+# A finding against a numbered step in a supplied argument.
+id: "FG-COR-1f8b3d5e6072"
+fingerprint_sha256: "01234567890123456789012345678901"
+category: CATEGORY_COR
+location { anchor { argument_step { argument: "migrate-to-single-writer" step: 3 label: "Throughput is unaffected" } } }
+risk { severity: SEVERITY_P1 likelihood: LIKELIHOOD_PLAUSIBLE blast_radius: BLAST_RADIUS_SERVICE }
+evidence {
+  tier: EVIDENCE_TIER_E2
+  claim: "step 3 assumes write volume is unchanged while step 1 states it triples"
+  citation {
+    anchor { argument_step { argument: "migrate-to-single-writer" step: 3 } }
+    quote: "Because write volume is unchanged, a single writer suffices."
+  }
+}
+evidence_sha256: "01234567890123456789012345678901"
+status: FINDING_STATUS_OPEN
+first_seen { seconds: 1780000000 }
+last_seen { seconds: 1780000000 }
+history { iteration: 1 from: FINDING_STATUS_UNSPECIFIED to: FINDING_STATUS_OPEN evidence_sha256: "01234567890123456789012345678901" at { seconds: 1780000000 } actor: "grimes" }

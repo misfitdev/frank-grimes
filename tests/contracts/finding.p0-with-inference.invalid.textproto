@@ -3,7 +3,7 @@
 id: "FG-SEC-9a34db214c59"
 fingerprint_sha256: "01234567890123456789012345678901"
 category: CATEGORY_SEC
-location { path { value: "bad-script.sh" } }
+location { anchor { repo_line { path { value: "bad-script.sh" } } } }
 risk { severity: SEVERITY_P0 likelihood: LIKELIHOOD_PLAUSIBLE blast_radius: BLAST_RADIUS_SERVICE }
 evidence {
   tier: EVIDENCE_TIER_E3

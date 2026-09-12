@@ -1,0 +1,243 @@
+package main
+
+import (
+	"errors"
+	"strings"
+	"testing"
+
+	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
+	"github.com/misfitdev/frank-grimes/internal/engine"
+)
+
+func baseArgs(extra ...string) []string {
+	return append([]string{"--provider-command", "/bin/true"}, append(extra, "src")...)
+}
+
+func TestParseRunDefaults(t *testing.T) {
+	cfg, err := parseRun(baseArgs())
+	if err != nil {
+		t.Fatalf("parseRun: %v", err)
+	}
+	if cfg.Target != "src" {
+		t.Errorf("target = %q, want src", cfg.Target)
+	}
+	if cfg.Mode != pb.Mode_MODE_REPORT {
+		t.Errorf("mode = %v, want report", cfg.Mode)
+	}
+	if cfg.MaxIterations != 5 {
+		t.Errorf("max iterations = %d, want 5", cfg.MaxIterations)
+	}
+	if len(cfg.Categories) != 0 {
+		t.Errorf("categories = %v, want none by default", cfg.Categories)
+	}
+}
+
+func TestParseRunRequiresOneTarget(t *testing.T) {
+	for _, args := range [][]string{
+		{"--provider-command", "/bin/true"},
+		{"--provider-command", "/bin/true", "a", "b"},
+	} {
+		if _, err := parseRun(args); !errors.Is(err, errUsage) {
+			t.Errorf("args %v: error = %v, want errUsage", args, err)
+		}
+	}
+}
+
+func TestParseRunRequiresProviderCommand(t *testing.T) {
+	if _, err := parseRun([]string{"src"}); err == nil {
+		t.Fatal("want an error without --provider-command")
+	}
+}
+
+// Fix mode is a separately authorized privilege that this engine does not
+// implement; accepting the flag silently would imply it does.
+func TestParseRunRejectsFixMode(t *testing.T) {
+	_, err := parseRun(baseArgs("--mode", "fix"))
+	if !errors.Is(err, engine.ErrFixModeUnsupported) {
+		t.Errorf("error = %v, want ErrFixModeUnsupported", err)
+	}
+}
+
+func TestParseRunCommitRequiresFixMode(t *testing.T) {
+	_, err := parseRun(baseArgs("--commit"))
+	if err == nil {
+		t.Fatal("want an error for --commit in report mode")
+	}
+	if !strings.Contains(err.Error(), "--mode fix") {
+		t.Errorf("error = %v, want it to name --mode fix", err)
+	}
+}
+
+func TestParseRunCommitRequiresVerifyCommand(t *testing.T) {
+	_, err := parseRun(baseArgs("--commit", "--mode", "fix"))
+	if err == nil {
+		t.Fatal("want an error for --commit without a gate")
+	}
+	if !strings.Contains(err.Error(), "--verify-command") {
+		t.Errorf("error = %v, want it to name --verify-command", err)
+	}
+}
+
+func TestParseRunRejectsZeroIterations(t *testing.T) {
+	if _, err := parseRun(baseArgs("--max-iterations", "0")); err == nil {
+		t.Fatal("want an error for a zero iteration ceiling")
+	}
+}
+
+func TestParseRunCategories(t *testing.T) {
+	cfg, err := parseRun(baseArgs("--categories", "COR,sec"))
+	if err != nil {
+		t.Fatalf("parseRun: %v", err)
+	}
+	want := []pb.Category{pb.Category_CATEGORY_COR, pb.Category_CATEGORY_SEC}
+	if len(cfg.Categories) != len(want) {
+		t.Fatalf("categories = %v, want %v", cfg.Categories, want)
+	}
+	for i := range want {
+		if cfg.Categories[i] != want[i] {
+			t.Errorf("category %d = %v, want %v", i, cfg.Categories[i], want[i])
+		}
+	}
+}
+
+func TestParseRunRejectsUnknownValues(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		args []string
+	}{
+		{"category", baseArgs("--categories", "NOPE")},
+		{"mode", baseArgs("--mode", "sideways")},
+		{"scope", baseArgs("--scope", "everything")},
+		{"research", baseArgs("--research", "vibes")},
+		{"format", baseArgs("--format", "yaml")},
+	} {
+		if _, err := parseRun(c.args); err == nil {
+			t.Errorf("%s: want an error for an unknown value", c.name)
+		}
+	}
+}
+
+func TestParseRunResearchModes(t *testing.T) {
+	for _, mode := range []string{"online", "offline", "frozen:/tmp/bundle"} {
+		if _, err := parseRun(baseArgs("--research", mode)); err != nil {
+			t.Errorf("research %q rejected: %v", mode, err)
+		}
+	}
+	if _, err := parseRun(baseArgs("--research", "frozen:")); err == nil {
+		t.Error("want an error for a frozen bundle with no path")
+	}
+}
+
+// A flag that is parsed and ignored is worse than one that is refused: the
+// caller believes they asked for something.
+func TestParseRunRejectsUnimplementedScope(t *testing.T) {
+	if _, err := parseRun(baseArgs("--scope", "whole-repo")); err == nil {
+		t.Fatal("want an error for --scope while collection cannot honour it")
+	}
+	// The default must not trip the same check.
+	if _, err := parseRun(baseArgs()); err != nil {
+		t.Errorf("default scope was rejected: %v", err)
+	}
+}
+
+// strings.Fields cannot express an argument containing a space, so arguments
+// that need one are passed individually.
+func TestParseRunRepeatableProviderArgs(t *testing.T) {
+	cfg, err := parseRun([]string{
+		"--provider-command", "/bin/echo",
+		"--provider-arg", "/tmp/config file.json",
+		"--provider-arg", "--flag=a b",
+		"src",
+	})
+	if err != nil {
+		t.Fatalf("parseRun: %v", err)
+	}
+	want := []string{"/bin/echo", "/tmp/config file.json", "--flag=a b"}
+	if len(cfg.ProviderCommand) != len(want) {
+		t.Fatalf("argv = %q, want %q", cfg.ProviderCommand, want)
+	}
+	for i := range want {
+		if cfg.ProviderCommand[i] != want[i] {
+			t.Errorf("argv[%d] = %q, want %q", i, cfg.ProviderCommand[i], want[i])
+		}
+	}
+}
+
+// flag would consume a following option name as the argument, handing it to the
+// provider while leaving the engine's own option unset.
+func TestParseRunRejectsSwallowedOption(t *testing.T) {
+	for _, args := range [][]string{
+		{"--provider-command", "/bin/echo", "--provider-arg", "--auto-loop", "src"},
+		{"--provider-command", "/bin/echo", "--adjudicator-command", "/bin/echo", "--adjudicator-arg", "--format", "src"},
+		{"--provider-command", "/bin/echo", "--provider-arg", "--max-iterations", "src"},
+		// An option carrying its value in the same token is swallowed the same way.
+		{"--provider-command", "/bin/echo", "--provider-arg", "--auto-loop=true", "src"},
+		{"--provider-command", "/bin/echo", "--provider-arg", "--max-iterations=99", "src"},
+		{"--provider-command", "/bin/echo", "--provider-arg", "--dir=/tmp", "src"},
+	} {
+		if _, err := parseRun(args); !errors.Is(err, errUsage) {
+			t.Errorf("args %v: error = %v, want errUsage", args, err)
+		}
+	}
+}
+
+// The = form is unambiguous, so an option name may be passed through on purpose.
+func TestParseRunAllowsExplicitOptionAsArgument(t *testing.T) {
+	cfg, err := parseRun([]string{"--provider-command", "/bin/echo", "--provider-arg=--auto-loop", "src"})
+	if err != nil {
+		t.Fatalf("parseRun: %v", err)
+	}
+	if cfg.AutoLoop {
+		t.Error("--provider-arg=--auto-loop set the engine's own auto-loop")
+	}
+	want := []string{"/bin/echo", "--auto-loop"}
+	if len(cfg.ProviderCommand) != len(want) || cfg.ProviderCommand[1] != want[1] {
+		t.Errorf("argv = %q, want %q", cfg.ProviderCommand, want)
+	}
+}
+
+// A value that merely begins with a dash is what the flag exists to carry.
+func TestParseRunKeepsDashedArgumentValues(t *testing.T) {
+	cfg, err := parseRun([]string{
+		"--provider-command", "/bin/echo",
+		"--provider-arg", "--flag=a b",
+		"--provider-arg", "--not-a-registered-option",
+		"src",
+	})
+	if err != nil {
+		t.Fatalf("parseRun: %v", err)
+	}
+	if len(cfg.ProviderCommand) != 3 {
+		t.Fatalf("argv = %q, want three elements", cfg.ProviderCommand)
+	}
+}
+
+func TestParseRunAdjudicatorArgNeedsCommand(t *testing.T) {
+	if _, err := parseRun(baseArgs("--adjudicator-arg", "x")); err == nil {
+		t.Fatal("want an error for --adjudicator-arg without a command")
+	}
+}
+
+// The contract carries the bound as a uint32, so a larger value must be refused
+// rather than wrapped into a smaller limit.
+func TestParseRunRejectsIterationOverflow(t *testing.T) {
+	if _, err := parseRun(baseArgs("--max-iterations", "4294967296")); err == nil {
+		t.Fatal("want an error for an iteration bound above uint32")
+	}
+}
+
+func TestCodeForDecision(t *testing.T) {
+	for _, c := range []struct {
+		decision pb.Decision
+		want     int
+	}{
+		{pb.Decision_DECISION_PASS, exitPass},
+		{pb.Decision_DECISION_BLOCK, exitBlock},
+		{pb.Decision_DECISION_CONDITIONAL, exitConditional},
+		{pb.Decision_DECISION_UNSPECIFIED, exitConditional},
+	} {
+		if got := codeFor(c.decision); got != c.want {
+			t.Errorf("codeFor(%v) = %d, want %d", c.decision, got, c.want)
+		}
+	}
+}

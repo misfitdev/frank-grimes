@@ -19,22 +19,32 @@ bench-compare:
 
 # Lint all shell scripts
 lint:
-    shellcheck scripts/*.sh benchmark/*.sh hooks/*.sh tests/*.sh
+    shellcheck scripts/*.sh benchmark/*.sh hooks/*.sh tests/*.sh tests/fakes/*.sh
 
-# Format all shell scripts in place
+# Format all shell scripts and Go sources in place
 fmt:
-    shfmt -w -i 4 -ci scripts/*.sh benchmark/*.sh hooks/*.sh tests/*.sh
+    shfmt -w -i 4 -ci scripts/*.sh benchmark/*.sh hooks/*.sh tests/*.sh tests/fakes/*.sh
+    gofmt -w ./cmd ./internal
 
 # Check formatting without writing
 fmt-check:
-    shfmt -d -i 4 -ci scripts/*.sh benchmark/*.sh hooks/*.sh tests/*.sh
+    shfmt -d -i 4 -ci scripts/*.sh benchmark/*.sh hooks/*.sh tests/*.sh tests/fakes/*.sh
+    test -z "$(gofmt -l ./cmd ./internal)"
 
 # Serve the GitHub Pages site locally for review
 preview:
     cd docs && python3 -m http.server 8080
 
 # Lint, format-check, validate, and run contract tests
-check: lint fmt-check proto-lint validate test-fix-gate test-adjudication test-stop-hook test-contracts
+check: lint fmt-check proto-lint vet test-go validate test-fix-gate test-adjudication test-stop-hook test-contracts test-orchestrator
+
+# Vet the Go packages
+vet:
+    go vet ./...
+
+# Run the Go unit tests
+test-go:
+    go test ./...
 
 # Run the fix-gate contract tests
 test-fix-gate:
@@ -56,6 +66,10 @@ gen:
 proto-lint:
     buf lint
 
+# Run the orchestrator tests
+test-orchestrator:
+    ./tests/test-orchestrator.sh
+
 # Run the contract and ledger tests
 test-contracts:
     ./tests/test-contracts.sh
@@ -63,3 +77,4 @@ test-contracts:
 # Build the contract codec
 build:
     go build -o bin/grimes-contract ./cmd/grimes-contract
+    go build -o bin/grimes ./cmd/grimes

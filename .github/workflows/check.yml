@@ -1,0 +1,32 @@
+name: Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+# A superseded push has nothing left to prove, and the suites spawn provider
+# subprocesses, so leaving stale runs alive costs real minutes.
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: just check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The generated bindings must be byte-identical across machines, and the
+        # process-group termination the provider relies on differs between the
+        # two kernels. Both are unverified if only one runs.
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: jdx/mise-action@v4.3.0
+      - run: just check

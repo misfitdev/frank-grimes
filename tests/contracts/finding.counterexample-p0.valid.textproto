@@ -1,0 +1,24 @@
+# E1 without a command: a case the target's own claim does not survive.
+id: "FG-COR-2d4e6f8a0b13"
+fingerprint_sha256: "01234567890123456789012345678901"
+category: CATEGORY_COR
+location { anchor { document_part { document: "rollout-plan.md" section: "Rollback" } } }
+risk { severity: SEVERITY_P0 likelihood: LIKELIHOOD_LIKELY blast_radius: BLAST_RADIUS_SYSTEMIC }
+evidence {
+  tier: EVIDENCE_TIER_E1
+  claim: "the rollback procedure cannot restore a schema change it describes as reversible"
+  reproduction {
+    completed_at { seconds: 1780000000 }
+    counterexample {
+      claim_anchor { document_part { document: "rollout-plan.md" section: "Rollback" } }
+      claim_quote: "Every migration in this plan is reversible by running the down step."
+      counterexample: "Step 2 drops the legacy_email column after backfill; its down step recreates the column but has no source for the dropped values."
+      violation: "A reversible migration restores prior state. This one restores the schema and loses the data, so the claim does not hold for step 2."
+    }
+  }
+}
+evidence_sha256: "01234567890123456789012345678901"
+status: FINDING_STATUS_OPEN
+first_seen { seconds: 1780000000 }
+last_seen { seconds: 1780000000 }
+history { iteration: 1 from: FINDING_STATUS_UNSPECIFIED to: FINDING_STATUS_OPEN evidence_sha256: "01234567890123456789012345678901" at { seconds: 1780000000 } actor: "grimes" }

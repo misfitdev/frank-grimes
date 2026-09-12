@@ -108,14 +108,14 @@ Assume the target fails its claims or critical invariants somewhere in the route
 
 Attack every routed category. Do not stop at the first flaw; hunt the terminal ones first. Within each category, use the priority order in its attack card and the stopping rule in Phase 7.
 
-Before freehand analysis, discover the repository's existing local analyzers and tests from its checked-in workflow files and scripts. Inspect the command before execution, then run the applicable commands that require no network or unavailable service. Record the exact command, exit code, and bounded output. Treat that result as E1 even when the command passes. Spend model attention where mechanical tools are weak: cross-file invariants, authorization decisions, ordering, contextual wrongness, failure propagation, and mismatch between claims and behavior.
+Before freehand analysis, exhaust the target's own mechanical checks. When the target has a repository, discover its existing local analyzers and tests from its checked-in workflow files and scripts, inspect the command before execution, then run the applicable commands that require no network or unavailable service, and record the exact command, exit code, and bounded output. When the target is a supplied artifact with no runnable check, record the read actions performed over it and the spans they covered. Treat either result as E1 even when it finds nothing. Spend model attention where mechanical tools are weak: cross-file invariants, authorization decisions, ordering, contextual wrongness, failure propagation, and mismatch between claims and behavior.
 
-Every candidate finding must have exactly one primary evidence tier:
+Every candidate finding must have exactly one primary evidence tier. The tier is the same for every target type; only the record it requires follows from what the target is:
 
 | Tier | Required record |
 |------|-----------------|
-| **E1 (reproduced)** | Executed action or command, exit code/status, and the result excerpt that demonstrates the behavior. |
-| **E2 (cited)** | Repository-relative `path:line` and an exact quote in which the defect is visible without unstated surrounding facts. |
+| **E1 (reproduced)** | An action actually performed and its outcome: an executed command with its exit status and the result excerpt that demonstrates the behavior, or a counterexample exhibited against a stated claim. |
+| **E2 (cited)** | A resolvable anchor and an exact quote in which the defect is visible without unstated surrounding facts. The anchor is a repository-relative `path:line`, a document section or clause, a numbered claim or step in an argument, or an authoritative retrieved source recorded with its retrieval identity. |
 | **E3 (inferred)** | Explicit assumption, observed facts used by the inference, and a named observation that would falsify it. |
 
 Do not promote a command name, an unexecuted scenario, a path without a checked quote, or model recollection into evidence. E2 proves only what the quote visibly establishes; it cannot by itself prove absence, authorial intent, future divergence, runtime reachability, or that a deliberate override is defective. Put those claims in E3 unless an executed probe or independently cited contract establishes the missing premise. P0 requires E1 or E2. E3 is capped at P1; the stricter self-grind cap applies when its falsifier cannot be attempted.
@@ -133,9 +133,9 @@ Record candidate findings in this clinical form before the self-grind:
 - Disproof observation: [specific result that would show this accusation is wrong]
 ```
 
-Finding identity is content-addressed, so the same defect in the same place with the same evidence carries the same ID on every run and every machine. The fingerprint is `SHA-256(category + NUL + normalized path + NUL + normalized evidence)`, and the ID is `FG-<CATEGORY>-<first 12 hex>`. Line numbers are deliberately excluded: code moving down a file is not a new finding.
+Finding identity is content-addressed, so the same defect in the same place with the same evidence carries the same ID on every run and every machine. The fingerprint is `SHA-256(category + NUL + anchor kind + NUL + normalized anchor + NUL + normalized evidence)`, and the ID is `FG-<CATEGORY>-<first 12 hex>`. The anchor is the finding's location: a repository-relative path, a document section or clause, a numbered step in an argument, or a retrieved source's stable identifier. Line and section numbers are deliberately excluded: content moving down an artifact is not a new finding. The anchor kind is an input so that a path and a URL reading the same cannot collide.
 
-Normalization is UTF-8, LF line endings, trailing whitespace removed per line, and no leading or trailing blank lines. Leading indentation is preserved, because indentation changes what code means.
+Normalization is UTF-8, LF line endings, trailing whitespace removed per line, and no leading or trailing blank lines. For code, leading indentation is preserved, because indentation changes what code means. For prose, leading indentation is removed, because re-nesting a list does not change what it says.
 
 Do not invent a second ID or lifecycle scheme. The machine contract defines `Finding`, `Evidence`, `Verdict`, `GrimesResult`, and the lifecycle `open → fixed → verified`, with `accepted` requiring a named human owner and a review deadline. A fingerprint that was already `fixed` or `verified` reappearing is `regressed`, which sets the run-level oscillation flag and makes a pass unreachable: a loop that keeps re-breaking what it fixed does not get to declare success on the iteration where the damage is invisible.
 

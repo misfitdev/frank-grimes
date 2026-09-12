@@ -1,0 +1,20 @@
+# Accepted with no named human owner. An accepted risk nobody owns is an
+# orphaned risk, and the ledger must refuse to carry one.
+schema_major: 2
+target { root: "/repo" scope: "bad-script.sh" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
+findings {
+  key: "FG-SEC-9a34db214c59"
+  value {
+    id: "FG-SEC-9a34db214c59"
+    fingerprint_sha256: "01234567890123456789012345678901"
+    category: CATEGORY_SEC
+    location { anchor { repo_line { path { value: "bad-script.sh" } } } }
+    risk { severity: SEVERITY_P0 likelihood: LIKELIHOOD_LIKELY blast_radius: BLAST_RADIUS_SYSTEMIC }
+    evidence { tier: EVIDENCE_TIER_E2 claim: "caller-controlled deletion path" citation { anchor { repo_line { path { value: "bad-script.sh" } line: 22 } } quote: "rm -rf \"$1\"/*" } }
+    evidence_sha256: "01234567890123456789012345678901"
+    status: FINDING_STATUS_ACCEPTED
+    first_seen { seconds: 1780000000 }
+    last_seen { seconds: 1780000000 }
+    history { iteration: 1 from: FINDING_STATUS_OPEN to: FINDING_STATUS_ACCEPTED evidence_sha256: "01234567890123456789012345678901" at { seconds: 1780000000 } actor: "grimes" }
+  }
+}

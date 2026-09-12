@@ -4,16 +4,15 @@ package contracts
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"io"
+	"strconv"
 	"strings"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 )
-
-// NUL separates fingerprint components so that no component's content can
-// impersonate a boundary between two others.
-const fieldSep = "\x00"
 
 // NormalizeEvidence renders evidence text comparable across runs: UTF-8, LF
 // line endings, no trailing whitespace, no leading or trailing blank lines.
@@ -49,18 +48,79 @@ func NormalizePath(p string) string {
 	return p
 }
 
+// AnchorKey reduces an anchor to the kind tag and the canonical parts identity
+// is taken over.
+//
+// The parts are returned separately rather than joined. Joining them would need
+// a separator, and protobuf permits any byte inside a string, so a part could
+// contain whatever separator was chosen and impersonate a boundary.
+//
+// The kind tag is a part because the canonical forms are not comparable across
+// kinds: a path and a URI that read the same are different places. Line,
+// section, and step numbers are excluded, so content moving within an artifact
+// is not a new finding.
+func AnchorKey(a *pb.Anchor) (kind string, parts []string) {
+	switch at := a.GetAt().(type) {
+	case *pb.Anchor_RepoLine:
+		return "repo", []string{NormalizePath(at.RepoLine.GetPath().GetValue())}
+	case *pb.Anchor_DocumentPart:
+		return "doc", []string{
+			NormalizePath(at.DocumentPart.GetDocument()),
+			normalizeLabel(at.DocumentPart.GetSection()),
+		}
+	case *pb.Anchor_ArgumentStep:
+		// The step number is the claim's identity here, not an offset into it:
+		// claim 3 of an argument is a different claim from claim 4.
+		return "arg", []string{
+			normalizeLabel(at.ArgumentStep.GetArgument()),
+			strconv.FormatUint(uint64(at.ArgumentStep.GetStep()), 10),
+		}
+	case *pb.Anchor_RetrievedSource:
+		return "src", []string{strings.TrimRight(at.RetrievedSource.GetUri(), "/")}
+	default:
+		return "none", nil
+	}
+}
+
+// normalizeLabel renders a document or argument identifier comparable: single
+// spaces, no surrounding space, case-folded, since "Appendix B" and "appendix
+// b" name the same section.
+func normalizeLabel(s string) string {
+	return strings.ToLower(strings.Join(strings.Fields(s), " "))
+}
+
 // Fingerprint is the content address of a finding: the same defect in the same
 // place with the same evidence yields the same bytes on every run and every
-// machine. Line numbers are not an input, so a finding survives the code above
-// it moving.
-func Fingerprint(category pb.Category, repoPath, evidence string) []byte {
+// machine. Positions within an artifact are not inputs, so a finding survives
+// the content above it moving.
+func Fingerprint(category pb.Category, anchor *pb.Anchor, evidence string) []byte {
+	kind, parts := AnchorKey(anchor)
 	h := sha256.New()
-	h.Write([]byte(CategoryName(category)))
-	h.Write([]byte(fieldSep))
-	h.Write([]byte(NormalizePath(repoPath)))
-	h.Write([]byte(fieldSep))
-	h.Write([]byte(NormalizeEvidence(evidence)))
+	writeComponent(h, CategoryName(category))
+	writeComponent(h, kind)
+	for _, part := range parts {
+		writeComponent(h, part)
+	}
+	writeComponent(h, NormalizeEvidence(evidence))
 	return h.Sum(nil)
+}
+
+// writeComponent length-prefixes a component so its content cannot reach across
+// its own boundary. Separators alone are not enough: an anchor holding a NUL
+// would otherwise hash identically to a shorter anchor plus a longer evidence
+// string, giving two different findings one identity.
+func writeComponent(h io.Writer, s string) {
+	var n [8]byte
+	binary.BigEndian.PutUint64(n[:], uint64(len(s)))
+	h.Write(n[:])
+	h.Write([]byte(s))
+}
+
+// RepoAnchor is the common case: a finding at a repository-relative path.
+func RepoAnchor(path string) *pb.Anchor {
+	return &pb.Anchor{At: &pb.Anchor_RepoLine{RepoLine: &pb.RepoLine{
+		Path: &pb.RepoPath{Value: path},
+	}}}
 }
 
 // FindingID renders a fingerprint as the stable, human-referenceable ID.

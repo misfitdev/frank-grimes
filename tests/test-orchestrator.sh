@@ -1,0 +1,284 @@
+#!/usr/bin/env bash
+# FG-105: the orchestrator derives its own result and fails closed.
+#
+# Black-box: everything here goes through the grimes CLI with a fake provider,
+# the same way an adapter must. Nothing reaches into the Go packages directly.
+#
+# Exit codes: 0 all passed, 1 a test failed, 2 the toolchain is unavailable.
+
+set -euo pipefail
+
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+FAKES="$PROJECT_ROOT/tests/fakes"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+PASSED=0
+FAILED=0
+
+pass() {
+    echo -e "${GREEN}PASS${NC}: $*"
+    PASSED=$((PASSED + 1))
+}
+
+fail() {
+    echo -e "${RED}FAIL${NC}: $*"
+    FAILED=$((FAILED + 1))
+}
+
+# `cond && pass || fail` misreports when pass itself returns non-zero, so the
+# assertions go through helpers instead.
+assert_eq() {
+    if [[ "$1" == "$2" ]]; then pass "$3"; else fail "$3 (got '$1' vs '$2')"; fi
+}
+
+if ! command -v go &>/dev/null; then
+    echo -e "${YELLOW}SKIP${NC}: go is not installed; orchestrator tests require the toolchain"
+    exit 2
+fi
+
+BINDIR="$(mktemp -d)"
+trap 'rm -rf "$BINDIR"' EXIT
+GRIMES="$BINDIR/grimes"
+# The provider runs with a minimal environment and inherits only PATH, so the
+# fakes find grimes-contract there rather than through a bespoke variable.
+export PATH="$BINDIR:$PATH"
+
+echo "--- Build ---"
+if (cd "$PROJECT_ROOT" && go build -o "$GRIMES" ./cmd/grimes) 2>/dev/null &&
+    (cd "$PROJECT_ROOT" && go build -o "$BINDIR/grimes-contract" ./cmd/grimes-contract) 2>/dev/null; then
+    pass "grimes and grimes-contract build"
+else
+    fail "grimes and grimes-contract build"
+    echo "Passed: $PASSED / Failed: $FAILED"
+    exit 1
+fi
+
+# Each case gets its own workspace so a leftover ledger cannot leak between them.
+workspace() {
+    local dir
+    dir="$(mktemp -d)"
+    echo "$dir"
+}
+
+run_grimes() {
+    local dir="$1"
+    shift
+    "$GRIMES" run --dir="$dir" "$@" src 2>&1 || true
+}
+
+exit_code() {
+    local dir="$1"
+    shift
+    "$GRIMES" run --dir="$dir" "$@" src >/dev/null 2>&1
+    echo $?
+}
+
+echo ""
+# prototext's spacing is randomized per binary build
+# (google.golang.org/protobuf/internal/detrand), so match on content, not
+# exact spacing.
+echo "--- A provider cannot certify its own review ---"
+
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-green.sh" --format=prototext)"
+if echo "$OUT" | grep -qE 'legacy_color: +LEGACY_COLOR_GREEN'; then
+    fail "engine adopted the provider's GREEN"
+else
+    pass "a GREEN-claiming provider does not produce GREEN"
+fi
+if echo "$OUT" | grep -qE 'producer_role: +PRODUCER_ROLE_ORCHESTRATOR'; then
+    pass "the emitted result is attributed to the orchestrator"
+else
+    fail "result is not attributed to the orchestrator"
+fi
+if echo "$OUT" | grep -qE 'unmet_gates: +"adjudication"'; then
+    pass "a run with no adjudicator names adjudication as unmet"
+else
+    fail "a run with no adjudicator does not name adjudication"
+fi
+rm -rf "$WS"
+
+echo ""
+echo "--- The emitted result satisfies the machine contract ---"
+
+WS="$(workspace)"
+ENVELOPE="$(mktemp)"
+run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" >"$ENVELOPE"
+if grimes-contract decode-result "$ENVELOPE" >/dev/null 2>&1; then
+    pass "the emitted envelope decodes and revalidates"
+else
+    fail "the emitted envelope does not revalidate"
+fi
+if [[ -f "$WS/.grimes/ledger.pb" ]]; then
+    pass "a completed run persists the ledger"
+else
+    fail "a completed run did not persist the ledger"
+fi
+if [[ -f "$WS/.grimes-state.json" ]]; then
+    fail "the engine wrote the hook's state file"
+else
+    pass "the engine leaves .grimes-state.json to the stop hook"
+fi
+rm -f "$ENVELOPE"
+rm -rf "$WS"
+
+echo ""
+echo "--- Invalid provider output fails closed ---"
+
+for fake in provider-garbage provider-noenvelope provider-exit7; do
+    WS="$(workspace)"
+    CODE="$(exit_code "$WS" --provider-command="$FAKES/$fake.sh")"
+    assert_eq "$CODE" "1" "$fake fails the run"
+    if [[ -f "$WS/.grimes/ledger.pb" ]]; then
+        fail "$fake wrote a ledger despite failing"
+    else
+        pass "$fake leaves no ledger behind"
+    fi
+    rm -rf "$WS"
+done
+
+echo ""
+echo "--- Output and time are bounded ---"
+
+WS="$(workspace)"
+START=$(date +%s)
+CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-flood.sh" --max-output-bytes=4096)"
+ELAPSED=$(($(date +%s) - START))
+assert_eq "$CODE" "1" "an unbounded provider fails the run"
+if [[ "$ELAPSED" -lt 30 ]]; then
+    pass "the output bound trips promptly (${ELAPSED}s)"
+else
+    fail "the output bound took ${ELAPSED}s"
+fi
+rm -rf "$WS"
+
+WS="$(workspace)"
+START=$(date +%s)
+CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-hang.sh" --provider-timeout=2s)"
+ELAPSED=$(($(date +%s) - START))
+assert_eq "$CODE" "1" "a hanging provider fails the run"
+if [[ "$ELAPSED" -lt 30 ]]; then
+    pass "the timeout kills a provider holding the pipe open (${ELAPSED}s)"
+else
+    fail "the timeout took ${ELAPSED}s"
+fi
+rm -rf "$WS"
+
+echo ""
+echo "--- Adjudication ---"
+
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" \
+    --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --format=prototext)"
+if echo "$OUT" | grep -qE 'zero_knowledge: +true'; then
+    pass "an adjudicated run records the independent review"
+else
+    fail "an adjudicated run does not record the independent review"
+fi
+if echo "$OUT" | grep -q 'adjudicator received'; then
+    fail "the adjudicator was handed findings or evidence"
+else
+    pass "the adjudicator receives only the target and the claimed tuple"
+fi
+rm -rf "$WS"
+
+WS="$(workspace)"
+CODE="$(exit_code "$WS" \
+    --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-block.sh")"
+assert_eq "$CODE" "4" "an independent block produces a blocking exit code"
+rm -rf "$WS"
+
+echo ""
+echo "--- The loop runs only when it was asked for ---"
+
+WS="$(workspace)"
+run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" >/dev/null
+if [[ -f "$WS/.grimes/state.pb" ]]; then
+    fail "a run without --auto-loop left loop state"
+else
+    pass "a run without --auto-loop leaves no loop state"
+fi
+if [[ -f "$WS/.grimes/result.pb" ]]; then
+    pass "a one-shot run still records its result"
+else
+    fail "a one-shot run recorded no result"
+fi
+rm -rf "$WS"
+
+WS="$(workspace)"
+run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" --auto-loop >/dev/null
+if [[ -f "$WS/.grimes/state.pb" ]]; then
+    pass "--auto-loop records loop state"
+else
+    fail "--auto-loop recorded no loop state"
+fi
+rm -rf "$WS"
+
+echo ""
+echo "--- A ledger belongs to one target ---"
+
+WS="$(workspace)"
+run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" >/dev/null
+CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-red.sh")"
+if [[ "$CODE" == "1" ]]; then
+    fail "a second run against the same target failed"
+else
+    pass "the same target reuses its ledger"
+fi
+
+# A second target in the same directory must not inherit the first one's
+# findings: the contract pins the ledger to a single path.
+set +e
+OTHER="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-red.sh" other-target 2>&1)"
+OTHER_CODE=$?
+set -e
+# Both halves matter: printing the reason while exiting zero would still let a
+# caller treat the run as having succeeded.
+if [[ "$OTHER_CODE" == "1" ]] && grep -qi 'different target' <<<"$OTHER"; then
+    pass "a ledger raised against another target is refused"
+else
+    fail "a second target reused the first target's ledger (exit $OTHER_CODE)"
+fi
+rm -rf "$WS"
+
+echo ""
+echo "--- Fix mode is not available ---"
+
+WS="$(workspace)"
+CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-red.sh" --mode=fix)"
+assert_eq "$CODE" "1" "fix mode is refused rather than ignored"
+rm -rf "$WS"
+
+echo ""
+echo "--- State ---"
+
+WS="$(workspace)"
+run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" --auto-loop >/dev/null
+if "$GRIMES" state --dir="$WS" --show | grep -qE 'run_id: +'; then
+    pass "state --show reports the run in progress"
+else
+    fail "state --show does not report the run"
+fi
+"$GRIMES" state --dir="$WS" --clear
+if "$GRIMES" state --dir="$WS" --show | grep -q 'no run in progress'; then
+    pass "state --clear discards loop state"
+else
+    fail "state --clear left state behind"
+fi
+rm -rf "$WS"
+
+echo ""
+echo "========================================"
+echo "Passed: $PASSED"
+echo "Failed: $FAILED"
+echo "========================================"
+
+if [[ "$FAILED" -gt 0 ]]; then
+    exit 1
+fi

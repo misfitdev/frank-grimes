@@ -3,7 +3,7 @@
 schema_major: 2
 run_id: "run-003"
 producer_role: PRODUCER_ROLE_ORCHESTRATOR
-target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" }
+target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
 mode: MODE_REPORT
 iteration: 4
 max_iterations: 5

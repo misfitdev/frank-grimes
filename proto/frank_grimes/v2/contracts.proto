@@ -70,11 +70,33 @@ enum EvidenceTier {
   EVIDENCE_TIER_E3 = 3;
 }
 
+// What kind of artifact is under review. The kind selects the collector and
+// the record each evidence tier requires; it never changes the verdict rules.
+enum TargetKind {
+  TARGET_KIND_UNSPECIFIED = 0;
+  TARGET_KIND_CODE = 1;
+  TARGET_KIND_DOCUMENT = 2;
+  TARGET_KIND_IDEA = 3;
+  TARGET_KIND_EXTERNAL = 4;
+}
+
 message Target {
-  string root = 1 [(buf.validate.field).string.min_len = 1];
+  // A pasted argument has no repository to be rooted in, so root is required
+  // only where one exists.
+  option (buf.validate.message).cel = {
+    id: "target.code_requires_root"
+    message: "a code target must record the repository root it was taken from"
+    expression: "this.kind != 1 || this.root != ''"
+  };
+
+  string root = 1;
   string scope = 2 [(buf.validate.field).string.min_len = 1];
   bytes fingerprint_sha256 = 3 [(buf.validate.field).bytes.len = 32];
   string display = 4 [(buf.validate.field).string.max_len = 512];
+  TargetKind kind = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
 }
 
 // A repository-relative path that cannot escape the repository root.
@@ -94,9 +116,65 @@ message RepoPath {
   }];
 }
 
-message Location {
+// A place in a code target.
+message RepoLine {
   RepoPath path = 1 [(buf.validate.field).required = true];
-  optional string symbol = 2 [(buf.validate.field).string.max_len = 512];
+  optional uint32 line = 2 [(buf.validate.field).uint32.gt = 0];
+  optional string symbol = 3 [(buf.validate.field).string.max_len = 512];
+}
+
+// A place in a supplied document. The section identifier is the document's own
+// ("4.2", "Appendix B", a heading), not an offset, so reformatting does not
+// move it.
+message DocumentPart {
+  string document = 1 [(buf.validate.field).string.min_len = 1];
+  string section = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 512
+  }];
+  optional string heading = 3 [(buf.validate.field).string.max_len = 512];
+}
+
+// A numbered claim or inference step in a supplied argument.
+message ArgumentStep {
+  string argument = 1 [(buf.validate.field).string.min_len = 1];
+  uint32 step = 2 [(buf.validate.field).uint32.gt = 0];
+  optional string label = 3 [(buf.validate.field).string.max_len = 512];
+}
+
+// An external source. The digest and timestamp are what make a retrieved page
+// citable later: without them the quote cannot be checked against what was
+// actually read.
+message RetrievedSource {
+  string uri = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+    uri: true
+  }];
+  string publisher = 2 [(buf.validate.field).string.min_len = 1];
+  optional string section = 3 [(buf.validate.field).string.max_len = 512];
+  bytes snapshot_sha256 = 4 [(buf.validate.field).bytes.len = 32];
+  google.protobuf.Timestamp retrieved_at = 5 [(buf.validate.field).required = true];
+}
+
+// Where a finding or a quotation lives. One locator for every target kind, so
+// a review of a proposal anchors its findings as precisely as a review of a
+// diff does.
+message Anchor {
+  oneof at {
+    option (buf.validate.oneof).required = true;
+    RepoLine repo_line = 1;
+    DocumentPart document_part = 2;
+    ArgumentStep argument_step = 3;
+    RetrievedSource retrieved_source = 4;
+  }
+}
+
+message Location {
+  reserved 1, 2;
+  reserved "path", "symbol";
+
+  Anchor anchor = 3 [(buf.validate.field).required = true];
 }
 
 message Risk {
@@ -127,7 +205,8 @@ message HumanOwner {
 // Evidence
 // ---------------------------------------------------------------------------
 
-message Reproduction {
+// A command that was run, with what it did.
+message ExecutedCommand {
   string action = 1 [(buf.validate.field).string.min_len = 1];
   RepoPath cwd = 2 [(buf.validate.field).required = true];
   int32 exit_code = 3;
@@ -136,13 +215,38 @@ message Reproduction {
     string output_excerpt = 4 [(buf.validate.field).string.min_len = 1];
     bytes output_sha256 = 5 [(buf.validate.field).bytes.len = 32];
   }
+}
+
+// A case that the target's own claim does not survive. The claim is quoted so
+// the violation can be checked against what was actually asserted, rather than
+// against a paraphrase of it.
+message Counterexample {
+  Anchor claim_anchor = 1 [(buf.validate.field).required = true];
+  string claim_quote = 2 [(buf.validate.field).string.min_len = 1];
+  string counterexample = 3 [(buf.validate.field).string.min_len = 1];
+  string violation = 4 [(buf.validate.field).string.min_len = 1];
+}
+
+// What was exhibited, and when. An executed command is one way to exhibit a
+// defect; a counterexample the target's claim cannot survive is another.
+message Reproduction {
+  reserved 1 to 5;
+  reserved "action", "cwd", "exit_code", "output_excerpt", "output_sha256";
+
   google.protobuf.Timestamp completed_at = 6 [(buf.validate.field).required = true];
+  oneof exhibit {
+    option (buf.validate.oneof).required = true;
+    ExecutedCommand executed_command = 7;
+    Counterexample counterexample = 8;
+  }
 }
 
 message Citation {
-  RepoPath path = 1 [(buf.validate.field).required = true];
-  uint32 line = 2 [(buf.validate.field).uint32.gt = 0];
+  reserved 1, 2;
+  reserved "path", "line";
+
   string quote = 3 [(buf.validate.field).string.min_len = 1];
+  Anchor anchor = 4 [(buf.validate.field).required = true];
 }
 
 message Inference {
@@ -230,7 +334,7 @@ message Finding {
 }
 
 message Ledger {
-  uint32 schema_major = 1 [(buf.validate.field).uint32.const = 1];
+  uint32 schema_major = 1 [(buf.validate.field).uint32.const = 2];
   uint32 schema_minor = 2;
   Target target = 3 [(buf.validate.field).required = true];
   map<string, Finding> findings = 4;

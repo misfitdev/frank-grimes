@@ -1,34 +1,35 @@
 # Stop Hook Integration
 
-The Grimes Grind auto-loop uses a stop hook to intercept exit attempts and continue iterating. The hook owns the loop: it decides whether another pass happens, increments the counter, and re-injects the prompt. The grind itself must never advance the iteration.
+The Grimes Grind auto-loop uses a stop hook to intercept exit attempts and continue iterating.
 
-Iteration stops when a pass is confirmed, when an iteration surfaces no new P0/P1 findings, or when the cap is reached. Verdict rules live in the skill, not here.
+The hook decides nothing. The engine owns the loop: it derives the verdict, advances the iteration, and writes the run record. The hook locates the repository and the binary, asks the engine, and reports the answer. Verdict rules live in the skill, not here.
+
+Iteration stops when a pass is confirmed, when an iteration surfaces no new P0/P1 findings, or when the cap is reached.
 
 ## How It Works
 
-1. During a grind, the agent writes state to `.grimes-state.json` in the project root
+1. A grind runs through the engine, which writes `.grimes/state.pb`, `.grimes/result.pb`, and `.grimes/ledger.pb`
 2. On session stop, the agent's hook system calls `hooks/stop.sh`
-3. The hook reads the state file and decides:
-   - **Exit 0**: Allow the session to end (pass confirmed, no new P0/P1 findings, max iterations reached, or auto-loop disabled)
+3. The hook invokes `grimes loop`, which verifies the record and decides:
+   - **Exit 0**: Allow the session to end (pass confirmed, no new P0/P1 findings, cap reached, or the record could not be verified)
    - **Exit 2**: Block exit and re-inject the grind prompt (continue iterating)
-4. If continuing, the hook increments the iteration counter and outputs the next prompt
 
-## State File Format
+## The Run Record
 
-```json
-{
-  "iteration": 2,
-  "max_iterations": 5,
-  "last_verdict": "YELLOW",
-  "target": "./src/auth.py",
-  "auto_loop": true,
-  "issues_found": 8,
-  "issues_fixed": 3,
-  "new_p0_p1": 2,
-  "last_commit": "abc1234",
-  "last_grind_timestamp": "2026-08-21T10:30:00Z"
-}
+The record is protobuf, not JSON, and the engine writes it. A hand-written verdict is rejected rather than believed.
+
+`grimes loop` refuses to treat a result as terminal unless its digest is the one `.grimes/state.pb` recorded, its run id matches, its target fingerprint matches, and it declares contract major 2 and orchestrator authorship. A GREEN result additionally has to satisfy the contract's own rule that a pass carries an independent review of the same target with no oscillation.
+
+Anything that fails those checks is quarantined under `.grimes/quarantine/` and the session ends without a pass recorded. Inspect the current record with:
+
+```bash
+grimes state --show     # the loop state, if a review is in progress
+grimes state --clear    # discard it
 ```
+
+## Locating the Repository
+
+An installed hook runs from a versioned plugin cache, so its own path says nothing about which repository is under review. The hook resolves the project from `GRIMES_PROJECT_DIR`, then `CLAUDE_PROJECT_DIR`, then the working directory, and only then falls back to its own parent. Set one of the first two if your agent runs the hook from outside the repository.
 
 ## Integration by Provider
 
@@ -92,24 +93,22 @@ Any agent framework that supports stop hooks can integrate with this script. The
 3. Respect the exit code: 0 = allow exit, 2 = continue
 
 If your provider doesn't support hooks, you can simulate the loop by:
-1. Running the grind manually
-2. Reading `.grimes-state.json` after each iteration
-3. If verdict is not GREEN and iterations remain, re-invoking the grind with the updated state
+1. Running the grind through `grimes run`
+2. Running `grimes loop` after each iteration
+3. Re-invoking the grind while it exits 2
 
 ## Dependencies
 
-- `jq`: required for JSON parsing in the stop hook
+- `grimes`: the engine binary, found next to the hook, in `bin/`, or on `PATH`
 
-Install on macOS: `brew install jq`
-Install on Ubuntu/Debian: `apt-get install jq`
-Install on Fedora: `dnf install jq`
+If the binary is missing the hook allows the session to end and records no pass.
 
 ## Troubleshooting
 
 **Hook not triggering**: Verify your agent's hook system is configured to call `hooks/stop.sh` on stop events.
 
-**State file not found**: The state file is created when a grind starts with `auto_loop: true`. If you're not using auto-loop, the hook will exit cleanly without finding state.
+**State file not found**: The record is created when a review runs through the engine. If the hook reports nothing, check that it resolved the right repository; set `GRIMES_PROJECT_DIR` if it did not.
 
-**jq not found**: Install jq. The hook cannot parse JSON without it and will exit cleanly with a warning.
+**grimes not found**: Install the binary or put it on `PATH`. Without it the hook cannot verify a run, so it ends the session and records no pass.
 
-**Corrupted state**: If the state file is invalid JSON or missing required fields, the hook removes it and exits cleanly. Start a new grind to recreate it.
+**Corrupted or unverifiable record**: The hook quarantines it under `.grimes/quarantine/` rather than deleting it, and ends the session without a pass. The quarantined file is the only evidence of how the run broke.

@@ -72,10 +72,11 @@ just bench-all    # run the benchmark against every target
 
 ## Architecture Overview
 
-`skills/frank-grimes/SKILL.md` is the sole normative methodology; nothing else may restate its phases, categories, evidence tiers, or verdict rules. `proto/frank_grimes/v2/contracts.proto` is the sole normative machine contract, enforced by the `grimes-contract` codec. Adapters under `adapters/` carry provider-specific wiring only: arguments, tools, and transport. `hooks/stop.sh` owns the iteration loop.
+`skills/frank-grimes/SKILL.md` is the sole normative methodology; nothing else may restate its phases, categories, evidence tiers, or verdict rules. `proto/frank_grimes/v2/contracts.proto` is the sole normative machine contract, enforced by the `grimes-contract` codec. Adapters under `adapters/` carry provider-specific wiring only: arguments, tools, and transport. The engine owns the iteration loop, the verdict, and the run record; `hooks/stop.sh` asks it for a decision and relays the answer.
 
 ## Conventions & Patterns
 
 - A methodology change goes in the skill, never in an adapter copy. `validate.sh` fails the build if a normative marker appears in two files.
 - A contract change requires `just gen` and the regenerated bindings in the same commit.
-- Tests are black-box: they run the real script or CLI against fixtures, and every one of them has been checked to fail when its defect is reintroduced.
+- Tests are black-box by default: they run the real script or CLI against fixtures. Go unit tests are permitted only for behaviour a black-box test cannot reach, such as context cancellation, timeouts, output bounds, and pure derivation over a large input space; anything observable through the CLI is asserted there.
+- Every test, either kind, has been checked to fail when its defect is reintroduced.
