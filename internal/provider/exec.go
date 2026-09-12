@@ -122,13 +122,14 @@ type boundedBuffer struct {
 }
 
 func (b *boundedBuffer) Write(p []byte) (int, error) {
-	if room := b.limit - b.buf.Len(); room > 0 {
-		if len(p) <= room {
-			return b.buf.Write(p)
-		}
-		b.buf.Write(p[:room])
+	// How much is kept has to be decided before the write, since writing moves
+	// the remaining room and would make retained bytes look dropped.
+	kept := min(len(p), max(0, b.limit-b.buf.Len()))
+	if kept > 0 {
+		b.buf.Write(p[:kept])
 	}
-	b.dropped += len(p) - max(0, b.limit-b.buf.Len())
+	b.dropped += len(p) - kept
+	// Report the full length: a short write from a Stderr sink stops the pipe.
 	return len(p), nil
 }
 
