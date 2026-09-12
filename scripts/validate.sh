@@ -341,6 +341,41 @@ else
 fi
 
 echo ""
+echo "--- Orchestrator ---"
+
+check test -d "$PROJECT_ROOT/cmd/grimes" "cmd/grimes/ exists"
+check test -f "$PROJECT_ROOT/internal/engine/verdict.go" "verdict derivation has a single home"
+check test -f "$PROJECT_ROOT/internal/adjudicate/resolve.go" "adjudication resolution has a single home"
+
+# A verdict decided in two places drifts, and the second copy is the one nobody
+# updates. Returning a colour is the derivation; reading one to format output is
+# not, so this looks for the assignment rather than the mention.
+DUPLICATES=""
+while IFS= read -r match; do
+    rel="${match%%:*}"
+    rel="${rel#"$PROJECT_ROOT"/}"
+    case "$rel" in
+        internal/engine/weight.go | *_test.go) continue ;;
+    esac
+    DUPLICATES="$DUPLICATES $rel"
+done < <(grep -rnE 'return pb\.LegacyColor_' \
+    "$PROJECT_ROOT/internal" "$PROJECT_ROOT/cmd" --include='*.go' 2>/dev/null || true)
+
+if [[ -n "$DUPLICATES" ]]; then
+    fail "colour derived outside internal/engine/weight.go:$DUPLICATES"
+else
+    pass "the legacy colour is derived in one place"
+fi
+
+# An adapter carries wiring, never methodology: a colour or decision decided
+# there is a second implementation of Phase 7.
+if grep -rqE 'LEGACY_COLOR_|DECISION_PASS' "$PROJECT_ROOT/adapters" "$PROJECT_ROOT/hooks" 2>/dev/null; then
+    fail "adapters or hooks name contract verdict values; the engine owns them"
+else
+    pass "no adapter or hook decides a verdict"
+fi
+
+echo ""
 
 # SKILL.md is the sole normative methodology. A second copy in an adapter or a
 # README does not stay in sync; it goes stale and then contradicts the skill.
