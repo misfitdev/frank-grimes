@@ -11,3 +11,10 @@ buf = "1.70.0"
 protoc = "36.0"
 protoc-gen-go = "1.36.12"
 shfmt = "3.13.1"
+
+[env]
+# Dolt publishes a visible branch pointing at refs/dolt/data, where the issue
+# data actually lives. GitHub sees it as an ordinary branch and offers to open a
+# pull request for it on every push. Empty disables the signpost; sync is
+# unaffected.
+DOLT_REMOTE_INFO_BRANCH = ""
