@@ -264,3 +264,106 @@ func TestStoreRespectsCancelledContext(t *testing.T) {
 }
 
 func timeZero() time.Time { return time.Unix(1780000000, 0).UTC() }
+
+func sampleResult() *pb.GrimesResult {
+	digest := digest32()
+	return &pb.GrimesResult{
+		SchemaMajor:     2,
+		RunId:           "run-001",
+		ProducerRole:    pb.ProducerRole_PRODUCER_ROLE_ORCHESTRATOR,
+		Target:          target(),
+		Mode:            pb.Mode_MODE_REPORT,
+		Iteration:       1,
+		MaxIterations:   5,
+		CompletionState: pb.CompletionState_COMPLETION_STATE_REVIEW_COMPLETE,
+		Verdict: &pb.Verdict{
+			Decision:           pb.Decision_DECISION_BLOCK,
+			ResidualRisk:       pb.ResidualRisk_RESIDUAL_RISK_CRITICAL,
+			ReviewConfidence:   pb.ReviewConfidence_REVIEW_CONFIDENCE_HIGH,
+			ReviewCompleteness: pb.ReviewCompleteness_REVIEW_COMPLETENESS_LIMITED,
+		},
+		LegacyColor:   pb.LegacyColor_LEGACY_COLOR_RED,
+		MarginalYield: &pb.MarginalYield{CandidatesExamined: 4, NewP0P1: 2},
+		Counts:        &pb.FindingCounts{Total: 1, OpenP0: 1},
+		Verification:  &pb.Verification{Status: pb.VerificationStatus_VERIFICATION_STATUS_NOT_APPLICABLE},
+		Ledger:        &pb.LedgerRef{Path: contracts.LedgerPath, DigestSha256: digest},
+		UnmetGates:    []string{"decision"},
+		Summary:       "An open P0 blocks this target.",
+	}
+}
+
+func TestFileResultStoreLoadMissingReturnsNil(t *testing.T) {
+	got, err := NewFileResultStore(t.TempDir()).Load(context.Background())
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got != nil {
+		t.Errorf("result = %v, want nil", got)
+	}
+}
+
+func TestFileResultStoreRoundTrip(t *testing.T) {
+	r := NewFileResultStore(t.TempDir())
+	want := sampleResult()
+	sum, err := r.Save(context.Background(), want)
+	if err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	if len(sum) != 32 {
+		t.Errorf("digest length = %d, want 32", len(sum))
+	}
+	got, err := r.Load(context.Background())
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !proto.Equal(got, want) {
+		t.Error("round-tripped result differs from what was saved")
+	}
+}
+
+func TestFileResultStoreDigestMatchesContents(t *testing.T) {
+	r := NewFileResultStore(t.TempDir())
+	result := sampleResult()
+	sum, err := r.Save(context.Background(), result)
+	if err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	want, err := contracts.Digest(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(sum) != string(want) {
+		t.Error("returned digest does not match the saved result")
+	}
+}
+
+func TestFileResultStoreCorruptQuarantines(t *testing.T) {
+	dir := t.TempDir()
+	r := NewFileResultStore(dir)
+	if err := os.MkdirAll(filepath.Dir(r.Path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(r.Path, []byte("not a protobuf"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.Load(context.Background()); err == nil {
+		t.Fatal("want an error for a corrupt result")
+	}
+	matches, _ := filepath.Glob(filepath.Join(dir, ".grimes", "quarantine", "*"))
+	if len(matches) == 0 {
+		t.Error("corrupt result was not preserved in quarantine")
+	}
+}
+
+func TestFileResultStoreRejectsInvalidOnSave(t *testing.T) {
+	r := NewFileResultStore(t.TempDir())
+	bad := sampleResult()
+	// Only the orchestrator may emit a result.
+	bad.ProducerRole = pb.ProducerRole_PRODUCER_ROLE_GRINDER
+	if _, err := r.Save(context.Background(), bad); err == nil {
+		t.Fatal("want an error saving a contract-invalid result")
+	}
+	if _, err := os.Stat(r.Path); err == nil {
+		t.Error("an invalid result was written to disk")
+	}
+}
