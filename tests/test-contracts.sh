@@ -189,7 +189,22 @@ else
     fail "envelope extraction failed"
 fi
 
-rm -f "$BIN_OUT" "$BIN_OUT2" "$TAMPERED" "$DUPED" "$ENVELOPE"
+# A stream cut mid-retry leaves a BEGIN after the good block. Scanning back from
+# the final marker alone would find that one and report an unclosed envelope.
+TRAILING="$(mktemp)"
+{
+    "$BIN" encode-result "$VALID_RESULT"
+    echo "GRIMES_RESULT_PROTOBUF_V2_BEGIN"
+    echo "dHJ1bmNhdGVk"
+} >"$TRAILING"
+
+if "$BIN" decode-result "$TRAILING" | grep -qE 'run_id: *"run-001"'; then
+    pass "trailing truncated block does not shadow the complete envelope"
+else
+    fail "trailing truncated block shadows the complete envelope"
+fi
+
+rm -f "$BIN_OUT" "$BIN_OUT2" "$TAMPERED" "$DUPED" "$ENVELOPE" "$TRAILING"
 
 echo ""
 echo "========================================"

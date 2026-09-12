@@ -4,7 +4,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -14,6 +13,7 @@ import (
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
+	"github.com/misfitdev/frank-grimes/internal/envelope"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -43,11 +43,6 @@ Usage:
 Message types: Ledger, Finding, GrimesResult, LoopState, Verdict
 States: open, fixed, verified, accepted, false_positive, regressed
 `
-
-const (
-	envelopeBegin = "GRIMES_RESULT_PROTOBUF_V2_BEGIN"
-	envelopeEnd   = "GRIMES_RESULT_PROTOBUF_V2_END"
-)
 
 func main() {
 	if len(os.Args) < 2 {
@@ -200,26 +195,8 @@ func cmdEncodeResult(args []string) error {
 		_, err := os.Stdout.Write(encoded)
 		return err
 	}
-	fmt.Println(envelopeBegin)
-	fmt.Println(base64.StdEncoding.EncodeToString(encoded))
-	fmt.Println(envelopeEnd)
+	fmt.Print(envelope.Wrap(encoded))
 	return nil
-}
-
-// extractEnvelope takes the last complete envelope. An assistant message may
-// contain earlier partial or quoted blocks; only the final complete one counts.
-func extractEnvelope(s string) ([]byte, error) {
-	begin := strings.LastIndex(s, envelopeBegin)
-	if begin < 0 {
-		return nil, fmt.Errorf("no %s marker found", envelopeBegin)
-	}
-	rest := s[begin+len(envelopeBegin):]
-	end := strings.Index(rest, envelopeEnd)
-	if end < 0 {
-		return nil, fmt.Errorf("envelope opened but never closed")
-	}
-	payload := strings.Join(strings.Fields(rest[:end]), "")
-	return base64.StdEncoding.DecodeString(payload)
 }
 
 func cmdDecodeResult(args []string) error {
@@ -231,8 +208,8 @@ func cmdDecodeResult(args []string) error {
 	if err != nil {
 		return err
 	}
-	if strings.Contains(string(data), envelopeBegin) {
-		data, err = extractEnvelope(string(data))
+	if envelope.Contains(string(data)) {
+		data, err = envelope.Extract(string(data))
 		if err != nil {
 			return err
 		}
