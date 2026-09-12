@@ -83,6 +83,40 @@ ID_D=$("$BIN" id --category=COR --path=bad-script.sh --evidence='rm -rf "$1"/*' 
 assert_eq "$ID_A" "$ID_B" "path normalization does not change identity"
 assert_ne "$ID_A" "$ID_C" "different evidence yields a different identity"
 assert_ne "$ID_A" "$ID_D" "category participates in identity"
+
+# A finding can live in a document, an argument, or a retrieved source as well
+# as at a path. The anchor kind is part of identity, so two kinds reading the
+# same cannot be the same finding.
+# shellcheck disable=SC2016
+ID_DOC=$("$BIN" id --category=SEC --document=bad-script.sh --section=1 --evidence='rm -rf "$1"/*' | grep '^id:')
+# shellcheck disable=SC2016
+ID_ARG=$("$BIN" id --category=SEC --argument=bad-script.sh --step=1 --evidence='rm -rf "$1"/*' | grep '^id:')
+# shellcheck disable=SC2016
+ID_SRC=$("$BIN" id --category=SEC --source=bad-script.sh --evidence='rm -rf "$1"/*' | grep '^id:')
+
+assert_ne "$ID_A" "$ID_DOC" "a document clause is not the same place as a path"
+assert_ne "$ID_DOC" "$ID_ARG" "an argument step is not the same place as a document clause"
+assert_ne "$ID_ARG" "$ID_SRC" "a retrieved source is not the same place as an argument step"
+
+# shellcheck disable=SC2016
+ID_DOC_CASE=$("$BIN" id --category=SEC --document=bad-script.sh --section="  1  " --evidence='rm -rf "$1"/*' | grep '^id:')
+assert_eq "$ID_DOC" "$ID_DOC_CASE" "section spacing does not change identity"
+
+# shellcheck disable=SC2016
+ID_DOC_S2=$("$BIN" id --category=SEC --document=bad-script.sh --section=2 --evidence='rm -rf "$1"/*' | grep '^id:')
+assert_ne "$ID_DOC" "$ID_DOC_S2" "a different clause is a different finding"
+
+# An anchor is required, and only one of them.
+if "$BIN" id --category=SEC --evidence=x 2>/dev/null; then
+    fail "an anchorless id was accepted"
+else
+    pass "an id requires an anchor"
+fi
+if "$BIN" id --category=SEC --path=a --document=b --section=1 --evidence=x 2>/dev/null; then
+    fail "two anchors were accepted at once"
+else
+    pass "anchors are exclusive"
+fi
 if [[ "$ID_A" =~ ^id:\ FG-SEC-[0-9a-f]{12}$ ]]; then
     pass "ID matches the schema pattern"
 else

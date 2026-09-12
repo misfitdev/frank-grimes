@@ -56,6 +56,10 @@ type DeriveInput struct {
 	CriticalInvariantProbed bool
 	CriticalUnknownRemains  bool
 
+	// TargetKind records what was reviewed. It selects nothing in the verdict
+	// rules; it is carried so the result can say what it judged.
+	TargetKind pb.TargetKind
+
 	// Run facts
 	Oscillation                  bool
 	RankingBlocked               bool

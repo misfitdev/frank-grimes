@@ -25,6 +25,7 @@ func clean() DeriveInput {
 		IndependentDecision:     pb.Decision_DECISION_PASS,
 		AllCategoriesStopped:    true,
 		CriticalInvariantProbed: true,
+		TargetKind:              pb.TargetKind_TARGET_KIND_CODE,
 	}
 }
 
@@ -312,6 +313,14 @@ func TestDeriveAlwaysEncodesCanonically(t *testing.T) {
 	}
 }
 
+// Only a code target records a repository root.
+func rootFor(kind pb.TargetKind) string {
+	if kind == pb.TargetKind_TARGET_KIND_CODE {
+		return "/repo"
+	}
+	return ""
+}
+
 func hasGate(gates []string, want string) bool {
 	for _, g := range gates {
 		if g == want {
@@ -368,6 +377,26 @@ func deriveCorpus() []DeriveInput {
 			}
 		}
 	}
+	// The verdict rules are the same whatever was reviewed, so every target
+	// kind has to survive the same derivation.
+	for _, kind := range []pb.TargetKind{
+		pb.TargetKind_TARGET_KIND_CODE,
+		pb.TargetKind_TARGET_KIND_DOCUMENT,
+		pb.TargetKind_TARGET_KIND_IDEA,
+		pb.TargetKind_TARGET_KIND_EXTERNAL,
+	} {
+		for _, tier := range tiers {
+			for _, sev := range severities {
+				in := clean()
+				in.TargetKind = kind
+				in.Candidates = []Candidate{{
+					Severity: sev, Status: pb.FindingStatus_FINDING_STATUS_OPEN,
+					Tier: tier, ProbeAttempted: true,
+				}}
+				out = append(out, in)
+			}
+		}
+	}
 	for _, blocked := range []bool{true, false} {
 		for _, stopped := range []bool{true, false} {
 			for _, probed := range []bool{true, false} {
@@ -389,7 +418,10 @@ func deriveCorpus() []DeriveInput {
 func resultFrom(d Derived, in DeriveInput) *pb.GrimesResult {
 	digest := make([]byte, 32)
 	ts := timestamppb.New(SystemClock())
-	target := &pb.Target{Root: "/repo", Scope: "src", FingerprintSha256: digest}
+	target := &pb.Target{
+		Root: rootFor(in.TargetKind), Scope: "src",
+		FingerprintSha256: digest, Kind: in.TargetKind,
+	}
 
 	r := &pb.GrimesResult{
 		SchemaMajor:     2,

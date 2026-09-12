@@ -117,7 +117,7 @@ func TestDecideLoopBindingChecks(t *testing.T) {
 			s.RunId = "run-999"
 		}},
 		{"target fingerprint mismatch", func(s *pb.LoopState, _ *pb.GrimesResult) {
-			s.Target = &pb.Target{Root: "/repo", Scope: "elsewhere", FingerprintSha256: bytesOf(0xbb)}
+			s.Target = &pb.Target{Root: "/repo", Scope: "elsewhere", FingerprintSha256: bytesOf(0xbb), Kind: pb.TargetKind_TARGET_KIND_CODE}
 		}},
 		{"contract major mismatch", func(_ *pb.LoopState, r *pb.GrimesResult) {
 			r.SchemaMajor = 3

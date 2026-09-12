@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
@@ -49,18 +50,59 @@ func NormalizePath(p string) string {
 	return p
 }
 
+// AnchorKey reduces an anchor to the kind tag and canonical text that identity
+// is taken over.
+//
+// The kind tag is part of the key because the canonical forms are not
+// comparable across kinds: a path and a URI that read the same are different
+// places. Line, section, and step numbers are excluded, so content moving
+// within an artifact is not a new finding.
+func AnchorKey(a *pb.Anchor) (kind, text string) {
+	switch at := a.GetAt().(type) {
+	case *pb.Anchor_RepoLine:
+		return "repo", NormalizePath(at.RepoLine.GetPath().GetValue())
+	case *pb.Anchor_DocumentPart:
+		return "doc", NormalizePath(at.DocumentPart.GetDocument()) + fieldSep + normalizeLabel(at.DocumentPart.GetSection())
+	case *pb.Anchor_ArgumentStep:
+		// The step number is the claim's identity here, not an offset into it:
+		// claim 3 of an argument is a different claim from claim 4.
+		return "arg", normalizeLabel(at.ArgumentStep.GetArgument()) + fieldSep + strconv.FormatUint(uint64(at.ArgumentStep.GetStep()), 10)
+	case *pb.Anchor_RetrievedSource:
+		return "src", strings.TrimRight(at.RetrievedSource.GetUri(), "/")
+	default:
+		return "none", ""
+	}
+}
+
+// normalizeLabel renders a document or argument identifier comparable: single
+// spaces, no surrounding space, case-folded, since "Appendix B" and "appendix
+// b" name the same section.
+func normalizeLabel(s string) string {
+	return strings.ToLower(strings.Join(strings.Fields(s), " "))
+}
+
 // Fingerprint is the content address of a finding: the same defect in the same
 // place with the same evidence yields the same bytes on every run and every
-// machine. Line numbers are not an input, so a finding survives the code above
-// it moving.
-func Fingerprint(category pb.Category, repoPath, evidence string) []byte {
+// machine. Positions within an artifact are not inputs, so a finding survives
+// the content above it moving.
+func Fingerprint(category pb.Category, anchor *pb.Anchor, evidence string) []byte {
+	kind, text := AnchorKey(anchor)
 	h := sha256.New()
 	h.Write([]byte(CategoryName(category)))
 	h.Write([]byte(fieldSep))
-	h.Write([]byte(NormalizePath(repoPath)))
+	h.Write([]byte(kind))
+	h.Write([]byte(fieldSep))
+	h.Write([]byte(text))
 	h.Write([]byte(fieldSep))
 	h.Write([]byte(NormalizeEvidence(evidence)))
 	return h.Sum(nil)
+}
+
+// RepoAnchor is the common case: a finding at a repository-relative path.
+func RepoAnchor(path string) *pb.Anchor {
+	return &pb.Anchor{At: &pb.Anchor_RepoLine{RepoLine: &pb.RepoLine{
+		Path: &pb.RepoPath{Value: path},
+	}}}
 }
 
 // FindingID renders a fingerprint as the stable, human-referenceable ID.

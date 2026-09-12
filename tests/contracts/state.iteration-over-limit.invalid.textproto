@@ -2,7 +2,7 @@
 # termination, so state that has already escaped it cannot be resumed.
 schema_major: 2
 run_id: "run-001"
-target { root: "/repo" scope: "bad-script.sh" fingerprint_sha256: "01234567890123456789012345678901" }
+target { root: "/repo" scope: "bad-script.sh" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
 mode: MODE_REPORT
 iteration: 6
 max_iterations: 5

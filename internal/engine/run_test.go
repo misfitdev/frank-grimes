@@ -106,7 +106,7 @@ const seedPath, seedClaim = "bad.sh", "caller-controlled deletion"
 // drift away from the fingerprint rule it is meant to exercise.
 func p0ID() string {
 	cat := pb.Category_CATEGORY_SEC
-	return contracts.FindingID(cat, contracts.Fingerprint(cat, seedPath, seedClaim), false)
+	return contracts.FindingID(cat, contracts.Fingerprint(cat, contracts.RepoAnchor(seedPath), seedClaim), false)
 }
 
 // seededLedger holds one open P0 whose id matches its own fingerprint.
@@ -122,9 +122,9 @@ func seededLedger(t *testing.T, status pb.FindingStatus) *pb.Ledger {
 		Findings: map[string]*pb.Finding{
 			id: {
 				Id:                id,
-				FingerprintSha256: contracts.Fingerprint(cat, path, claim),
+				FingerprintSha256: contracts.Fingerprint(cat, contracts.RepoAnchor(path), claim),
 				Category:          cat,
-				Location:          &pb.Location{Path: &pb.RepoPath{Value: path}},
+				Location:          &pb.Location{Anchor: contracts.RepoAnchor(path)},
 				Risk: &pb.Risk{
 					Severity:    pb.Severity_SEVERITY_P0,
 					Likelihood:  pb.Likelihood_LIKELIHOOD_LIKELY,
@@ -134,7 +134,7 @@ func seededLedger(t *testing.T, status pb.FindingStatus) *pb.Ledger {
 					Tier:  pb.EvidenceTier_EVIDENCE_TIER_E2,
 					Claim: claim,
 					Detail: &pb.Evidence_Citation{Citation: &pb.Citation{
-						Path: &pb.RepoPath{Value: path}, Line: 22, Quote: "rm -rf \"$1\"/*",
+						Anchor: contracts.RepoAnchor(path), Quote: "rm -rf \"$1\"/*",
 					}},
 				},
 				EvidenceSha256: make([]byte, 32),

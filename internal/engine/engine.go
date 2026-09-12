@@ -18,7 +18,8 @@ var AllCategories = []pb.Category{
 	pb.Category_CATEGORY_HUM,
 }
 
-// PathCollector fingerprints a target by its root and scope.
+// PathCollector fingerprints a code target by its root and scope. Document,
+// idea, and external targets need a collector that can resolve them.
 //
 // It does not enumerate or hash the target's contents, so it cannot report that
 // a routed category reached its stop; completeness therefore stays below
@@ -38,6 +39,7 @@ func (PathCollector) Collect(ctx context.Context, spec TargetSpec) (*pb.Target, 
 		Scope:             spec.Scope,
 		FingerprintSha256: sum[:],
 		Display:           spec.Scope,
+		Kind:              pb.TargetKind_TARGET_KIND_CODE,
 	}
 	categories := spec.Categories
 	if len(categories) == 0 {

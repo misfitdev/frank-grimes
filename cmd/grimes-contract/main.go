@@ -21,8 +21,10 @@ import (
 const usage = `grimes-contract - validator and codec for the Frank Grimes contract
 
 Usage:
-  grimes-contract id --category=SEC --path=<repo-path> [--evidence-file=<f>|--evidence=<s>] [--wide]
+  grimes-contract id --category=SEC <anchor> [--evidence-file=<f>|--evidence=<s>] [--wide]
       Print the content-addressed fingerprint and stable finding ID.
+      Anchor is exactly one of --path=<repo-path>, --document=<name> with
+      --section=<id>, --argument=<name> with --step=<n>, or --source=<uri>.
 
   grimes-contract validate --type=<message> [--format=binary|textproto] [file]
       Validate a message. Binary input must also be in canonical encoding.
@@ -104,14 +106,23 @@ func cmdID(args []string) error {
 	fs := flag.NewFlagSet("id", flag.ExitOnError)
 	category := fs.String("category", "", "canonical category code, e.g. SEC")
 	path := fs.String("path", "", "repository-relative path")
+	document := fs.String("document", "", "supplied document name")
+	section := fs.String("section", "", "section or clause within the document")
+	argument := fs.String("argument", "", "supplied argument name")
+	step := fs.Uint("step", 0, "numbered claim or step within the argument")
+	source := fs.String("source", "", "retrieved source URI")
 	evidence := fs.String("evidence", "", "primary evidence text")
 	evidenceFile := fs.String("evidence-file", "", "read evidence from a file")
 	wide := fs.Bool("wide", false, "extend the ID to 16 hex after an observed collision")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *category == "" || *path == "" {
-		return fmt.Errorf("--category and --path are required")
+	if *category == "" {
+		return fmt.Errorf("--category is required")
+	}
+	anchor, err := anchorFromFlags(*path, *document, *section, *argument, uint32(*step), *source)
+	if err != nil {
+		return err
 	}
 	cat, err := contracts.ParseCategory(*category)
 	if err != nil {
@@ -128,10 +139,57 @@ func cmdID(args []string) error {
 	if text == "" {
 		return fmt.Errorf("evidence is required: pass --evidence or --evidence-file")
 	}
-	fp := contracts.Fingerprint(cat, *path, text)
+	fp := contracts.Fingerprint(cat, anchor, text)
 	fmt.Printf("fingerprint_sha256: %s\n", hex.EncodeToString(fp))
 	fmt.Printf("id: %s\n", contracts.FindingID(cat, fp, *wide))
 	return nil
+}
+
+// anchorFromFlags builds the one anchor the flags describe, refusing a mix so
+// that an ID is never taken over a locator the caller did not mean.
+func anchorFromFlags(path, document, section, argument string, step uint32, source string) (*pb.Anchor, error) {
+	var chosen []string
+	if path != "" {
+		chosen = append(chosen, "--path")
+	}
+	if document != "" || section != "" {
+		chosen = append(chosen, "--document/--section")
+	}
+	if argument != "" || step != 0 {
+		chosen = append(chosen, "--argument/--step")
+	}
+	if source != "" {
+		chosen = append(chosen, "--source")
+	}
+	if len(chosen) == 0 {
+		return nil, fmt.Errorf("an anchor is required: pass --path, --document with --section, --argument with --step, or --source")
+	}
+	if len(chosen) > 1 {
+		return nil, fmt.Errorf("anchors are exclusive; got %s", strings.Join(chosen, " and "))
+	}
+
+	switch {
+	case path != "":
+		return contracts.RepoAnchor(path), nil
+	case document != "" || section != "":
+		if document == "" || section == "" {
+			return nil, fmt.Errorf("--document and --section go together")
+		}
+		return &pb.Anchor{At: &pb.Anchor_DocumentPart{DocumentPart: &pb.DocumentPart{
+			Document: document, Section: section,
+		}}}, nil
+	case argument != "" || step != 0:
+		if argument == "" || step == 0 {
+			return nil, fmt.Errorf("--argument and --step go together, and --step starts at 1")
+		}
+		return &pb.Anchor{At: &pb.Anchor_ArgumentStep{ArgumentStep: &pb.ArgumentStep{
+			Argument: argument, Step: step,
+		}}}, nil
+	default:
+		return &pb.Anchor{At: &pb.Anchor_RetrievedSource{RetrievedSource: &pb.RetrievedSource{
+			Uri: source,
+		}}}, nil
+	}
 }
 
 func cmdValidate(args []string) error {

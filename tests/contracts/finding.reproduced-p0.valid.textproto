@@ -3,17 +3,19 @@
 id: "FG-REL-4b1c8e2f7a90"
 fingerprint_sha256: "01234567890123456789012345678901"
 category: CATEGORY_REL
-location { path { value: "cmd/server/main.go" } }
+location { anchor { repo_line { path { value: "cmd/server/main.go" } } } }
 risk { severity: SEVERITY_P0 likelihood: LIKELIHOOD_LIKELY blast_radius: BLAST_RADIUS_SERVICE }
 evidence {
   tier: EVIDENCE_TIER_E1
   claim: "the server panics on an empty request body"
   reproduction {
-    action: "go test ./cmd/server -run TestEmptyBody"
-    cwd { value: "." }
-    exit_code: 1
-    output_excerpt: "panic: runtime error: index out of range [0] with length 0"
     completed_at { seconds: 1780000000 }
+    executed_command {
+      action: "go test ./cmd/server -run TestEmptyBody"
+      cwd { value: "." }
+      exit_code: 1
+      output_excerpt: "panic: runtime error: index out of range [0] with length 0"
+    }
   }
 }
 evidence_sha256: "01234567890123456789012345678901"

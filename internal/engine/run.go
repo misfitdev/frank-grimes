@@ -184,12 +184,12 @@ func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, proposal *pb.Grim
 	return oscillation, nil
 }
 
-// verifyIdentity recomputes a finding's ID from its own evidence. A provider
-// cannot rename a finding to escape its history.
+// verifyIdentity recomputes a finding's ID from its own anchor and evidence. A
+// provider cannot rename a finding to escape its history.
 func verifyIdentity(f *pb.Finding) error {
+	anchor := f.GetLocation().GetAnchor()
 	claim := f.GetEvidence().GetClaim()
-	path := f.GetLocation().GetPath().GetValue()
-	want := contracts.FindingID(f.GetCategory(), contracts.Fingerprint(f.GetCategory(), path, claim), false)
+	want := contracts.FindingID(f.GetCategory(), contracts.Fingerprint(f.GetCategory(), anchor, claim), false)
 	if f.GetId() != want {
 		return fmt.Errorf("%w: %s should be %s", ErrForgedFindingID, f.GetId(), want)
 	}

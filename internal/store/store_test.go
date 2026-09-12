@@ -17,7 +17,7 @@ import (
 func digest32() []byte { return make([]byte, 32) }
 
 func target() *pb.Target {
-	return &pb.Target{Root: "/repo", Scope: "src", FingerprintSha256: digest32()}
+	return &pb.Target{Root: "/repo", Scope: "src", FingerprintSha256: digest32(), Kind: pb.TargetKind_TARGET_KIND_CODE}
 }
 
 func sampleLedger() *pb.Ledger {
@@ -30,7 +30,7 @@ func sampleLedger() *pb.Ledger {
 				Id:                "FG-SEC-9a34db214c59",
 				FingerprintSha256: digest32(),
 				Category:          pb.Category_CATEGORY_SEC,
-				Location:          &pb.Location{Path: &pb.RepoPath{Value: "bad.sh"}},
+				Location:          &pb.Location{Anchor: contracts.RepoAnchor("bad.sh")},
 				Risk: &pb.Risk{
 					Severity:    pb.Severity_SEVERITY_P0,
 					Likelihood:  pb.Likelihood_LIKELIHOOD_LIKELY,
@@ -40,7 +40,7 @@ func sampleLedger() *pb.Ledger {
 					Tier:  pb.EvidenceTier_EVIDENCE_TIER_E2,
 					Claim: "caller-controlled deletion",
 					Detail: &pb.Evidence_Citation{Citation: &pb.Citation{
-						Path: &pb.RepoPath{Value: "bad.sh"}, Line: 22, Quote: "rm -rf \"$1\"/*",
+						Anchor: contracts.RepoAnchor("bad.sh"), Quote: "rm -rf \"$1\"/*",
 					}},
 				},
 				EvidenceSha256: digest32(),

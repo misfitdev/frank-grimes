@@ -25,7 +25,7 @@ func script(t *testing.T, body string) []string {
 func primaryReq() engine.Request {
 	return engine.Request{
 		Role:       engine.RolePrimary,
-		Target:     &pb.Target{Root: "/repo", Scope: "src", FingerprintSha256: make([]byte, 32)},
+		Target:     &pb.Target{Root: "/repo", Scope: "src", FingerprintSha256: make([]byte, 32), Kind: pb.TargetKind_TARGET_KIND_CODE},
 		Mode:       pb.Mode_MODE_REPORT,
 		Iteration:  1,
 		Categories: []pb.Category{pb.Category_CATEGORY_SEC, pb.Category_CATEGORY_COR},
