@@ -195,6 +195,54 @@ assert_eq "$CODE" "4" "an independent block produces a blocking exit code"
 rm -rf "$WS"
 
 echo ""
+echo "--- The loop runs only when it was asked for ---"
+
+WS="$(workspace)"
+run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" >/dev/null
+if [[ -f "$WS/.grimes/state.pb" ]]; then
+    fail "a run without --auto-loop left loop state"
+else
+    pass "a run without --auto-loop leaves no loop state"
+fi
+if [[ -f "$WS/.grimes/result.pb" ]]; then
+    pass "a one-shot run still records its result"
+else
+    fail "a one-shot run recorded no result"
+fi
+rm -rf "$WS"
+
+WS="$(workspace)"
+run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" --auto-loop >/dev/null
+if [[ -f "$WS/.grimes/state.pb" ]]; then
+    pass "--auto-loop records loop state"
+else
+    fail "--auto-loop recorded no loop state"
+fi
+rm -rf "$WS"
+
+echo ""
+echo "--- A ledger belongs to one target ---"
+
+WS="$(workspace)"
+run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" >/dev/null
+CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-red.sh")"
+if [[ "$CODE" == "1" ]]; then
+    fail "a second run against the same target failed"
+else
+    pass "the same target reuses its ledger"
+fi
+
+# A second target in the same directory must not inherit the first one's
+# findings: the contract pins the ledger to a single path.
+OTHER="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-red.sh" other-target 2>&1 || true)"
+if grep -qi 'different target' <<<"$OTHER"; then
+    pass "a ledger raised against another target is refused"
+else
+    fail "a second target silently reused the first target's ledger"
+fi
+rm -rf "$WS"
+
+echo ""
 echo "--- Fix mode is not available ---"
 
 WS="$(workspace)"
@@ -206,7 +254,7 @@ echo ""
 echo "--- State ---"
 
 WS="$(workspace)"
-run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" >/dev/null
+run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" --auto-loop >/dev/null
 if "$GRIMES" state --dir="$WS" --show | grep -qE 'run_id: +'; then
     pass "state --show reports the run in progress"
 else

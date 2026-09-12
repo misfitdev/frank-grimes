@@ -109,6 +109,7 @@ func cmdRun(args []string) (int, error) {
 		State:         store.NewFileStateStore(cfg.Dir),
 		Clock:         engine.SystemClock,
 		RunID:         runID(),
+		AutoLoop:      cfg.AutoLoop,
 		MaxIterations: uint32(cfg.MaxIterations),
 		Research:      cfg.Research,
 		Dir:           cfg.Dir,

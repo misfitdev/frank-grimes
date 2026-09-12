@@ -9,6 +9,7 @@ var (
 	ErrProviderOutput     = errors.New("provider output rejected")
 	ErrForgedFindingID    = errors.New("finding id does not match its own fingerprint")
 	ErrStaleState         = errors.New("loop state belongs to a different target")
+	ErrLedgerTarget       = errors.New("ledger belongs to a different target")
 	ErrOutputTooLarge     = errors.New("provider output exceeded the byte bound")
 	ErrFixModeUnsupported = errors.New("fix mode is not implemented")
 )

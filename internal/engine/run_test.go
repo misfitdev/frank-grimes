@@ -215,7 +215,7 @@ func newEngine(p Provider, l Ledger, s StateStore, a Adjudicator) *Engine {
 		Adjudicator: a, Gate: NotApplicableGate{}, Ledger: l,
 		Results: &memResults{}, State: s,
 		Clock: func() time.Time { return testTime() },
-		RunID: "run-001", MaxIterations: 5,
+		RunID: "run-001", AutoLoop: true, MaxIterations: 5,
 	}
 }
 
@@ -455,6 +455,64 @@ func TestRunCancelledContextWritesNothing(t *testing.T) {
 	}
 	if l.saves != 0 || s.saves != 0 {
 		t.Errorf("cancelled run persisted state (ledger %d, state %d)", l.saves, s.saves)
+	}
+}
+
+// A run that was not asked to loop must leave no loop state, or a stop hook
+// reads it and asks for an iteration the caller never requested.
+func TestRunWithoutAutoLoopLeavesNoState(t *testing.T) {
+	l := &memLedger{ledger: seededLedger(t, pb.FindingStatus_FINDING_STATUS_OPEN)}
+	s := &memState{}
+	results := &memResults{}
+	e := newEngine(&fakeProvider{out: proposal(t, p0ID())}, l, s, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
+	e.Results = results
+	e.AutoLoop = false
+
+	if _, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if s.saves != 0 {
+		t.Errorf("state saves = %d, want 0 without auto-loop", s.saves)
+	}
+	if s.state != nil {
+		t.Error("a one-shot run left loop state behind")
+	}
+	// The result is still recorded; only the loop's claim on the session is not.
+	if results.saves != 1 {
+		t.Errorf("result saves = %d, want 1", results.saves)
+	}
+}
+
+// A ledger is pinned to one path by the contract, so a second target in the
+// same directory must not inherit the first target's findings.
+func TestRunRejectsLedgerForAnotherTarget(t *testing.T) {
+	l := &memLedger{ledger: seededLedger(t, pb.FindingStatus_FINDING_STATUS_OPEN)}
+	s := &memState{}
+	e := newEngine(&fakeProvider{out: proposal(t, p0ID())}, l, s, nil)
+
+	other := TargetSpec{Root: "/repo", Scope: "somewhere-else"}
+	_, err := e.Run(context.Background(), other, pb.Mode_MODE_REPORT)
+	if !errors.Is(err, ErrLedgerTarget) {
+		t.Fatalf("error = %v, want ErrLedgerTarget", err)
+	}
+	if l.saves != 0 {
+		t.Error("the other target's ledger was written")
+	}
+	if s.saves != 0 {
+		t.Error("state was written for a rejected run")
+	}
+}
+
+// An empty ledger adopts whatever target it is first used for.
+func TestRunAdoptsEmptyLedger(t *testing.T) {
+	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: 2}}
+	e := newEngine(&fakeProvider{out: proposal(t)}, l, &memState{}, nil)
+
+	if _, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if l.ledger.GetTarget().GetScope() != testSpec().Scope {
+		t.Errorf("ledger target = %q, want %q", l.ledger.GetTarget().GetScope(), testSpec().Scope)
 	}
 }
 

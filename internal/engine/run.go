@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
@@ -23,6 +24,7 @@ type Engine struct {
 	Clock       Clock
 
 	RunID         string
+	AutoLoop      bool
 	MaxIterations uint32
 	Research      string
 	Dir           string
@@ -48,8 +50,8 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	if err != nil {
 		return nil, fmt.Errorf("ledger: %w", err)
 	}
-	if ledger.GetTarget() == nil {
-		ledger.Target = target
+	if err := adoptLedger(ledger, target); err != nil {
+		return nil, err
 	}
 
 	proposal, err := e.review(ctx, target, categories, mode, iteration)
@@ -103,6 +105,26 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		return nil, err
 	}
 	return result, nil
+}
+
+// adoptLedger binds an empty ledger to this target and refuses one raised
+// against a different artifact.
+//
+// The contract pins the ledger to a single path, so a directory holds one
+// ledger. Reviewing a second target in that directory would otherwise count the
+// first target's findings toward the second target's verdict, and the result
+// would be wrong rather than absent.
+func adoptLedger(ledger *pb.Ledger, target *pb.Target) error {
+	if ledger.GetTarget() == nil {
+		ledger.Target = target
+		return nil
+	}
+	if !bytes.Equal(ledger.GetTarget().GetFingerprintSha256(), target.GetFingerprintSha256()) {
+		return fmt.Errorf("%w: %s holds findings for %q, this run reviews %q; move it aside to start a new ledger",
+			ErrLedgerTarget, contracts.LedgerPath,
+			ledger.GetTarget().GetScope(), target.GetScope())
+	}
+	return nil
 }
 
 // resume returns the iteration this run is on, refusing state raised against a
@@ -167,9 +189,11 @@ func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, proposal *pb.Grim
 		}
 		existing, ok := ledger.GetFindings()[snap.GetId()]
 		if !ok {
-			// A snapshot names a finding the ledger has never seen. The engine
-			// cannot manufacture the evidence record the contract requires for
-			// one, so it refuses rather than inventing it.
+			// A snapshot names a finding the ledger has never seen. A snapshot
+			// carries no location and no evidence detail, so the engine cannot
+			// build the record the contract requires and refuses rather than
+			// inventing one. Broker.Admit is unreachable until a provider can
+			// send a whole Finding.
 			return false, fmt.Errorf("%w: %s is not in the ledger", ErrProviderOutput, snap.GetId())
 		}
 		if err := verifyIdentity(existing); err != nil {
@@ -211,10 +235,17 @@ func (e *Engine) adjudicate(ctx context.Context, target *pb.Target, claimed *pb.
 
 // persist writes the result before the state that references it, so state
 // never names a result digest that is not on disk.
+//
+// Loop state is what a stop hook reads to ask for another iteration, so a run
+// that was not asked to loop leaves none. Otherwise omitting --auto-loop would
+// still produce a hook request for a second pass.
 func (e *Engine) persist(ctx context.Context, target *pb.Target, mode pb.Mode, iteration uint32, result *pb.GrimesResult, ledgerDigest []byte) error {
 	resultDigest, err := e.Results.Save(ctx, result)
 	if err != nil {
 		return err
+	}
+	if !e.AutoLoop {
+		return e.State.Clear(ctx)
 	}
 	return e.State.Save(ctx, &pb.LoopState{
 		SchemaMajor:        contracts.SchemaMajor,
