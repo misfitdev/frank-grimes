@@ -160,6 +160,10 @@ func TestTruncateHoldsTheLabelBoundWithoutSplittingARune(t *testing.T) {
 // The CLI refuses a missing snapshot before collection is reached, so this
 // guard is only observable here. It is the guarantee that no code path fetches
 // an external source, which is what makes an external review repeatable.
+//
+// The assertion names the refusal itself rather than any error mentioning a
+// snapshot: without the guard the URI falls through to a read that fails for
+// its own reasons, and a looser check would pass on that instead.
 func TestCollectExternalRefusesAMissingSnapshot(t *testing.T) {
 	_, _, _, err := (TargetCollector{}).Collect(context.Background(), TargetSpec{
 		Scope: "https://example.com/policy", Kind: pb.TargetKind_TARGET_KIND_EXTERNAL,
@@ -167,8 +171,8 @@ func TestCollectExternalRefusesAMissingSnapshot(t *testing.T) {
 	if err == nil {
 		t.Fatal("an external target with no snapshot was collected")
 	}
-	if !strings.Contains(err.Error(), "snapshot") {
-		t.Errorf("error %q does not name the missing snapshot", err)
+	if !strings.Contains(err.Error(), "nothing here fetches") {
+		t.Errorf("error %q is not the refusal to fetch", err)
 	}
 }
 
