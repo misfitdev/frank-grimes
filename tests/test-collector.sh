@@ -313,6 +313,35 @@ else
 fi
 rm -rf "$WS"
 
+# Every file-backed kind reads a caller-named path, so each has to refuse a
+# special file: a FIFO blocks inside the read with nothing to cancel it.
+WS="$(mktemp -d)"
+mkfifo "$WS/pipe"
+printf 'x\n' >"$WS/real.txt"
+for kind in document idea; do
+    set +e
+    OUT="$(cd "$WS" && timeout 20 "$GRIMES" run --dir=. --kind="$kind" \
+        --provider-command="$FAKES/provider-red.sh" pipe 2>&1)"
+    CODE=$?
+    set -e
+    if [[ "$CODE" == "1" ]] && grep -qi 'not a regular file' <<<"$OUT"; then
+        pass "the $kind target that is a named pipe is refused"
+    else
+        fail "the $kind named pipe was not refused (exit $CODE)"
+    fi
+done
+set +e
+OUT="$(cd "$WS" && timeout 20 "$GRIMES" run --dir=. --kind=external --snapshot=pipe \
+    --provider-command="$FAKES/provider-red.sh" "https://example.com/p" 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" == "1" ]] && grep -qi 'not a regular file' <<<"$OUT"; then
+    pass "an external snapshot that is a named pipe is refused"
+else
+    fail "an external named-pipe snapshot was not refused (exit $CODE)"
+fi
+rm -rf "$WS"
+
 echo ""
 echo "--- A rejected run leaves the inventory alone ---"
 

@@ -203,23 +203,29 @@ func TestCollectRefusesAnUnnamedKind(t *testing.T) {
 // backtick block would otherwise end it and expose the commented-out lines
 // after it as sections that do not exist.
 func TestSectionsDoNotMixFenceDelimiters(t *testing.T) {
+	// Each case names two real headings and hides two inside a block. Asserting
+	// the labels rather than the count matters: a fence that closes early
+	// exposes a hidden heading and swallows a real one, which leaves the count
+	// unchanged and the inventory wrong.
 	for _, c := range []struct {
 		name string
 		text string
 	}{
 		// A tilde run quoted inside a backtick block.
-		{"other delimiter", "# Real\n\n```md\n~~~\n# not a heading\n~~~\n# still not\n```\n\n## Also Real\n"},
+		{"other delimiter", "# Real\n\n```md\n~~~\n# hidden\n~~~\n# hidden too\n```\n\n## Also Real\n"},
 		// A shorter run of the same character: a four-backtick fence is how a
 		// document quotes a three-backtick one, so the short line cannot close it.
-		{"shorter run", "# Real\n\n````md\n```\n# not a heading\n```\n# still not\n````\n\n## Also Real\n"},
+		{"shorter run", "# Real\n\n````md\n```\n# hidden\n```\n# hidden too\n````\n\n## Also Real\n"},
+		// Only an opening fence carries an info string, so a "```text" line
+		// inside a block is a quoted opener rather than a close.
+		{"info string", "# Real\n\n```\n```text\n# hidden\n```\n\n## Also Real\n"},
 	} {
-		units := mustSections(t, c.text)
-		if len(units) != 2 {
-			var got []string
-			for _, u := range units {
-				got = append(got, u.GetLabel())
-			}
-			t.Errorf("%s: got %d units (%v), want 2", c.name, len(units), got)
+		var got []string
+		for _, u := range mustSections(t, c.text) {
+			got = append(got, u.GetLabel())
+		}
+		if len(got) != 2 || got[0] != "Real" || got[1] != "Also Real" {
+			t.Errorf("%s: got %v, want [Real Also Real]", c.name, got)
 		}
 	}
 }

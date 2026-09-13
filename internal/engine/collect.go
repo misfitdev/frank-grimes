@@ -200,12 +200,33 @@ func contained(root, scope string) (abs, base string, err error) {
 	return abs, base, nil
 }
 
+// readRegular reads a file-backed target, refusing anything that is not a
+// regular file.
+//
+// A FIFO or an unbounded device would block inside os.ReadFile with nothing to
+// cancel it: collection checks the context before dispatch and not during a
+// read.
+func readRegular(kind, path string) ([]byte, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, fmt.Errorf("%s target %q: %w", kind, path, err)
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("%s target %q is not a regular file", kind, path)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("%s target %q: %w", kind, path, err)
+	}
+	return content, nil
+}
+
 // collectDocument fingerprints a document's bytes and makes each heading a
 // unit. No repository is required.
 func (c TargetCollector) collectDocument(spec TargetSpec) (*pb.Target, []*pb.TargetUnit, error) {
-	content, err := os.ReadFile(spec.Scope)
+	content, err := readRegular("document", spec.Scope)
 	if err != nil {
-		return nil, nil, fmt.Errorf("document target %q: %w", spec.Scope, err)
+		return nil, nil, err
 	}
 	sum := sha256.Sum256(content)
 	target := &pb.Target{
@@ -237,7 +258,7 @@ func (c TargetCollector) collectIdea(spec TargetSpec) (*pb.Target, []*pb.TargetU
 		content, err = io.ReadAll(in)
 		scope = "stdin"
 	} else {
-		content, err = os.ReadFile(spec.Scope)
+		content, err = readRegular("idea", spec.Scope)
 	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("idea target %q: %w", spec.Scope, err)
@@ -264,9 +285,9 @@ func (c TargetCollector) collectExternal(spec TargetSpec) (*pb.Target, []*pb.Tar
 	if spec.Snapshot == "" {
 		return nil, nil, fmt.Errorf("an external target needs a frozen snapshot; nothing here fetches %q", spec.Scope)
 	}
-	content, err := os.ReadFile(spec.Snapshot)
+	content, err := readRegular("external snapshot", spec.Snapshot)
 	if err != nil {
-		return nil, nil, fmt.Errorf("external snapshot %q: %w", spec.Snapshot, err)
+		return nil, nil, err
 	}
 	sum := sha256.Sum256(content)
 	return &pb.Target{
@@ -337,6 +358,9 @@ func sections(text, name string) ([]*pb.TargetUnit, error) {
 type fence struct {
 	char byte
 	n    int
+	// info is what follows the run. Only an opening fence may carry one, so a
+	// "```text" line inside a block is a quoted opener, not a close.
+	info string
 }
 
 // fenceOf returns the fence a line opens or closes with, or a zero fence when
@@ -349,7 +373,7 @@ func fenceOf(line string) fence {
 			n++
 		}
 		if n >= 3 {
-			return fence{char: c, n: n}
+			return fence{char: c, n: n, info: strings.TrimSpace(trimmed[n:])}
 		}
 	}
 	return fence{}
@@ -357,7 +381,7 @@ func fenceOf(line string) fence {
 
 // closes reports whether f ends a block opened by open.
 func (f fence) closes(open fence) bool {
-	return f.char == open.char && f.n >= open.n
+	return f.char == open.char && f.n >= open.n && f.info == ""
 }
 
 // uniqueID keeps a unit's identifier non-empty and distinct.
