@@ -1,0 +1,18 @@
+# The same claim as report.p0-same-claim.valid, reported at P2. Category,
+# anchor, and claim are what the finding ID is derived over, so the two land on
+# one ledger record and the severity difference is an escalation.
+schema_major: 2
+run_id: "run-001"
+target { root: "/repo" scope: "bad-script.sh" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
+mode: MODE_REPORT
+iteration: 1
+routed_categories: [CATEGORY_SEC, CATEGORY_COR, CATEGORY_REL, CATEGORY_OPS, CATEGORY_VER]
+candidates {
+  category: CATEGORY_SEC
+  location { anchor { repo_line { path { value: "bad-script.sh" } line: 22 } } }
+  risk { severity: SEVERITY_P2 likelihood: LIKELIHOOD_UNLIKELY blast_radius: BLAST_RADIUS_LOCAL_COMPONENT }
+  evidence { tier: EVIDENCE_TIER_E2 claim: "caller-controlled deletion path" citation { anchor { repo_line { path { value: "bad-script.sh" } line: 22 } } quote: "rm -rf \"$1\"/*" } }
+}
+candidates_examined: 4
+candidates_disproved: 3
+summary: "One deletion path looks reachable only from a trusted caller."
