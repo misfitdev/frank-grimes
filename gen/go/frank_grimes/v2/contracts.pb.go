@@ -2095,6 +2095,314 @@ func (*Evidence_Citation) isEvidence_Detail() {}
 
 func (*Evidence_Inference) isEvidence_Detail() {}
 
+// A finding as a provider may report it.
+//
+// Identity, timestamps, and lifecycle history are absent because they are the
+// ledger's to assign: a provider that could state an ID could rename a finding
+// to escape its own history.
+type CandidateFinding struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Category      Category               `protobuf:"varint,1,opt,name=category,proto3,enum=frank_grimes.v2.Category" json:"category,omitempty"`
+	Location      *Location              `protobuf:"bytes,2,opt,name=location,proto3" json:"location,omitempty"`
+	Risk          *Risk                  `protobuf:"bytes,3,opt,name=risk,proto3" json:"risk,omitempty"`
+	Evidence      *Evidence              `protobuf:"bytes,4,opt,name=evidence,proto3" json:"evidence,omitempty"`
+	SuggestedFix  *string                `protobuf:"bytes,5,opt,name=suggested_fix,json=suggestedFix,proto3,oneof" json:"suggested_fix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CandidateFinding) Reset() {
+	*x = CandidateFinding{}
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CandidateFinding) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CandidateFinding) ProtoMessage() {}
+
+func (x *CandidateFinding) ProtoReflect() protoreflect.Message {
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CandidateFinding.ProtoReflect.Descriptor instead.
+func (*CandidateFinding) Descriptor() ([]byte, []int) {
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *CandidateFinding) GetCategory() Category {
+	if x != nil {
+		return x.Category
+	}
+	return Category_CATEGORY_UNSPECIFIED
+}
+
+func (x *CandidateFinding) GetLocation() *Location {
+	if x != nil {
+		return x.Location
+	}
+	return nil
+}
+
+func (x *CandidateFinding) GetRisk() *Risk {
+	if x != nil {
+		return x.Risk
+	}
+	return nil
+}
+
+func (x *CandidateFinding) GetEvidence() *Evidence {
+	if x != nil {
+		return x.Evidence
+	}
+	return nil
+}
+
+func (x *CandidateFinding) GetSuggestedFix() string {
+	if x != nil && x.SuggestedFix != nil {
+		return *x.SuggestedFix
+	}
+	return ""
+}
+
+// What a primary review hands back.
+//
+// There is no verdict here, and no colour, counts, or completion state. The
+// engine derives all of them, and a message able to carry them would be a
+// message a provider could use to decide its own review.
+//
+// Nor is there a marginal-yield count: that decides when the loop stops, so it
+// is derived from what the ledger did and did not already hold.
+type ProviderReport struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	SchemaMajor         uint32                 `protobuf:"varint,1,opt,name=schema_major,json=schemaMajor,proto3" json:"schema_major,omitempty"`
+	SchemaMinor         uint32                 `protobuf:"varint,2,opt,name=schema_minor,json=schemaMinor,proto3" json:"schema_minor,omitempty"`
+	RunId               string                 `protobuf:"bytes,3,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	Target              *Target                `protobuf:"bytes,4,opt,name=target,proto3" json:"target,omitempty"`
+	Mode                Mode                   `protobuf:"varint,5,opt,name=mode,proto3,enum=frank_grimes.v2.Mode" json:"mode,omitempty"`
+	Iteration           uint32                 `protobuf:"varint,6,opt,name=iteration,proto3" json:"iteration,omitempty"`
+	Candidates          []*CandidateFinding    `protobuf:"bytes,7,rep,name=candidates,proto3" json:"candidates,omitempty"`
+	RoutedCategories    []Category             `protobuf:"varint,8,rep,packed,name=routed_categories,json=routedCategories,proto3,enum=frank_grimes.v2.Category" json:"routed_categories,omitempty"`
+	CandidatesExamined  uint32                 `protobuf:"varint,9,opt,name=candidates_examined,json=candidatesExamined,proto3" json:"candidates_examined,omitempty"`
+	CandidatesDisproved uint32                 `protobuf:"varint,10,opt,name=candidates_disproved,json=candidatesDisproved,proto3" json:"candidates_disproved,omitempty"`
+	Summary             string                 `protobuf:"bytes,11,opt,name=summary,proto3" json:"summary,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *ProviderReport) Reset() {
+	*x = ProviderReport{}
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProviderReport) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProviderReport) ProtoMessage() {}
+
+func (x *ProviderReport) ProtoReflect() protoreflect.Message {
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProviderReport.ProtoReflect.Descriptor instead.
+func (*ProviderReport) Descriptor() ([]byte, []int) {
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ProviderReport) GetSchemaMajor() uint32 {
+	if x != nil {
+		return x.SchemaMajor
+	}
+	return 0
+}
+
+func (x *ProviderReport) GetSchemaMinor() uint32 {
+	if x != nil {
+		return x.SchemaMinor
+	}
+	return 0
+}
+
+func (x *ProviderReport) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *ProviderReport) GetTarget() *Target {
+	if x != nil {
+		return x.Target
+	}
+	return nil
+}
+
+func (x *ProviderReport) GetMode() Mode {
+	if x != nil {
+		return x.Mode
+	}
+	return Mode_MODE_UNSPECIFIED
+}
+
+func (x *ProviderReport) GetIteration() uint32 {
+	if x != nil {
+		return x.Iteration
+	}
+	return 0
+}
+
+func (x *ProviderReport) GetCandidates() []*CandidateFinding {
+	if x != nil {
+		return x.Candidates
+	}
+	return nil
+}
+
+func (x *ProviderReport) GetRoutedCategories() []Category {
+	if x != nil {
+		return x.RoutedCategories
+	}
+	return nil
+}
+
+func (x *ProviderReport) GetCandidatesExamined() uint32 {
+	if x != nil {
+		return x.CandidatesExamined
+	}
+	return 0
+}
+
+func (x *ProviderReport) GetCandidatesDisproved() uint32 {
+	if x != nil {
+		return x.CandidatesDisproved
+	}
+	return 0
+}
+
+func (x *ProviderReport) GetSummary() string {
+	if x != nil {
+		return x.Summary
+	}
+	return ""
+}
+
+// What an independent review hands back: a verdict tuple over a named target,
+// and nothing else. An adjudicator that could report findings would be
+// reviewing rather than adjudicating.
+type AdjudicationReport struct {
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	SchemaMajor             uint32                 `protobuf:"varint,1,opt,name=schema_major,json=schemaMajor,proto3" json:"schema_major,omitempty"`
+	SchemaMinor             uint32                 `protobuf:"varint,2,opt,name=schema_minor,json=schemaMinor,proto3" json:"schema_minor,omitempty"`
+	RunId                   string                 `protobuf:"bytes,3,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	ReviewerId              string                 `protobuf:"bytes,4,opt,name=reviewer_id,json=reviewerId,proto3" json:"reviewer_id,omitempty"`
+	TargetFingerprintSha256 []byte                 `protobuf:"bytes,5,opt,name=target_fingerprint_sha256,json=targetFingerprintSha256,proto3" json:"target_fingerprint_sha256,omitempty"`
+	Verdict                 *Verdict               `protobuf:"bytes,6,opt,name=verdict,proto3" json:"verdict,omitempty"`
+	CompletedAt             *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
+}
+
+func (x *AdjudicationReport) Reset() {
+	*x = AdjudicationReport{}
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdjudicationReport) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdjudicationReport) ProtoMessage() {}
+
+func (x *AdjudicationReport) ProtoReflect() protoreflect.Message {
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdjudicationReport.ProtoReflect.Descriptor instead.
+func (*AdjudicationReport) Descriptor() ([]byte, []int) {
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *AdjudicationReport) GetSchemaMajor() uint32 {
+	if x != nil {
+		return x.SchemaMajor
+	}
+	return 0
+}
+
+func (x *AdjudicationReport) GetSchemaMinor() uint32 {
+	if x != nil {
+		return x.SchemaMinor
+	}
+	return 0
+}
+
+func (x *AdjudicationReport) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *AdjudicationReport) GetReviewerId() string {
+	if x != nil {
+		return x.ReviewerId
+	}
+	return ""
+}
+
+func (x *AdjudicationReport) GetTargetFingerprintSha256() []byte {
+	if x != nil {
+		return x.TargetFingerprintSha256
+	}
+	return nil
+}
+
+func (x *AdjudicationReport) GetVerdict() *Verdict {
+	if x != nil {
+		return x.Verdict
+	}
+	return nil
+}
+
+func (x *AdjudicationReport) GetCompletedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CompletedAt
+	}
+	return nil
+}
+
 type FindingEvent struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Iteration      uint32                 `protobuf:"varint,1,opt,name=iteration,proto3" json:"iteration,omitempty"`
@@ -2109,7 +2417,7 @@ type FindingEvent struct {
 
 func (x *FindingEvent) Reset() {
 	*x = FindingEvent{}
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[16]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2121,7 +2429,7 @@ func (x *FindingEvent) String() string {
 func (*FindingEvent) ProtoMessage() {}
 
 func (x *FindingEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[16]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2134,7 +2442,7 @@ func (x *FindingEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindingEvent.ProtoReflect.Descriptor instead.
 func (*FindingEvent) Descriptor() ([]byte, []int) {
-	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{16}
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *FindingEvent) GetIteration() uint32 {
@@ -2199,7 +2507,7 @@ type Finding struct {
 
 func (x *Finding) Reset() {
 	*x = Finding{}
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[17]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2211,7 +2519,7 @@ func (x *Finding) String() string {
 func (*Finding) ProtoMessage() {}
 
 func (x *Finding) ProtoReflect() protoreflect.Message {
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[17]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2224,7 +2532,7 @@ func (x *Finding) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Finding.ProtoReflect.Descriptor instead.
 func (*Finding) Descriptor() ([]byte, []int) {
-	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{17}
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *Finding) GetId() string {
@@ -2323,7 +2631,7 @@ type Ledger struct {
 
 func (x *Ledger) Reset() {
 	*x = Ledger{}
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[18]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2335,7 +2643,7 @@ func (x *Ledger) String() string {
 func (*Ledger) ProtoMessage() {}
 
 func (x *Ledger) ProtoReflect() protoreflect.Message {
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[18]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2348,7 +2656,7 @@ func (x *Ledger) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Ledger.ProtoReflect.Descriptor instead.
 func (*Ledger) Descriptor() ([]byte, []int) {
-	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{18}
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *Ledger) GetSchemaMajor() uint32 {
@@ -2391,7 +2699,7 @@ type Verdict struct {
 
 func (x *Verdict) Reset() {
 	*x = Verdict{}
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[19]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2403,7 +2711,7 @@ func (x *Verdict) String() string {
 func (*Verdict) ProtoMessage() {}
 
 func (x *Verdict) ProtoReflect() protoreflect.Message {
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[19]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2416,7 +2724,7 @@ func (x *Verdict) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Verdict.ProtoReflect.Descriptor instead.
 func (*Verdict) Descriptor() ([]byte, []int) {
-	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{19}
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *Verdict) GetDecision() Decision {
@@ -2461,7 +2769,7 @@ type Verification struct {
 
 func (x *Verification) Reset() {
 	*x = Verification{}
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[20]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2473,7 +2781,7 @@ func (x *Verification) String() string {
 func (*Verification) ProtoMessage() {}
 
 func (x *Verification) ProtoReflect() protoreflect.Message {
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[20]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2486,7 +2794,7 @@ func (x *Verification) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Verification.ProtoReflect.Descriptor instead.
 func (*Verification) Descriptor() ([]byte, []int) {
-	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{20}
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *Verification) GetStatus() VerificationStatus {
@@ -2548,7 +2856,7 @@ type IndependentReview struct {
 
 func (x *IndependentReview) Reset() {
 	*x = IndependentReview{}
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[21]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2560,7 +2868,7 @@ func (x *IndependentReview) String() string {
 func (*IndependentReview) ProtoMessage() {}
 
 func (x *IndependentReview) ProtoReflect() protoreflect.Message {
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[21]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2573,7 +2881,7 @@ func (x *IndependentReview) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IndependentReview.ProtoReflect.Descriptor instead.
 func (*IndependentReview) Descriptor() ([]byte, []int) {
-	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{21}
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *IndependentReview) GetRunId() string {
@@ -2637,7 +2945,7 @@ type MarginalYield struct {
 
 func (x *MarginalYield) Reset() {
 	*x = MarginalYield{}
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[22]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2649,7 +2957,7 @@ func (x *MarginalYield) String() string {
 func (*MarginalYield) ProtoMessage() {}
 
 func (x *MarginalYield) ProtoReflect() protoreflect.Message {
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[22]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2662,7 +2970,7 @@ func (x *MarginalYield) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarginalYield.ProtoReflect.Descriptor instead.
 func (*MarginalYield) Descriptor() ([]byte, []int) {
-	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{22}
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *MarginalYield) GetCandidatesExamined() uint32 {
@@ -2706,7 +3014,7 @@ type FindingCounts struct {
 
 func (x *FindingCounts) Reset() {
 	*x = FindingCounts{}
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[23]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2718,7 +3026,7 @@ func (x *FindingCounts) String() string {
 func (*FindingCounts) ProtoMessage() {}
 
 func (x *FindingCounts) ProtoReflect() protoreflect.Message {
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[23]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2731,7 +3039,7 @@ func (x *FindingCounts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindingCounts.ProtoReflect.Descriptor instead.
 func (*FindingCounts) Descriptor() ([]byte, []int) {
-	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{23}
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *FindingCounts) GetTotal() uint32 {
@@ -2782,7 +3090,7 @@ type FindingSnapshot struct {
 
 func (x *FindingSnapshot) Reset() {
 	*x = FindingSnapshot{}
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[24]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2794,7 +3102,7 @@ func (x *FindingSnapshot) String() string {
 func (*FindingSnapshot) ProtoMessage() {}
 
 func (x *FindingSnapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[24]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2807,7 +3115,7 @@ func (x *FindingSnapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindingSnapshot.ProtoReflect.Descriptor instead.
 func (*FindingSnapshot) Descriptor() ([]byte, []int) {
-	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{24}
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *FindingSnapshot) GetId() string {
@@ -2856,7 +3164,7 @@ type LedgerRef struct {
 
 func (x *LedgerRef) Reset() {
 	*x = LedgerRef{}
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[25]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2868,7 +3176,7 @@ func (x *LedgerRef) String() string {
 func (*LedgerRef) ProtoMessage() {}
 
 func (x *LedgerRef) ProtoReflect() protoreflect.Message {
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[25]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2881,7 +3189,7 @@ func (x *LedgerRef) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LedgerRef.ProtoReflect.Descriptor instead.
 func (*LedgerRef) Descriptor() ([]byte, []int) {
-	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{25}
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *LedgerRef) GetPath() string {
@@ -2932,7 +3240,7 @@ type GrimesResult struct {
 
 func (x *GrimesResult) Reset() {
 	*x = GrimesResult{}
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[26]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2944,7 +3252,7 @@ func (x *GrimesResult) String() string {
 func (*GrimesResult) ProtoMessage() {}
 
 func (x *GrimesResult) ProtoReflect() protoreflect.Message {
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[26]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2957,7 +3265,7 @@ func (x *GrimesResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GrimesResult.ProtoReflect.Descriptor instead.
 func (*GrimesResult) Descriptor() ([]byte, []int) {
-	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{26}
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *GrimesResult) GetSchemaMajor() uint32 {
@@ -3110,7 +3418,7 @@ type LoopState struct {
 
 func (x *LoopState) Reset() {
 	*x = LoopState{}
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[27]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3122,7 +3430,7 @@ func (x *LoopState) String() string {
 func (*LoopState) ProtoMessage() {}
 
 func (x *LoopState) ProtoReflect() protoreflect.Message {
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[27]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3135,7 +3443,7 @@ func (x *LoopState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoopState.ProtoReflect.Descriptor instead.
 func (*LoopState) Descriptor() ([]byte, []int) {
-	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{27}
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *LoopState) GetSchemaMajor() uint32 {
@@ -3304,7 +3612,42 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\bcitation\x18\x04 \x01(\v2\x19.frank_grimes.v2.CitationH\x00R\bcitation\x12:\n" +
 	"\tinference\x18\x05 \x01(\v2\x1a.frank_grimes.v2.InferenceH\x00R\tinference:\xd2\x01\xbaH\xce\x01\x1a\xcb\x01\n" +
 	"\x1cevidence.tier_matches_detail\x12*evidence tier must match its detail branch\x1a\x7f(this.tier == 1 && has(this.reproduction)) || (this.tier == 2 && has(this.citation)) || (this.tier == 3 && has(this.inference))B\x0f\n" +
-	"\x06detail\x12\x05\xbaH\x02\b\x01\"\xb4\x02\n" +
+	"\x06detail\x12\x05\xbaH\x02\b\x01\"\xd3\x04\n" +
+	"\x10CandidateFinding\x12A\n" +
+	"\bcategory\x18\x01 \x01(\x0e2\x19.frank_grimes.v2.CategoryB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\bcategory\x12=\n" +
+	"\blocation\x18\x02 \x01(\v2\x19.frank_grimes.v2.LocationB\x06\xbaH\x03\xc8\x01\x01R\blocation\x121\n" +
+	"\x04risk\x18\x03 \x01(\v2\x15.frank_grimes.v2.RiskB\x06\xbaH\x03\xc8\x01\x01R\x04risk\x12=\n" +
+	"\bevidence\x18\x04 \x01(\v2\x19.frank_grimes.v2.EvidenceB\x06\xbaH\x03\xc8\x01\x01R\bevidence\x122\n" +
+	"\rsuggested_fix\x18\x05 \x01(\tB\b\xbaH\x05r\x03\x18\x80 H\x00R\fsuggestedFix\x88\x01\x01:\x84\x02\xbaH\x80\x02\x1ax\n" +
+	"\x1ecandidate.p0_requires_e1_or_e2\x12\x1dP0 requires E1 or E2 evidence\x1a7this.risk.severity != 1 || this.evidence.tier in [1, 2]\x1a\x83\x01\n" +
+	"\x17candidate.e3_caps_at_p1\x124inferred evidence cannot support a severity above P1\x1a2this.evidence.tier != 3 || this.risk.severity != 1B\x10\n" +
+	"\x0e_suggested_fix\"\xbb\x04\n" +
+	"\x0eProviderReport\x12*\n" +
+	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
+	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x12\x1e\n" +
+	"\x06run_id\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05runId\x127\n" +
+	"\x06target\x18\x04 \x01(\v2\x17.frank_grimes.v2.TargetB\x06\xbaH\x03\xc8\x01\x01R\x06target\x125\n" +
+	"\x04mode\x18\x05 \x01(\x0e2\x15.frank_grimes.v2.ModeB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x04mode\x12%\n" +
+	"\titeration\x18\x06 \x01(\rB\a\xbaH\x04*\x02 \x00R\titeration\x12A\n" +
+	"\n" +
+	"candidates\x18\a \x03(\v2!.frank_grimes.v2.CandidateFindingR\n" +
+	"candidates\x12Y\n" +
+	"\x11routed_categories\x18\b \x03(\x0e2\x19.frank_grimes.v2.CategoryB\x11\xbaH\x0e\x92\x01\v\x18\x01\"\a\x82\x01\x04\x10\x01 \x00R\x10routedCategories\x12/\n" +
+	"\x13candidates_examined\x18\t \x01(\rR\x12candidatesExamined\x121\n" +
+	"\x14candidates_disproved\x18\n" +
+	" \x01(\rR\x13candidatesDisproved\x12!\n" +
+	"\asummary\x18\v \x01(\tB\a\xbaH\x04r\x02\x10\x01R\asummary\"\xf5\x02\n" +
+	"\x12AdjudicationReport\x12*\n" +
+	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
+	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x12\x1e\n" +
+	"\x06run_id\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05runId\x12(\n" +
+	"\vreviewer_id\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\n" +
+	"reviewerId\x12C\n" +
+	"\x19target_fingerprint_sha256\x18\x05 \x01(\fB\a\xbaH\x04z\x02h R\x17targetFingerprintSha256\x12:\n" +
+	"\averdict\x18\x06 \x01(\v2\x18.frank_grimes.v2.VerdictB\x06\xbaH\x03\xc8\x01\x01R\averdict\x12E\n" +
+	"\fcompleted_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\vcompletedAt\"\xb4\x02\n" +
 	"\fFindingEvent\x12%\n" +
 	"\titeration\x18\x01 \x01(\rB\a\xbaH\x04*\x02 \x00R\titeration\x12<\n" +
 	"\x04from\x18\x02 \x01(\x0e2\x1e.frank_grimes.v2.FindingStatusB\b\xbaH\x05\x82\x01\x02\x10\x01R\x04from\x12:\n" +
@@ -3553,7 +3896,7 @@ func file_frank_grimes_v2_contracts_proto_rawDescGZIP() []byte {
 }
 
 var file_frank_grimes_v2_contracts_proto_enumTypes = make([]protoimpl.EnumInfo, 16)
-var file_frank_grimes_v2_contracts_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
+var file_frank_grimes_v2_contracts_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
 var file_frank_grimes_v2_contracts_proto_goTypes = []any{
 	(Category)(0),                 // 0: frank_grimes.v2.Category
 	(Severity)(0),                 // 1: frank_grimes.v2.Severity
@@ -3587,25 +3930,28 @@ var file_frank_grimes_v2_contracts_proto_goTypes = []any{
 	(*Citation)(nil),              // 29: frank_grimes.v2.Citation
 	(*Inference)(nil),             // 30: frank_grimes.v2.Inference
 	(*Evidence)(nil),              // 31: frank_grimes.v2.Evidence
-	(*FindingEvent)(nil),          // 32: frank_grimes.v2.FindingEvent
-	(*Finding)(nil),               // 33: frank_grimes.v2.Finding
-	(*Ledger)(nil),                // 34: frank_grimes.v2.Ledger
-	(*Verdict)(nil),               // 35: frank_grimes.v2.Verdict
-	(*Verification)(nil),          // 36: frank_grimes.v2.Verification
-	(*IndependentReview)(nil),     // 37: frank_grimes.v2.IndependentReview
-	(*MarginalYield)(nil),         // 38: frank_grimes.v2.MarginalYield
-	(*FindingCounts)(nil),         // 39: frank_grimes.v2.FindingCounts
-	(*FindingSnapshot)(nil),       // 40: frank_grimes.v2.FindingSnapshot
-	(*LedgerRef)(nil),             // 41: frank_grimes.v2.LedgerRef
-	(*GrimesResult)(nil),          // 42: frank_grimes.v2.GrimesResult
-	(*LoopState)(nil),             // 43: frank_grimes.v2.LoopState
-	nil,                           // 44: frank_grimes.v2.Ledger.FindingsEntry
-	(*timestamppb.Timestamp)(nil), // 45: google.protobuf.Timestamp
+	(*CandidateFinding)(nil),      // 32: frank_grimes.v2.CandidateFinding
+	(*ProviderReport)(nil),        // 33: frank_grimes.v2.ProviderReport
+	(*AdjudicationReport)(nil),    // 34: frank_grimes.v2.AdjudicationReport
+	(*FindingEvent)(nil),          // 35: frank_grimes.v2.FindingEvent
+	(*Finding)(nil),               // 36: frank_grimes.v2.Finding
+	(*Ledger)(nil),                // 37: frank_grimes.v2.Ledger
+	(*Verdict)(nil),               // 38: frank_grimes.v2.Verdict
+	(*Verification)(nil),          // 39: frank_grimes.v2.Verification
+	(*IndependentReview)(nil),     // 40: frank_grimes.v2.IndependentReview
+	(*MarginalYield)(nil),         // 41: frank_grimes.v2.MarginalYield
+	(*FindingCounts)(nil),         // 42: frank_grimes.v2.FindingCounts
+	(*FindingSnapshot)(nil),       // 43: frank_grimes.v2.FindingSnapshot
+	(*LedgerRef)(nil),             // 44: frank_grimes.v2.LedgerRef
+	(*GrimesResult)(nil),          // 45: frank_grimes.v2.GrimesResult
+	(*LoopState)(nil),             // 46: frank_grimes.v2.LoopState
+	nil,                           // 47: frank_grimes.v2.Ledger.FindingsEntry
+	(*timestamppb.Timestamp)(nil), // 48: google.protobuf.Timestamp
 }
 var file_frank_grimes_v2_contracts_proto_depIdxs = []int32{
 	6,  // 0: frank_grimes.v2.Target.kind:type_name -> frank_grimes.v2.TargetKind
 	17, // 1: frank_grimes.v2.RepoLine.path:type_name -> frank_grimes.v2.RepoPath
-	45, // 2: frank_grimes.v2.RetrievedSource.retrieved_at:type_name -> google.protobuf.Timestamp
+	48, // 2: frank_grimes.v2.RetrievedSource.retrieved_at:type_name -> google.protobuf.Timestamp
 	18, // 3: frank_grimes.v2.Anchor.repo_line:type_name -> frank_grimes.v2.RepoLine
 	19, // 4: frank_grimes.v2.Anchor.document_part:type_name -> frank_grimes.v2.DocumentPart
 	20, // 5: frank_grimes.v2.Anchor.argument_step:type_name -> frank_grimes.v2.ArgumentStep
@@ -3614,11 +3960,11 @@ var file_frank_grimes_v2_contracts_proto_depIdxs = []int32{
 	1,  // 8: frank_grimes.v2.Risk.severity:type_name -> frank_grimes.v2.Severity
 	2,  // 9: frank_grimes.v2.Risk.likelihood:type_name -> frank_grimes.v2.Likelihood
 	3,  // 10: frank_grimes.v2.Risk.blast_radius:type_name -> frank_grimes.v2.BlastRadius
-	45, // 11: frank_grimes.v2.HumanOwner.recorded_at:type_name -> google.protobuf.Timestamp
-	45, // 12: frank_grimes.v2.HumanOwner.review_by:type_name -> google.protobuf.Timestamp
+	48, // 11: frank_grimes.v2.HumanOwner.recorded_at:type_name -> google.protobuf.Timestamp
+	48, // 12: frank_grimes.v2.HumanOwner.review_by:type_name -> google.protobuf.Timestamp
 	17, // 13: frank_grimes.v2.ExecutedCommand.cwd:type_name -> frank_grimes.v2.RepoPath
 	22, // 14: frank_grimes.v2.Counterexample.claim_anchor:type_name -> frank_grimes.v2.Anchor
-	45, // 15: frank_grimes.v2.Reproduction.completed_at:type_name -> google.protobuf.Timestamp
+	48, // 15: frank_grimes.v2.Reproduction.completed_at:type_name -> google.protobuf.Timestamp
 	26, // 16: frank_grimes.v2.Reproduction.executed_command:type_name -> frank_grimes.v2.ExecutedCommand
 	27, // 17: frank_grimes.v2.Reproduction.counterexample:type_name -> frank_grimes.v2.Counterexample
 	22, // 18: frank_grimes.v2.Citation.anchor:type_name -> frank_grimes.v2.Anchor
@@ -3626,52 +3972,62 @@ var file_frank_grimes_v2_contracts_proto_depIdxs = []int32{
 	28, // 20: frank_grimes.v2.Evidence.reproduction:type_name -> frank_grimes.v2.Reproduction
 	29, // 21: frank_grimes.v2.Evidence.citation:type_name -> frank_grimes.v2.Citation
 	30, // 22: frank_grimes.v2.Evidence.inference:type_name -> frank_grimes.v2.Inference
-	4,  // 23: frank_grimes.v2.FindingEvent.from:type_name -> frank_grimes.v2.FindingStatus
-	4,  // 24: frank_grimes.v2.FindingEvent.to:type_name -> frank_grimes.v2.FindingStatus
-	45, // 25: frank_grimes.v2.FindingEvent.at:type_name -> google.protobuf.Timestamp
-	0,  // 26: frank_grimes.v2.Finding.category:type_name -> frank_grimes.v2.Category
-	23, // 27: frank_grimes.v2.Finding.location:type_name -> frank_grimes.v2.Location
-	24, // 28: frank_grimes.v2.Finding.risk:type_name -> frank_grimes.v2.Risk
-	31, // 29: frank_grimes.v2.Finding.evidence:type_name -> frank_grimes.v2.Evidence
-	4,  // 30: frank_grimes.v2.Finding.status:type_name -> frank_grimes.v2.FindingStatus
-	25, // 31: frank_grimes.v2.Finding.owner:type_name -> frank_grimes.v2.HumanOwner
-	45, // 32: frank_grimes.v2.Finding.first_seen:type_name -> google.protobuf.Timestamp
-	45, // 33: frank_grimes.v2.Finding.last_seen:type_name -> google.protobuf.Timestamp
-	32, // 34: frank_grimes.v2.Finding.history:type_name -> frank_grimes.v2.FindingEvent
-	16, // 35: frank_grimes.v2.Ledger.target:type_name -> frank_grimes.v2.Target
-	44, // 36: frank_grimes.v2.Ledger.findings:type_name -> frank_grimes.v2.Ledger.FindingsEntry
-	7,  // 37: frank_grimes.v2.Verdict.decision:type_name -> frank_grimes.v2.Decision
-	8,  // 38: frank_grimes.v2.Verdict.residual_risk:type_name -> frank_grimes.v2.ResidualRisk
-	9,  // 39: frank_grimes.v2.Verdict.review_confidence:type_name -> frank_grimes.v2.ReviewConfidence
-	10, // 40: frank_grimes.v2.Verdict.review_completeness:type_name -> frank_grimes.v2.ReviewCompleteness
-	15, // 41: frank_grimes.v2.Verification.status:type_name -> frank_grimes.v2.VerificationStatus
-	17, // 42: frank_grimes.v2.Verification.cwd:type_name -> frank_grimes.v2.RepoPath
-	45, // 43: frank_grimes.v2.Verification.completed_at:type_name -> google.protobuf.Timestamp
-	35, // 44: frank_grimes.v2.IndependentReview.verdict:type_name -> frank_grimes.v2.Verdict
-	45, // 45: frank_grimes.v2.IndependentReview.completed_at:type_name -> google.protobuf.Timestamp
-	4,  // 46: frank_grimes.v2.FindingSnapshot.status:type_name -> frank_grimes.v2.FindingStatus
-	24, // 47: frank_grimes.v2.FindingSnapshot.risk:type_name -> frank_grimes.v2.Risk
-	5,  // 48: frank_grimes.v2.FindingSnapshot.evidence_tier:type_name -> frank_grimes.v2.EvidenceTier
-	14, // 49: frank_grimes.v2.GrimesResult.producer_role:type_name -> frank_grimes.v2.ProducerRole
-	16, // 50: frank_grimes.v2.GrimesResult.target:type_name -> frank_grimes.v2.Target
-	12, // 51: frank_grimes.v2.GrimesResult.mode:type_name -> frank_grimes.v2.Mode
-	13, // 52: frank_grimes.v2.GrimesResult.completion_state:type_name -> frank_grimes.v2.CompletionState
-	35, // 53: frank_grimes.v2.GrimesResult.verdict:type_name -> frank_grimes.v2.Verdict
-	11, // 54: frank_grimes.v2.GrimesResult.legacy_color:type_name -> frank_grimes.v2.LegacyColor
-	38, // 55: frank_grimes.v2.GrimesResult.marginal_yield:type_name -> frank_grimes.v2.MarginalYield
-	39, // 56: frank_grimes.v2.GrimesResult.counts:type_name -> frank_grimes.v2.FindingCounts
-	40, // 57: frank_grimes.v2.GrimesResult.findings:type_name -> frank_grimes.v2.FindingSnapshot
-	36, // 58: frank_grimes.v2.GrimesResult.verification:type_name -> frank_grimes.v2.Verification
-	37, // 59: frank_grimes.v2.GrimesResult.independent_review:type_name -> frank_grimes.v2.IndependentReview
-	41, // 60: frank_grimes.v2.GrimesResult.ledger:type_name -> frank_grimes.v2.LedgerRef
-	16, // 61: frank_grimes.v2.LoopState.target:type_name -> frank_grimes.v2.Target
-	12, // 62: frank_grimes.v2.LoopState.mode:type_name -> frank_grimes.v2.Mode
-	33, // 63: frank_grimes.v2.Ledger.FindingsEntry.value:type_name -> frank_grimes.v2.Finding
-	64, // [64:64] is the sub-list for method output_type
-	64, // [64:64] is the sub-list for method input_type
-	64, // [64:64] is the sub-list for extension type_name
-	64, // [64:64] is the sub-list for extension extendee
-	0,  // [0:64] is the sub-list for field type_name
+	0,  // 23: frank_grimes.v2.CandidateFinding.category:type_name -> frank_grimes.v2.Category
+	23, // 24: frank_grimes.v2.CandidateFinding.location:type_name -> frank_grimes.v2.Location
+	24, // 25: frank_grimes.v2.CandidateFinding.risk:type_name -> frank_grimes.v2.Risk
+	31, // 26: frank_grimes.v2.CandidateFinding.evidence:type_name -> frank_grimes.v2.Evidence
+	16, // 27: frank_grimes.v2.ProviderReport.target:type_name -> frank_grimes.v2.Target
+	12, // 28: frank_grimes.v2.ProviderReport.mode:type_name -> frank_grimes.v2.Mode
+	32, // 29: frank_grimes.v2.ProviderReport.candidates:type_name -> frank_grimes.v2.CandidateFinding
+	0,  // 30: frank_grimes.v2.ProviderReport.routed_categories:type_name -> frank_grimes.v2.Category
+	38, // 31: frank_grimes.v2.AdjudicationReport.verdict:type_name -> frank_grimes.v2.Verdict
+	48, // 32: frank_grimes.v2.AdjudicationReport.completed_at:type_name -> google.protobuf.Timestamp
+	4,  // 33: frank_grimes.v2.FindingEvent.from:type_name -> frank_grimes.v2.FindingStatus
+	4,  // 34: frank_grimes.v2.FindingEvent.to:type_name -> frank_grimes.v2.FindingStatus
+	48, // 35: frank_grimes.v2.FindingEvent.at:type_name -> google.protobuf.Timestamp
+	0,  // 36: frank_grimes.v2.Finding.category:type_name -> frank_grimes.v2.Category
+	23, // 37: frank_grimes.v2.Finding.location:type_name -> frank_grimes.v2.Location
+	24, // 38: frank_grimes.v2.Finding.risk:type_name -> frank_grimes.v2.Risk
+	31, // 39: frank_grimes.v2.Finding.evidence:type_name -> frank_grimes.v2.Evidence
+	4,  // 40: frank_grimes.v2.Finding.status:type_name -> frank_grimes.v2.FindingStatus
+	25, // 41: frank_grimes.v2.Finding.owner:type_name -> frank_grimes.v2.HumanOwner
+	48, // 42: frank_grimes.v2.Finding.first_seen:type_name -> google.protobuf.Timestamp
+	48, // 43: frank_grimes.v2.Finding.last_seen:type_name -> google.protobuf.Timestamp
+	35, // 44: frank_grimes.v2.Finding.history:type_name -> frank_grimes.v2.FindingEvent
+	16, // 45: frank_grimes.v2.Ledger.target:type_name -> frank_grimes.v2.Target
+	47, // 46: frank_grimes.v2.Ledger.findings:type_name -> frank_grimes.v2.Ledger.FindingsEntry
+	7,  // 47: frank_grimes.v2.Verdict.decision:type_name -> frank_grimes.v2.Decision
+	8,  // 48: frank_grimes.v2.Verdict.residual_risk:type_name -> frank_grimes.v2.ResidualRisk
+	9,  // 49: frank_grimes.v2.Verdict.review_confidence:type_name -> frank_grimes.v2.ReviewConfidence
+	10, // 50: frank_grimes.v2.Verdict.review_completeness:type_name -> frank_grimes.v2.ReviewCompleteness
+	15, // 51: frank_grimes.v2.Verification.status:type_name -> frank_grimes.v2.VerificationStatus
+	17, // 52: frank_grimes.v2.Verification.cwd:type_name -> frank_grimes.v2.RepoPath
+	48, // 53: frank_grimes.v2.Verification.completed_at:type_name -> google.protobuf.Timestamp
+	38, // 54: frank_grimes.v2.IndependentReview.verdict:type_name -> frank_grimes.v2.Verdict
+	48, // 55: frank_grimes.v2.IndependentReview.completed_at:type_name -> google.protobuf.Timestamp
+	4,  // 56: frank_grimes.v2.FindingSnapshot.status:type_name -> frank_grimes.v2.FindingStatus
+	24, // 57: frank_grimes.v2.FindingSnapshot.risk:type_name -> frank_grimes.v2.Risk
+	5,  // 58: frank_grimes.v2.FindingSnapshot.evidence_tier:type_name -> frank_grimes.v2.EvidenceTier
+	14, // 59: frank_grimes.v2.GrimesResult.producer_role:type_name -> frank_grimes.v2.ProducerRole
+	16, // 60: frank_grimes.v2.GrimesResult.target:type_name -> frank_grimes.v2.Target
+	12, // 61: frank_grimes.v2.GrimesResult.mode:type_name -> frank_grimes.v2.Mode
+	13, // 62: frank_grimes.v2.GrimesResult.completion_state:type_name -> frank_grimes.v2.CompletionState
+	38, // 63: frank_grimes.v2.GrimesResult.verdict:type_name -> frank_grimes.v2.Verdict
+	11, // 64: frank_grimes.v2.GrimesResult.legacy_color:type_name -> frank_grimes.v2.LegacyColor
+	41, // 65: frank_grimes.v2.GrimesResult.marginal_yield:type_name -> frank_grimes.v2.MarginalYield
+	42, // 66: frank_grimes.v2.GrimesResult.counts:type_name -> frank_grimes.v2.FindingCounts
+	43, // 67: frank_grimes.v2.GrimesResult.findings:type_name -> frank_grimes.v2.FindingSnapshot
+	39, // 68: frank_grimes.v2.GrimesResult.verification:type_name -> frank_grimes.v2.Verification
+	40, // 69: frank_grimes.v2.GrimesResult.independent_review:type_name -> frank_grimes.v2.IndependentReview
+	44, // 70: frank_grimes.v2.GrimesResult.ledger:type_name -> frank_grimes.v2.LedgerRef
+	16, // 71: frank_grimes.v2.LoopState.target:type_name -> frank_grimes.v2.Target
+	12, // 72: frank_grimes.v2.LoopState.mode:type_name -> frank_grimes.v2.Mode
+	36, // 73: frank_grimes.v2.Ledger.FindingsEntry.value:type_name -> frank_grimes.v2.Finding
+	74, // [74:74] is the sub-list for method output_type
+	74, // [74:74] is the sub-list for method input_type
+	74, // [74:74] is the sub-list for extension type_name
+	74, // [74:74] is the sub-list for extension extendee
+	0,  // [0:74] is the sub-list for field type_name
 }
 
 func init() { file_frank_grimes_v2_contracts_proto_init() }
@@ -3702,13 +4058,14 @@ func file_frank_grimes_v2_contracts_proto_init() {
 		(*Evidence_Citation)(nil),
 		(*Evidence_Inference)(nil),
 	}
+	file_frank_grimes_v2_contracts_proto_msgTypes[16].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_frank_grimes_v2_contracts_proto_rawDesc), len(file_frank_grimes_v2_contracts_proto_rawDesc)),
 			NumEnums:      16,
-			NumMessages:   29,
+			NumMessages:   32,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

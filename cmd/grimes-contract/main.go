@@ -43,7 +43,8 @@ Usage:
   grimes-contract state --ledger=<f> [--json]
       Summarize ledger state.
 
-Message types: Ledger, Finding, GrimesResult, LoopState, Verdict
+Message types: Ledger, Finding, GrimesResult, LoopState, Verdict,
+               ProviderReport, AdjudicationReport, CandidateFinding
 States: open, fixed, verified, accepted, false_positive, regressed
 `
 
@@ -91,6 +92,12 @@ func newMessage(name string) (proto.Message, error) {
 		return &pb.LoopState{}, nil
 	case "Verdict", "frank_grimes.v2.Verdict":
 		return &pb.Verdict{}, nil
+	case "ProviderReport", "frank_grimes.v2.ProviderReport":
+		return &pb.ProviderReport{}, nil
+	case "AdjudicationReport", "frank_grimes.v2.AdjudicationReport":
+		return &pb.AdjudicationReport{}, nil
+	case "CandidateFinding", "frank_grimes.v2.CandidateFinding":
+		return &pb.CandidateFinding{}, nil
 	default:
 		return nil, fmt.Errorf("unknown message type %q", name)
 	}

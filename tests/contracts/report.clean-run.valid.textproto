@@ -1,0 +1,11 @@
+# A review that survived its own grind with nothing left. Valid and useful: it
+# is how the loop learns an iteration yielded nothing.
+schema_major: 2
+run_id: "run-001"
+target { root: "/repo" scope: "bad-script.sh" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
+mode: MODE_REPORT
+iteration: 1
+routed_categories: [CATEGORY_SEC, CATEGORY_COR, CATEGORY_REL, CATEGORY_OPS, CATEGORY_VER]
+candidates_examined: 7
+candidates_disproved: 7
+summary: "Seven candidates examined, all disproved."

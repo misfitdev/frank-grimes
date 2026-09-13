@@ -1,0 +1,7 @@
+# An independent reviewer stating a tuple over a named target, and nothing else.
+schema_major: 2
+run_id: "run-001-adj"
+reviewer_id: "grimey-verifier"
+target_fingerprint_sha256: "01234567890123456789012345678901"
+verdict { decision: DECISION_PASS residual_risk: RESIDUAL_RISK_LOW review_confidence: REVIEW_CONFIDENCE_HIGH review_completeness: REVIEW_COMPLETENESS_SUFFICIENT }
+completed_at { seconds: 1780000000 }
