@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -81,7 +82,7 @@ type fixedAdjudicator struct {
 	err      error
 }
 
-func (f fixedAdjudicator) Adjudicate(_ context.Context, target *pb.Target, _ *pb.Verdict) (*pb.IndependentReview, error) {
+func (f fixedAdjudicator) Adjudicate(_ context.Context, target *pb.Target, _ string, _ *pb.Verdict) (*pb.IndependentReview, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -157,9 +158,9 @@ func seededLedger(t *testing.T, status pb.FindingStatus) *pb.Ledger {
 // collector against real artifacts.
 type stubCollector struct{}
 
-func (stubCollector) Collect(ctx context.Context, spec TargetSpec) (*pb.Target, *pb.TargetInventory, []pb.Category, error) {
+func (stubCollector) Collect(ctx context.Context, spec TargetSpec) (*Collected, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	sum := sha256.Sum256([]byte(spec.Root + "\x00" + spec.Scope))
 	target := &pb.Target{
@@ -170,20 +171,25 @@ func (stubCollector) Collect(ctx context.Context, spec TargetSpec) (*pb.Target, 
 	if len(categories) == 0 {
 		categories = AllCategories
 	}
-	return target, &pb.TargetInventory{
-		SchemaMajor:             contracts.SchemaMajor,
-		TargetFingerprintSha256: target.GetFingerprintSha256(),
-		Units:                   []*pb.TargetUnit{{Id: spec.Scope, Label: spec.Scope}},
-	}, categories, nil
+	return &Collected{
+		Target: target,
+		Inventory: &pb.TargetInventory{
+			SchemaMajor:             contracts.SchemaMajor,
+			TargetFingerprintSha256: target.GetFingerprintSha256(),
+			Units:                   []*pb.TargetUnit{{Id: spec.Scope, Label: spec.Scope}},
+		},
+		Categories:  categories,
+		ContentPath: filepath.Join(spec.Root, spec.Scope),
+	}, nil
 }
 
 func testTarget(t *testing.T) *pb.Target {
 	t.Helper()
-	target, _, _, err := stubCollector{}.Collect(context.Background(), testSpec())
+	out, err := stubCollector{}.Collect(context.Background(), testSpec())
 	if err != nil {
 		t.Fatal(err)
 	}
-	return target
+	return out.Target
 }
 
 func testSpec() TargetSpec { return TargetSpec{Root: "/repo", Scope: "bad.sh"} }
@@ -472,10 +478,11 @@ func unvalidatedReport(t *testing.T, candidates ...*pb.CandidateFinding) []byte 
 }
 
 func TestRunStaleStateFailsClosed(t *testing.T) {
-	other, _, _, err := stubCollector{}.Collect(context.Background(), TargetSpec{Root: "/repo", Scope: "somewhere-else"})
+	otherCollected, err := stubCollector{}.Collect(context.Background(), TargetSpec{Root: "/repo", Scope: "somewhere-else"})
 	if err != nil {
 		t.Fatal(err)
 	}
+	other := otherCollected.Target
 	s := &memState{state: &pb.LoopState{
 		SchemaMajor: 2, RunId: "run-000", Target: other,
 		Mode: pb.Mode_MODE_REPORT, Iteration: 1, MaxIterations: 5,

@@ -165,7 +165,7 @@ func TestTruncateHoldsTheLabelBoundWithoutSplittingARune(t *testing.T) {
 // snapshot: without the guard the URI falls through to a read that fails for
 // its own reasons, and a looser check would pass on that instead.
 func TestCollectExternalRefusesAMissingSnapshot(t *testing.T) {
-	_, _, _, err := (TargetCollector{}).Collect(context.Background(), TargetSpec{
+	_, err := (TargetCollector{}).Collect(context.Background(), TargetSpec{
 		Scope: "https://example.com/policy", Kind: pb.TargetKind_TARGET_KIND_EXTERNAL,
 	})
 	if err == nil {
@@ -185,7 +185,7 @@ func TestCollectRefusesAnUnnamedKind(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "a.sh"), []byte("echo one\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, _, err := (TargetCollector{}).Collect(context.Background(), TargetSpec{
+	if _, err := (TargetCollector{}).Collect(context.Background(), TargetSpec{
 		Root: root, Scope: "a.sh", Kind: pb.TargetKind_TARGET_KIND_CODE,
 	}); err != nil {
 		t.Fatalf("the control case did not collect: %v", err)
@@ -194,7 +194,7 @@ func TestCollectRefusesAnUnnamedKind(t *testing.T) {
 		pb.TargetKind_TARGET_KIND_UNSPECIFIED,
 		pb.TargetKind(99),
 	} {
-		_, _, _, err := (TargetCollector{}).Collect(context.Background(), TargetSpec{
+		_, err := (TargetCollector{}).Collect(context.Background(), TargetSpec{
 			Root: root, Scope: "a.sh", Kind: kind,
 		})
 		if err == nil {

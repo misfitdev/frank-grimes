@@ -32,14 +32,18 @@ const (
 // Request is everything a provider is given. An adjudicator request carries
 // Claimed and no findings, evidence, or ledger data.
 type Request struct {
-	Role       Role
-	RunID      string
-	Target     *pb.Target
-	Mode       pb.Mode
-	Iteration  uint32
-	Categories []pb.Category
-	Research   string
-	Claimed    *pb.Verdict
+	Role   Role
+	RunID  string
+	Target *pb.Target
+	// ContentPath is where the provider reads the target. Both roles get it: an
+	// adjudicator that cannot see the artifact cannot form an opinion of its
+	// own, and zero knowledge is about the first report, not the target.
+	ContentPath string
+	Mode        pb.Mode
+	Iteration   uint32
+	Categories  []pb.Category
+	Research    string
+	Claimed     *pb.Verdict
 }
 
 // ProviderOutput is raw transport output. Raw is untrusted bytes; the engine
@@ -48,10 +52,29 @@ type ProviderOutput struct {
 	Raw []byte
 }
 
+// Collected is what resolving a target produced.
+type Collected struct {
+	Target     *pb.Target
+	Inventory  *pb.TargetInventory
+	Categories []pb.Category
+	// ContentPath is where the reviewed bytes are. Always absolute: collection
+	// resolves a relative scope against its own working directory and the
+	// provider runs in another, so a relative path would name two files.
+	//
+	// A directory when the target is a tree, a file when it is one file. A code
+	// target may be either.
+	ContentPath string
+	// ContentBytes is set only when the target has no path of its own, which
+	// today means an argument read from stdin. The engine persists it and fills
+	// ContentPath in with where it put it.
+	ContentBytes []byte
+}
+
 // Collector resolves a caller's target spec into a fingerprinted target, the
-// inventory of units a review is accountable for, and the categories to route.
+// inventory of units a review is accountable for, the categories to route, and
+// where the reviewed bytes can be read.
 type Collector interface {
-	Collect(ctx context.Context, spec TargetSpec) (*pb.Target, *pb.TargetInventory, []pb.Category, error)
+	Collect(ctx context.Context, spec TargetSpec) (*Collected, error)
 }
 
 // Provider runs one review and returns its untrusted output.
@@ -68,7 +91,7 @@ type EvidenceBroker interface {
 // Adjudicator obtains a second verdict reached without sight of the first.
 // A nil review with a nil error means adjudication was unavailable.
 type Adjudicator interface {
-	Adjudicate(ctx context.Context, target *pb.Target, claimed *pb.Verdict) (*pb.IndependentReview, error)
+	Adjudicate(ctx context.Context, target *pb.Target, contentPath string, claimed *pb.Verdict) (*pb.IndependentReview, error)
 }
 
 // GateRunner runs the verification command once over a batch.
@@ -93,6 +116,12 @@ type ResultStore interface {
 // accountable to the same units the first one was.
 type InventoryStore interface {
 	Save(ctx context.Context, i *pb.TargetInventory) error
+}
+
+// ContentStore persists collected bytes that have no path of their own, so a
+// provider can be pointed at them.
+type ContentStore interface {
+	Save(ctx context.Context, content []byte) (path string, err error)
 }
 
 // StateStore persists loop state between iterations.
