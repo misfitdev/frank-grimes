@@ -28,6 +28,12 @@ func srcAnchor(uri string) *pb.Anchor {
 	}}}
 }
 
+func srcSection(uri, section string) *pb.Anchor {
+	a := srcAnchor(uri)
+	a.GetRetrievedSource().Section = &section
+	return a
+}
+
 func fp(a *pb.Anchor, evidence string) []byte {
 	return Fingerprint(pb.Category_CATEGORY_SEC, a, evidence)
 }
@@ -117,6 +123,25 @@ func TestFingerprintDistinguishesArgumentSteps(t *testing.T) {
 func TestFingerprintSourceIgnoresTrailingSlash(t *testing.T) {
 	if !bytes.Equal(fp(srcAnchor("https://example.com/a/"), ev), fp(srcAnchor("https://example.com/a"), ev)) {
 		t.Error("a trailing slash on a URI changed identity")
+	}
+}
+
+// A section names a place in an external source the way a document's does, so
+// two clauses of one policy are two findings. Sharing an identity would let the
+// ledger merge them and lose the second.
+func TestFingerprintDistinguishesSourceSections(t *testing.T) {
+	uri := "https://example.com/policy"
+	four := fp(srcSection(uri, "Clause 4"), ev)
+	if bytes.Equal(four, fp(srcSection(uri, "Clause 9"), ev)) {
+		t.Error("two clauses of one source share an identity")
+	}
+	if bytes.Equal(four, fp(srcAnchor(uri), ev)) {
+		t.Error("a sectioned finding shares the whole source's identity")
+	}
+	// Normalized the way a document section is, so case and spacing do not mint
+	// a second finding for the same clause.
+	if !bytes.Equal(four, fp(srcSection(uri, "  clause   4 "), ev)) {
+		t.Error("the same clause written differently produced two identities")
 	}
 }
 

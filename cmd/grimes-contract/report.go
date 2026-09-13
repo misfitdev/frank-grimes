@@ -167,6 +167,16 @@ func cmdReportSeal(args []string) error {
 	if *iteration == 0 || *iteration > math.MaxUint32 {
 		return fmt.Errorf("--iteration must be between 1 and %d", uint32(math.MaxUint32))
 	}
+	// The contract carries these as uint32. A larger value would wrap into a
+	// smaller one and the sealed report would record a count nobody supplied.
+	for _, c := range []struct {
+		flag string
+		val  uint
+	}{{"examined", *examined}, {"disproved", *disproved}} {
+		if c.val > math.MaxUint32 {
+			return fmt.Errorf("--%s must not exceed %d", c.flag, uint32(math.MaxUint32))
+		}
+	}
 
 	report, err := loadReport(*file)
 	if err != nil {
@@ -271,6 +281,12 @@ func evidenceFromFlags(tier, claim string, anchor *pb.Anchor,
 		e.Tier = pb.EvidenceTier_EVIDENCE_TIER_E1
 		if action == "" {
 			return nil, fmt.Errorf("E1 needs --action")
+		}
+		// int32 in the contract: a wider value would wrap and the evidence would
+		// record an outcome the command did not have.
+		if exitCode > math.MaxInt32 || exitCode < math.MinInt32 {
+			return nil, fmt.Errorf("--exit-code must be between %d and %d",
+				int32(math.MinInt32), int32(math.MaxInt32))
 		}
 		cmd := &pb.ExecutedCommand{
 			Action:   action,

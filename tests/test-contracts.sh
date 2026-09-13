@@ -278,6 +278,46 @@ fi
 rm -f "$BIN_OUT" "$BIN_OUT2" "$TAMPERED" "$DUPED" "$ENVELOPE" "$TRAILING"
 
 echo ""
+echo "--- A count the contract cannot hold is refused, not wrapped ---"
+
+# The contract carries these counters as uint32 and the exit code as int32. A
+# wider value narrowed silently would seal a report recording a number nobody
+# supplied, and it would validate, because the wrapped value is in range.
+WORK="$(mktemp -d)"
+(
+    cd "$WORK" || exit 1
+    mkdir -p .grimes
+    "$BIN" report add --category=SEC --severity=P2 --blast=local_component \
+        --likelihood=unlikely --path=a.sh --tier=E2 --claim="c" --quote="q" >/dev/null
+) || fail "report add rejected the seed candidate"
+
+for flag in examined disproved; do
+    set +e
+    OUT="$(cd "$WORK" && "$BIN" report seal --target-root=/repo --target-scope=a.sh \
+        --iteration=1 --routed=SEC --"$flag"=4294967296 --summary="s" 2>&1)"
+    CODE=$?
+    set -e
+    if [[ "$CODE" != "0" ]] && grep -q -- "--$flag" <<<"$OUT"; then
+        pass "--$flag above uint32 is refused by name"
+    else
+        fail "--$flag above uint32 was accepted (exit $CODE)"
+    fi
+done
+
+set +e
+OUT="$(cd "$WORK" && "$BIN" report add --category=SEC --severity=P2 \
+    --blast=local_component --likelihood=unlikely --path=b.sh \
+    --tier=E1 --claim="c" --action="go test" --cwd=. --exit-code=2147483648 --output="x" 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" != "0" ]] && grep -q -- '--exit-code' <<<"$OUT"; then
+    pass "--exit-code above int32 is refused by name"
+else
+    fail "--exit-code above int32 was accepted (exit $CODE)"
+fi
+rm -rf "$WORK"
+
+echo ""
 echo "========================================"
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"
