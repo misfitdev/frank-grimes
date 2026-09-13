@@ -203,12 +203,32 @@ func TestCollectRefusesAnUnnamedKind(t *testing.T) {
 // backtick block would otherwise end it and expose the commented-out lines
 // after it as sections that do not exist.
 func TestSectionsDoNotMixFenceDelimiters(t *testing.T) {
-	text := "# Real\n\n```md\n~~~\n# not a heading\n~~~\n# still not\n```\n\n## Also Real\n"
-	if units := mustSections(t, text); len(units) != 2 {
-		var got []string
-		for _, u := range units {
-			got = append(got, u.GetLabel())
+	for _, c := range []struct {
+		name string
+		text string
+	}{
+		// A tilde run quoted inside a backtick block.
+		{"other delimiter", "# Real\n\n```md\n~~~\n# not a heading\n~~~\n# still not\n```\n\n## Also Real\n"},
+		// A shorter run of the same character: a four-backtick fence is how a
+		// document quotes a three-backtick one, so the short line cannot close it.
+		{"shorter run", "# Real\n\n````md\n```\n# not a heading\n```\n# still not\n````\n\n## Also Real\n"},
+	} {
+		units := mustSections(t, c.text)
+		if len(units) != 2 {
+			var got []string
+			for _, u := range units {
+				got = append(got, u.GetLabel())
+			}
+			t.Errorf("%s: got %d units (%v), want 2", c.name, len(units), got)
 		}
-		t.Errorf("got %d units (%v), want 2", len(units), got)
+	}
+}
+
+// A longer run closes a shorter one, so a block cannot swallow the rest of a
+// document because its closing fence was written with extra characters.
+func TestSectionsCloseOnALongerRun(t *testing.T) {
+	text := "# Real\n\n```sh\n# not a heading\n`````\n\n## Also Real\n"
+	if units := mustSections(t, text); len(units) != 2 {
+		t.Errorf("got %d units, want 2", len(units))
 	}
 }
