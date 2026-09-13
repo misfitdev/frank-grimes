@@ -19,6 +19,7 @@ type Engine struct {
 	Adjudicator Adjudicator
 	Gate        GateRunner
 	Inventory   InventoryStore
+	Content     ContentStore
 	Ledger      Ledger
 	Results     ResultStore
 	State       StateStore
@@ -37,10 +38,11 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		return nil, ErrFixModeUnsupported
 	}
 
-	target, inventory, categories, err := e.Collector.Collect(ctx, spec)
+	collected, err := e.Collector.Collect(ctx, spec)
 	if err != nil {
 		return nil, fmt.Errorf("collect: %w", err)
 	}
+	target := collected.Target
 
 	iteration, err := e.resume(ctx, target)
 	if err != nil {
@@ -60,12 +62,26 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	// leave a rejected run's inventory behind, describing a target the surviving
 	// state and ledger are not about.
 	if e.Inventory != nil {
-		if err := e.Inventory.Save(ctx, inventory); err != nil {
+		if err := e.Inventory.Save(ctx, collected.Inventory); err != nil {
 			return nil, fmt.Errorf("inventory: %w", err)
 		}
 	}
+	// A target with no path of its own is written down, so the provider has
+	// something to read. Same moment as the inventory and for the same reason:
+	// a rejected run must not leave content behind describing a target the
+	// surviving state and ledger are not about.
+	if len(collected.ContentBytes) > 0 {
+		if e.Content == nil {
+			return nil, fmt.Errorf("%w: no store for a target with no path of its own", ErrProviderOutput)
+		}
+		path, err := e.Content.Save(ctx, collected.ContentBytes)
+		if err != nil {
+			return nil, fmt.Errorf("target content: %w", err)
+		}
+		collected.ContentPath = path
+	}
 
-	report, err := e.review(ctx, target, categories, mode, iteration)
+	report, err := e.review(ctx, target, collected.ContentPath, collected.Categories, mode, iteration)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +105,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		Oscillation:             oscillation,
 	})
 
-	review, err := e.adjudicate(ctx, target, primary.Verdict)
+	review, err := e.adjudicate(ctx, target, collected.ContentPath, primary.Verdict)
 	if err != nil {
 		return nil, err
 	}
@@ -162,15 +178,16 @@ func (e *Engine) resume(ctx context.Context, target *pb.Target) (uint32, error) 
 
 // review obtains and decodes provider output. Nothing here is trusted beyond
 // its findings; every authoritative field on the proposal is discarded.
-func (e *Engine) review(ctx context.Context, target *pb.Target, categories []pb.Category, mode pb.Mode, iteration uint32) (*pb.ProviderReport, error) {
+func (e *Engine) review(ctx context.Context, target *pb.Target, contentPath string, categories []pb.Category, mode pb.Mode, iteration uint32) (*pb.ProviderReport, error) {
 	out, err := e.Provider.Review(ctx, Request{
-		Role:       RolePrimary,
-		RunID:      e.RunID,
-		Target:     target,
-		Mode:       mode,
-		Iteration:  iteration,
-		Categories: categories,
-		Research:   e.Research,
+		Role:        RolePrimary,
+		RunID:       e.RunID,
+		Target:      target,
+		ContentPath: contentPath,
+		Mode:        mode,
+		Iteration:   iteration,
+		Categories:  categories,
+		Research:    e.Research,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrProviderFailed, err)
@@ -344,11 +361,11 @@ func verifyIdentity(f *pb.Finding) error {
 	return nil
 }
 
-func (e *Engine) adjudicate(ctx context.Context, target *pb.Target, claimed *pb.Verdict) (*pb.IndependentReview, error) {
+func (e *Engine) adjudicate(ctx context.Context, target *pb.Target, contentPath string, claimed *pb.Verdict) (*pb.IndependentReview, error) {
 	if e.Adjudicator == nil {
 		return nil, nil
 	}
-	review, err := e.Adjudicator.Adjudicate(ctx, target, claimed)
+	review, err := e.Adjudicator.Adjudicate(ctx, target, contentPath, claimed)
 	if err != nil {
 		// Absence of a second opinion is not agreement, but it is also not a
 		// run failure: the verdict caps itself instead.

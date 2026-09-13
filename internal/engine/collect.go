@@ -39,47 +39,54 @@ type TargetCollector struct {
 	Stdin io.Reader
 }
 
-func (c TargetCollector) Collect(ctx context.Context, spec TargetSpec) (*pb.Target, *pb.TargetInventory, []pb.Category, error) {
+func (c TargetCollector) Collect(ctx context.Context, spec TargetSpec) (*Collected, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	if spec.Scope == "" {
-		return nil, nil, nil, fmt.Errorf("target needs a scope")
+		return nil, fmt.Errorf("target needs a scope")
 	}
 
 	var (
-		target *pb.Target
-		units  []*pb.TargetUnit
-		err    error
+		out *Collected
+		err error
 	)
 	switch spec.Kind {
 	case pb.TargetKind_TARGET_KIND_CODE:
-		target, units, err = c.collectCode(spec)
+		out, err = c.collectCode(spec)
 	case pb.TargetKind_TARGET_KIND_DOCUMENT:
-		target, units, err = c.collectDocument(spec)
+		out, err = c.collectDocument(spec)
 	case pb.TargetKind_TARGET_KIND_IDEA:
-		target, units, err = c.collectIdea(spec)
+		out, err = c.collectIdea(spec)
 	case pb.TargetKind_TARGET_KIND_EXTERNAL:
-		target, units, err = c.collectExternal(spec)
+		out, err = c.collectExternal(spec)
 	default:
 		// Falling through to code would review a caller's unnamed kind as a
 		// repository path and report a verdict over the wrong thing.
-		return nil, nil, nil, fmt.Errorf("unsupported target kind %v", spec.Kind)
+		return nil, fmt.Errorf("unsupported target kind %v", spec.Kind)
 	}
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
-	categories := spec.Categories
-	if len(categories) == 0 {
-		categories = AllCategories
+	out.Categories = spec.Categories
+	if len(out.Categories) == 0 {
+		out.Categories = AllCategories
 	}
-	inventory := &pb.TargetInventory{
-		SchemaMajor:             contracts.SchemaMajor,
-		TargetFingerprintSha256: target.GetFingerprintSha256(),
-		Units:                   units,
+	return out, nil
+}
+
+// collected assembles what every kind returns in common.
+func collected(target *pb.Target, units []*pb.TargetUnit, contentPath string) *Collected {
+	return &Collected{
+		Target: target,
+		Inventory: &pb.TargetInventory{
+			SchemaMajor:             contracts.SchemaMajor,
+			TargetFingerprintSha256: target.GetFingerprintSha256(),
+			Units:                   units,
+		},
+		ContentPath: contentPath,
 	}
-	return target, inventory, categories, nil
 }
 
 // collectCode fingerprints every file under the target path and makes each one
@@ -89,17 +96,17 @@ func (c TargetCollector) Collect(ctx context.Context, spec TargetSpec) (*pb.Targ
 // that silently skipped a generated or ignored file would report coverage it
 // does not have. Only .git and the engine's own .grimes directory are skipped,
 // neither being part of any target.
-func (c TargetCollector) collectCode(spec TargetSpec) (*pb.Target, []*pb.TargetUnit, error) {
+func (c TargetCollector) collectCode(spec TargetSpec) (*Collected, error) {
 	if spec.Root == "" {
-		return nil, nil, fmt.Errorf("a code target needs a repository root")
+		return nil, fmt.Errorf("a code target needs a repository root")
 	}
 	abs, base, err := contained(spec.Root, spec.Scope)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	info, err := os.Lstat(abs)
 	if err != nil {
-		return nil, nil, fmt.Errorf("code target %q: %w", spec.Scope, err)
+		return nil, fmt.Errorf("code target %q: %w", spec.Scope, err)
 	}
 
 	var paths []string
@@ -121,19 +128,19 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*pb.Target, []*pb.TargetU
 			return nil
 		})
 		if err != nil {
-			return nil, nil, fmt.Errorf("code target %q: %w", spec.Scope, err)
+			return nil, fmt.Errorf("code target %q: %w", spec.Scope, err)
 		}
 	} else {
 		// A walk skips anything that is not a regular file; a target named
 		// directly has to be held to the same rule, since reading a FIFO or a
 		// device blocks with nothing to cancel it.
 		if !info.Mode().IsRegular() {
-			return nil, nil, fmt.Errorf("code target %q is not a regular file", spec.Scope)
+			return nil, fmt.Errorf("code target %q is not a regular file", spec.Scope)
 		}
 		paths = []string{abs}
 	}
 	if len(paths) == 0 {
-		return nil, nil, fmt.Errorf("code target %q holds no files to review", spec.Scope)
+		return nil, fmt.Errorf("code target %q holds no files to review", spec.Scope)
 	}
 	sort.Strings(paths)
 
@@ -142,12 +149,12 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*pb.Target, []*pb.TargetU
 	for _, p := range paths {
 		rel, err := filepath.Rel(base, p)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		rel = filepath.ToSlash(rel)
 		content, err := os.ReadFile(p)
 		if err != nil {
-			return nil, nil, fmt.Errorf("code target %q: %w", spec.Scope, err)
+			return nil, fmt.Errorf("code target %q: %w", spec.Scope, err)
 		}
 		body := sha256.Sum256(content)
 		// Path and content digest both enter the fingerprint, so renaming a file
@@ -156,13 +163,15 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*pb.Target, []*pb.TargetU
 		units = append(units, unit(rel, rel))
 	}
 
-	return &pb.Target{
+	// A directory, unlike every other kind: the reviewable unit of code is the
+	// tree the scope names.
+	return collected(&pb.Target{
 		Root:              spec.Root,
 		Scope:             spec.Scope,
 		FingerprintSha256: sum.Sum(nil),
 		Display:           truncate(spec.Scope),
 		Kind:              pb.TargetKind_TARGET_KIND_CODE,
-	}, units, nil
+	}, units, abs), nil
 }
 
 // contained resolves a code scope against its root and refuses one that leaves
@@ -223,10 +232,10 @@ func readRegular(kind, path string) ([]byte, error) {
 
 // collectDocument fingerprints a document's bytes and makes each heading a
 // unit. No repository is required.
-func (c TargetCollector) collectDocument(spec TargetSpec) (*pb.Target, []*pb.TargetUnit, error) {
+func (c TargetCollector) collectDocument(spec TargetSpec) (*Collected, error) {
 	content, err := readRegular("document", spec.Scope)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	sum := sha256.Sum256(content)
 	target := &pb.Target{
@@ -237,14 +246,14 @@ func (c TargetCollector) collectDocument(spec TargetSpec) (*pb.Target, []*pb.Tar
 	}
 	units, err := sections(string(content), spec.Scope)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return target, units, nil
+	return collected(target, units, spec.Scope), nil
 }
 
 // collectIdea fingerprints an argument's text and makes each paragraph a step.
 // "-" reads the argument from stdin, since a pasted argument has no file.
-func (c TargetCollector) collectIdea(spec TargetSpec) (*pb.Target, []*pb.TargetUnit, error) {
+func (c TargetCollector) collectIdea(spec TargetSpec) (*Collected, error) {
 	var (
 		content []byte
 		err     error
@@ -261,19 +270,26 @@ func (c TargetCollector) collectIdea(spec TargetSpec) (*pb.Target, []*pb.TargetU
 		content, err = readRegular("idea", spec.Scope)
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("idea target %q: %w", spec.Scope, err)
+		return nil, fmt.Errorf("idea target %q: %w", spec.Scope, err)
 	}
 	steps := paragraphs(string(content))
 	if len(steps) == 0 {
-		return nil, nil, fmt.Errorf("idea target %q holds no argument to review", spec.Scope)
+		return nil, fmt.Errorf("idea target %q holds no argument to review", spec.Scope)
 	}
 	sum := sha256.Sum256(content)
-	return &pb.Target{
+	out := collected(&pb.Target{
 		Scope:             scope,
 		FingerprintSha256: sum[:],
 		Display:           truncate(scope),
 		Kind:              pb.TargetKind_TARGET_KIND_IDEA,
-	}, steps, nil
+	}, steps, spec.Scope)
+	if spec.Scope == "-" {
+		// A pasted argument has no path of its own. The engine persists these
+		// and fills in where it put them.
+		out.ContentPath = ""
+		out.ContentBytes = content
+	}
+	return out, nil
 }
 
 // collectExternal fingerprints a frozen snapshot of an external source.
@@ -281,21 +297,23 @@ func (c TargetCollector) collectIdea(spec TargetSpec) (*pb.Target, []*pb.TargetU
 // Nothing here fetches the URI. A review must be repeatable and a network fetch
 // is not, so the snapshot the reviewer already took is the target and the URI
 // only names where it came from.
-func (c TargetCollector) collectExternal(spec TargetSpec) (*pb.Target, []*pb.TargetUnit, error) {
+func (c TargetCollector) collectExternal(spec TargetSpec) (*Collected, error) {
 	if spec.Snapshot == "" {
-		return nil, nil, fmt.Errorf("an external target needs a frozen snapshot; nothing here fetches %q", spec.Scope)
+		return nil, fmt.Errorf("an external target needs a frozen snapshot; nothing here fetches %q", spec.Scope)
 	}
 	content, err := readRegular("external snapshot", spec.Snapshot)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	sum := sha256.Sum256(content)
-	return &pb.Target{
+	// The snapshot is the target: pointing at the file the reviewer froze is
+	// what makes an external review repeatable.
+	return collected(&pb.Target{
 		Scope:             spec.Scope,
 		FingerprintSha256: sum[:],
 		Display:           truncate(spec.Scope),
 		Kind:              pb.TargetKind_TARGET_KIND_EXTERNAL,
-	}, []*pb.TargetUnit{unit(spec.Scope, spec.Scope)}, nil
+	}, []*pb.TargetUnit{unit(spec.Scope, spec.Scope)}, spec.Snapshot), nil
 }
 
 // sections splits a document at its ATX headings. A document with no heading is

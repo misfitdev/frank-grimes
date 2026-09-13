@@ -391,6 +391,93 @@ fi
 rm -rf "$WS"
 
 echo ""
+echo "--- The provider reads the target it was asked to review ---"
+
+# provider-verify-content.sh digests what it was handed and refuses to report
+# unless that digest is the target the engine named. A run that succeeds is
+# therefore a run where the provider saw the artifact, which is the whole point:
+# a finding about an artifact nobody could read is a finding about nothing.
+run_verified() {
+    local ws="$1"
+    shift
+    set +e
+    VERIFY_OUT="$(cd "$ws" && "$GRIMES" run --dir=. \
+        --provider-command="$FAKES/provider-verify-content.sh" "$@" 2>&1)"
+    VERIFY_CODE=$?
+    set -e
+}
+
+# A blocking verdict means the provider read the content and reported on it.
+# Anything else is the fake refusing, and its reason is worth printing.
+assert_verified() {
+    if [[ "$VERIFY_CODE" == "4" ]]; then
+        pass "$1"
+    else
+        fail "$1 (exit $VERIFY_CODE): $(tail -1 <<<"$VERIFY_OUT")"
+    fi
+}
+
+# A pasted argument: consumed from stdin, so it exists nowhere until the engine
+# writes it down.
+WS="$(mktemp -d)"
+set +e
+VERIFY_OUT="$(cd "$WS" && printf 'First, costs fall.\n\nTherefore we should ship.\n' |
+    "$GRIMES" run --dir=. --kind=idea \
+        --provider-command="$FAKES/provider-verify-content.sh" - 2>&1)"
+VERIFY_CODE=$?
+set -e
+assert_verified "a pasted argument is readable by the provider"
+if [[ -f "$WS/.grimes/target.bin" ]]; then
+    pass "a target with no path of its own is written down"
+else
+    fail "a pasted argument was never written down"
+fi
+rm -rf "$WS"
+
+# An external target: the snapshot is the artifact, and it already has a path.
+WS="$(mktemp -d)"
+printf 'Clause 4: retention is 30 days.\n' >"$WS/frozen.txt"
+run_verified "$WS" --kind=external --snapshot=frozen.txt "https://example.com/policy"
+assert_verified "an external snapshot is readable by the provider"
+if [[ -f "$WS/.grimes/target.bin" ]]; then
+    fail "an external snapshot was copied when it already had a path"
+else
+    pass "a target that has a path is not copied"
+fi
+rm -rf "$WS"
+
+WS="$(mktemp -d)"
+printf '# One\n\ntext\n' >"$WS/spec.md"
+run_verified "$WS" --kind=document spec.md
+assert_verified "a document is readable by the provider"
+rm -rf "$WS"
+
+WS="$(mktemp -d)"
+mkdir -p "$WS/src"
+printf 'echo one\n' >"$WS/src/a.sh"
+run_verified "$WS" src
+assert_verified "a code target is handed the tree under review"
+rm -rf "$WS"
+
+# The adjudicator judges the same artifact. Zero knowledge is about the first
+# report, not about the target, and an adjudicator that cannot read a pasted
+# argument cannot form an opinion of its own.
+WS="$(mktemp -d)"
+printf 'Clause 4: retention is 30 days.\n' >"$WS/frozen.txt"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --kind=external --snapshot=frozen.txt \
+    --provider-command="$FAKES/provider-red.sh" \
+    --adjudicator-command="$FAKES/adjudicator-reads-content.sh" \
+    --format=prototext "https://example.com/policy" 2>&1)"
+set -e
+if echo "$OUT" | grep -qE 'zero_knowledge: +true'; then
+    pass "an adjudicator that read the artifact still records an independent review"
+else
+    fail "the adjudicator could not read the artifact: $OUT"
+fi
+rm -rf "$WS"
+
+echo ""
 echo "--- The inventory belongs to the target it was taken from ---"
 
 WS="$(mktemp -d)"

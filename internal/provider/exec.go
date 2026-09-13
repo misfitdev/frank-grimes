@@ -151,6 +151,10 @@ func requestEnv(req engine.Request) []string {
 		// The kind selects what each evidence tier requires of a finding, so a
 		// provider that did not know it would cite a document as if it were code.
 		"GRIMES_TARGET_KIND=" + strings.ToLower(short(req.Target.GetKind().String(), "TARGET_KIND_")),
+		// Where the reviewed bytes are. Both roles get it: an adjudicator that
+		// cannot see the artifact cannot form an opinion of its own, and zero
+		// knowledge is about the first report, not the target.
+		"GRIMES_TARGET_CONTENT=" + req.ContentPath,
 	}
 	if req.Role == engine.RoleAdjudicator {
 		return append(env,

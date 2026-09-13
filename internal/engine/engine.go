@@ -56,14 +56,15 @@ type ProviderAdjudicator struct {
 	Clock      Clock
 }
 
-func (a ProviderAdjudicator) Adjudicate(ctx context.Context, target *pb.Target, claimed *pb.Verdict) (*pb.IndependentReview, error) {
+func (a ProviderAdjudicator) Adjudicate(ctx context.Context, target *pb.Target, contentPath string, claimed *pb.Verdict) (*pb.IndependentReview, error) {
 	if a.Provider == nil {
 		return nil, fmt.Errorf("no adjudicator configured")
 	}
 	out, err := a.Provider.Review(ctx, Request{
-		Role:    RoleAdjudicator,
-		Target:  target,
-		Claimed: claimed,
+		Role:        RoleAdjudicator,
+		Target:      target,
+		ContentPath: contentPath,
+		Claimed:     claimed,
 	})
 	if err != nil {
 		return nil, err

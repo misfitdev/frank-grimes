@@ -222,6 +222,10 @@ Sealing happens inside the run, as the provider command: the engine exports the
 run identity to the provider it invokes, and `report seal` reads it from there,
 so the flags below carry only what the caller supplies.
 
+`$GRIMES_TARGET_CONTENT` is where the engine put the bytes under review — a
+directory for a code target, a file otherwise. Read the target from there rather
+than from the scope, which for a pasted argument names no path at all.
+
 ```bash
 grimes run --dir=. \
   --provider-command="grimes-contract report seal \

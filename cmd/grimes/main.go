@@ -109,6 +109,7 @@ func cmdRun(args []string) (int, error) {
 		Adjudicator:   adjudicatorFor(cfg),
 		Gate:          engine.NotApplicableGate{},
 		Inventory:     store.NewFileInventoryStore(cfg.Dir),
+		Content:       store.NewFileContentStore(cfg.Dir),
 		Ledger:        store.NewFileLedger(cfg.Dir),
 		Results:       store.NewFileResultStore(cfg.Dir),
 		State:         store.NewFileStateStore(cfg.Dir),
