@@ -27,11 +27,7 @@ if [[ "${GRIMES_TARGET_KIND:-code}" != "code" ]]; then
         echo "content for ${GRIMES_TARGET_KIND} is a directory" >&2
         exit 1
     fi
-    if command -v sha256sum >/dev/null 2>&1; then
-        GOT="$(sha256sum "$GRIMES_TARGET_CONTENT" | cut -d" " -f1)"
-    else
-        GOT="$(shasum -a 256 "$GRIMES_TARGET_CONTENT" | cut -d" " -f1)"
-    fi
+    GOT="$("$FAKES/sha256.sh" "$GRIMES_TARGET_CONTENT")"
     if [[ "$GOT" != "${GRIMES_TARGET_FINGERPRINT:-}" ]]; then
         echo "content digest ${GOT} is not the target ${GRIMES_TARGET_FINGERPRINT:-(unset)}" >&2
         exit 1
