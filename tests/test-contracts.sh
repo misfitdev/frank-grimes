@@ -319,6 +319,39 @@ fi
 rm -rf "$WORK"
 
 echo ""
+echo "--- Sealing ends the report it sealed ---"
+
+# The next seal stamps the current run's identity onto whatever candidates it
+# finds. Leaving them would let a later request adopt findings its own pass
+# never made, and they would pass the engine's binding check because the
+# identity is current.
+WORK="$(mktemp -d)"
+mkdir -p "$WORK/.grimes"
+(
+    cd "$WORK" || exit 1
+    "$BIN" report add --category=SEC --severity=P2 --blast=local_component \
+        --likelihood=unlikely --path=a.sh --tier=E2 --claim="c" --quote="q" >/dev/null
+    "$BIN" report seal --target-root=/repo --target-scope=a.sh --iteration=1 \
+        --routed=SEC --examined=1 --disproved=0 --summary="s" >/dev/null
+) || fail "the seal sequence failed"
+
+if [[ -f "$WORK/.grimes/report.textproto" ]]; then
+    fail "the working report survived its own sealing"
+else
+    pass "sealing clears the candidates it sealed"
+fi
+
+SECOND="$(cd "$WORK" && "$BIN" report seal --target-root=/repo --target-scope=a.sh \
+    --iteration=2 --routed=SEC --examined=0 --disproved=0 --summary="s" |
+    "$BIN" decode-report)"
+if grep -q 'candidates' <<<"$SECOND"; then
+    fail "a later seal readopted the previous report's candidates"
+else
+    pass "a later seal carries no candidate it was not given"
+fi
+rm -rf "$WORK"
+
+echo ""
 echo "--- A retrieved source carries its retrieval identity ---"
 
 # Every --source candidate was rejected by validation, because the anchor was

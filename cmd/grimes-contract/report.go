@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -265,19 +264,25 @@ func cmdReportSeal(args []string) error {
 		return err
 	}
 
-	// Sealing ends this report. The candidates accumulated in the working file
-	// answered the request just sealed, and leaving them would let the next seal
-	// stamp the current run's identity onto them: they would pass the binding
-	// and be admitted again, re-reporting findings this pass never made.
+	if *raw {
+		if _, err := os.Stdout.Write(encoded); err != nil {
+			return err
+		}
+	} else if _, err := fmt.Print(envelope.WrapReport(encoded)); err != nil {
+		return err
+	}
+
+	// Sealing ends this report, but only once it has been delivered. The
+	// candidates in the working file are the only durable copy, and a write that
+	// failed — an engine closing an over-limit pipe, say — would otherwise take
+	// them with it, leaving nothing to inspect or retry.
+	//
+	// Clearing matters because the next seal stamps the current run's identity
+	// onto whatever it finds: candidates left here would pass the binding and be
+	// admitted again, re-reporting findings that pass never made.
 	if err := os.Remove(*file); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("clearing the sealed report: %w", err)
 	}
-
-	if *raw {
-		_, err := os.Stdout.Write(encoded)
-		return err
-	}
-	fmt.Print(envelope.WrapReport(encoded))
 	return nil
 }
 
@@ -321,11 +326,9 @@ func saveReport(path string, report *pb.ProviderReport) error {
 	if err != nil {
 		return err
 	}
-	if dir := filepath.Dir(path); dir != "." {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return err
-		}
-	}
+	// Creating the directory here would hide it from WriteAtomic, which syncs
+	// only the directories it creates itself; the new entry in the repository
+	// would then never be made durable.
 	return contracts.WriteAtomic(path, []byte(out))
 }
 
