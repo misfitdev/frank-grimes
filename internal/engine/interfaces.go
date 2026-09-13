@@ -57,8 +57,12 @@ type Collected struct {
 	Target     *pb.Target
 	Inventory  *pb.TargetInventory
 	Categories []pb.Category
-	// ContentPath is where the reviewed bytes are, absolute. A directory for a
-	// code target, a file for every other kind.
+	// ContentPath is where the reviewed bytes are. Always absolute: collection
+	// resolves a relative scope against its own working directory and the
+	// provider runs in another, so a relative path would name two files.
+	//
+	// A directory when the target is a tree, a file when it is one file. A code
+	// target may be either.
 	ContentPath string
 	// ContentBytes is set only when the target has no path of its own, which
 	// today means an argument read from stdin. The engine persists it and fills

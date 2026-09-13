@@ -459,6 +459,29 @@ run_verified "$WS" src
 assert_verified "a code target is handed the tree under review"
 rm -rf "$WS"
 
+# A code target may name one file rather than a tree; collection supports it,
+# so the content path is that file and nothing downstream may assume otherwise.
+WS="$(mktemp -d)"
+printf 'echo one\n' >"$WS/lone.sh"
+run_verified "$WS" lone.sh
+assert_verified "a single-file code target is handed that file"
+rm -rf "$WS"
+
+# Collection resolves a relative scope against its own working directory and the
+# provider runs in the review directory. The same name in both is two different
+# files, and the provider must be pointed at the one that was fingerprinted.
+WS="$(mktemp -d)"
+ELSEWHERE="$(mktemp -d)"
+printf 'the one collection read\n' >"$ELSEWHERE/spec.md"
+printf 'the one in the review directory\n' >"$WS/spec.md"
+set +e
+VERIFY_OUT="$(cd "$ELSEWHERE" && "$GRIMES" run --dir="$WS" --kind=document \
+    --provider-command="$FAKES/provider-verify-content.sh" spec.md 2>&1)"
+VERIFY_CODE=$?
+set -e
+assert_verified "a relative scope names one file to both halves of the run"
+rm -rf "$WS" "$ELSEWHERE"
+
 # The adjudicator judges the same artifact. Zero knowledge is about the first
 # report, not about the target, and an adjudicator that cannot read a pasted
 # argument cannot form an opinion of its own.

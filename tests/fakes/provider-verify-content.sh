@@ -19,8 +19,9 @@ if [[ ! -e "$GRIMES_TARGET_CONTENT" ]]; then
     exit 1
 fi
 
-# A code target is a tree, and its fingerprint is taken over path-and-digest
-# pairs rather than any one file's bytes, so only the single-file kinds compare.
+# A code fingerprint is taken over path-and-digest pairs rather than any one
+# file's bytes, so only the other kinds can compare a digest. A code target is
+# a tree or a single file; both are supported, so neither shape is an error.
 if [[ "${GRIMES_TARGET_KIND:-code}" != "code" ]]; then
     if [[ -d "$GRIMES_TARGET_CONTENT" ]]; then
         echo "content for ${GRIMES_TARGET_KIND} is a directory" >&2
@@ -35,9 +36,14 @@ if [[ "${GRIMES_TARGET_KIND:-code}" != "code" ]]; then
         echo "content digest ${GOT} is not the target ${GRIMES_TARGET_FINGERPRINT:-(unset)}" >&2
         exit 1
     fi
-elif [[ ! -d "$GRIMES_TARGET_CONTENT" ]]; then
-    echo "content for a code target is not a tree" >&2
-    exit 1
+else
+    # A code fingerprint cannot be recomputed here, so the check is that the
+    # content is the scope the engine named rather than something near it.
+    # Without this a path pointing one level up would still exist and pass.
+    if [[ "$(basename "$GRIMES_TARGET_CONTENT")" != "$(basename "$GRIMES_TARGET_SCOPE")" ]]; then
+        echo "content ${GRIMES_TARGET_CONTENT} is not the scope ${GRIMES_TARGET_SCOPE}" >&2
+        exit 1
+    fi
 fi
 
 cd "$(mktemp -d)"

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"path/filepath"
 
 	"github.com/misfitdev/frank-grimes/internal/contracts"
 )
@@ -28,5 +29,7 @@ func (c *FileContentStore) Save(ctx context.Context, content []byte) (string, er
 	if err := contracts.WriteAtomic(c.Path, content); err != nil {
 		return "", err
 	}
-	return c.Path, nil
+	// Absolute: the provider resolves this from the review directory, which is
+	// not necessarily the one this path was built against.
+	return filepath.Abs(c.Path)
 }

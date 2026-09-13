@@ -78,6 +78,15 @@ func (c TargetCollector) Collect(ctx context.Context, spec TargetSpec) (*Collect
 
 // collected assembles what every kind returns in common.
 func collected(target *pb.Target, units []*pb.TargetUnit, contentPath string) *Collected {
+	// Absolute, because the provider runs in the review directory while
+	// collection resolved this against its own. The same relative name in both
+	// is two different files, and the provider would review the one nobody
+	// fingerprinted.
+	if contentPath != "" {
+		if abs, err := filepath.Abs(contentPath); err == nil {
+			contentPath = abs
+		}
+	}
 	return &Collected{
 		Target: target,
 		Inventory: &pb.TargetInventory{
@@ -163,8 +172,9 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*Collected, error) {
 		units = append(units, unit(rel, rel))
 	}
 
-	// A directory, unlike every other kind: the reviewable unit of code is the
-	// tree the scope names.
+	// The scope itself: a tree when it names a directory, one file when it names
+	// a file. Both are supported targets, and the fingerprint is taken over
+	// path-and-digest pairs either way.
 	return collected(&pb.Target{
 		Root:              spec.Root,
 		Scope:             spec.Scope,
