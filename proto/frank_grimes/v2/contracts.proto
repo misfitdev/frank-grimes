@@ -438,6 +438,23 @@ message Finding {
 }
 
 message Ledger {
+  // A finding lives in the target under review. A code ledger holding a
+  // document_part is a finding about something else, and coverage counted
+  // against this target's inventory would never account for it.
+  //
+  // Only Finding.location.anchor is constrained. Evidence.citation.anchor is
+  // deliberately free: a finding in code may cite the spec it contradicts.
+  option (buf.validate.message).cel = {
+    id: "ledger.anchor_kind_matches_target"
+    message: "each finding must be anchored in the kind of target under review"
+    expression:
+      "this.findings.all(k, "
+      "this.target.kind == 1 ? has(this.findings[k].location.anchor.repo_line) : "
+      "this.target.kind == 2 ? has(this.findings[k].location.anchor.document_part) : "
+      "this.target.kind == 3 ? has(this.findings[k].location.anchor.argument_step) : "
+      "has(this.findings[k].location.anchor.retrieved_source))"
+  };
+
   uint32 schema_major = 1 [(buf.validate.field).uint32.const = 2];
   uint32 schema_minor = 2;
   Target target = 3 [(buf.validate.field).required = true];

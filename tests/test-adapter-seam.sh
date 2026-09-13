@@ -129,7 +129,10 @@ cp "$HOOK" "$SANDBOX/hooks/stop.sh"
 chmod +x "$SANDBOX/hooks/stop.sh"
 
 # The adapter is expected to drive the engine rather than hand-write a record.
-if grep -qE 'grimes run|grimes-contract encode-result' "$GRIND"; then
+# `grimes-contract encode-result` would not satisfy that: it is a codec call
+# that produces no engine-owned run record, and accepting it here would let the
+# end-to-end case below validate a test-authored invocation instead.
+if grep -qE '^grimes run|grimes run --dir' "$GRIND"; then
     pass "grind.md drives the engine to produce its result"
 else
     fail "grind.md never invokes the engine, so no run record is ever produced"

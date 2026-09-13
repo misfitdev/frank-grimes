@@ -1,0 +1,19 @@
+# The same finding shape, in a review of the document it is anchored in.
+schema_major: 2
+target { scope: "spec.md" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_DOCUMENT }
+findings {
+  key: "FG-SEC-0123456789ab"
+  value {
+    id: "FG-SEC-0123456789ab"
+    fingerprint_sha256: "01234567890123456789012345678901"
+    category: CATEGORY_SEC
+    location { anchor { document_part { document: "spec.md" section: "4.2" } } }
+    risk { severity: SEVERITY_P2 likelihood: LIKELIHOOD_UNLIKELY blast_radius: BLAST_RADIUS_LOCAL_COMPONENT }
+    evidence { tier: EVIDENCE_TIER_E2 claim: "c" citation { anchor { repo_line { path { value: "src/a.go" } line: 4 } } quote: "q" } }
+    evidence_sha256: "01234567890123456789012345678901"
+    status: FINDING_STATUS_OPEN
+    first_seen { seconds: 1767225600 }
+    last_seen { seconds: 1767225600 }
+    history { iteration: 1 to: FINDING_STATUS_OPEN evidence_sha256: "01234567890123456789012345678901" at { seconds: 1767225600 } actor: "grimes" }
+  }
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -820,5 +821,34 @@ func TestRunRejectsAStaleReport(t *testing.T) {
 	}
 	if l.saves != 0 {
 		t.Errorf("a rejected report still wrote the ledger %d times", l.saves)
+	}
+}
+
+// The broker decides whether a candidate's evidence earns the severity it
+// claims. It was dead code until a provider could report findings at all, so
+// this pins that it is consulted: a candidate it refuses must not reach the
+// ledger, whatever the report says.
+type refusingBroker struct{ called bool }
+
+func (b *refusingBroker) Admit(context.Context, *pb.CandidateFinding) (*pb.CandidateFinding, error) {
+	b.called = true
+	return nil, fmt.Errorf("%w: refused by the broker", ErrProviderOutput)
+}
+
+func TestRunConsultsTheEvidenceBroker(t *testing.T) {
+	l := &memLedger{}
+	b := &refusingBroker{}
+	e := newEngine(&fakeProvider{out: report(t, seedCandidate())}, l, &memState{}, nil)
+	e.Broker = b
+
+	_, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
+	if !b.called {
+		t.Fatal("the broker was never consulted")
+	}
+	if err == nil {
+		t.Fatal("a refused candidate was admitted anyway")
+	}
+	if l.saves != 0 {
+		t.Errorf("a refused candidate still wrote the ledger %d times", l.saves)
 	}
 }

@@ -3,9 +3,11 @@ package contracts
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"buf.build/go/protovalidate"
@@ -133,6 +135,10 @@ func ParseTextProto(b []byte, m proto.Message) error {
 // WriteAtomic writes through a temporary file in the same directory followed by
 // a rename, so a crash mid-write cannot leave a half-written ledger that the
 // next run would quarantine.
+//
+// The directory is synced after the rename as well as the file before it. A
+// rename is a directory modification, so without that a caller can be told its
+// write succeeded and find no file after power loss.
 func WriteAtomic(path string, data []byte) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -156,7 +162,30 @@ func WriteAtomic(path string, data []byte) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmpName, path)
+	if err := os.Rename(tmpName, path); err != nil {
+		return err
+	}
+	return syncDirectory(dir)
+}
+
+// syncDirectory is a variable so a test can observe that it was called. An
+// fsync has no effect anything short of power loss can see, so without this the
+// call could be dropped and every assertion would still pass.
+var syncDirectory = syncDir
+
+func syncDir(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	// Some filesystems refuse fsync on a directory. The rename already happened,
+	// so a refusal is not a failed write; a real I/O error still is.
+	if err := d.Sync(); err != nil && !errors.Is(err, syscall.EINVAL) &&
+		!errors.Is(err, syscall.ENOTSUP) {
+		d.Close()
+		return err
+	}
+	return d.Close()
 }
 
 // Quarantine moves an unusable file aside rather than deleting it. A corrupt

@@ -3871,7 +3871,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\ahistory\x18\f \x03(\v2\x1d.frank_grimes.v2.FindingEventB\b\xbaH\x05\x92\x01\x02\b\x01R\ahistory:\xf7\x02\xbaH\xf3\x02\x1au\n" +
 	"%finding.accepted_requires_human_owner\x12'accepted findings require a human owner\x1a#this.status != 4 || has(this.owner)\x1av\n" +
 	"\x1cfinding.p0_requires_e1_or_e2\x12\x1dP0 requires E1 or E2 evidence\x1a7this.risk.severity != 1 || this.evidence.tier in [1, 2]\x1a\x81\x01\n" +
-	"\x15finding.e3_caps_at_p1\x124inferred evidence cannot support a severity above P1\x1a2this.evidence.tier != 3 || this.risk.severity != 1\"\xaa\x02\n" +
+	"\x15finding.e3_caps_at_p1\x124inferred evidence cannot support a severity above P1\x1a2this.evidence.tier != 3 || this.risk.severity != 1\"\xce\x05\n" +
 	"\x06Ledger\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
 	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x127\n" +
@@ -3879,7 +3879,8 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\bfindings\x18\x04 \x03(\v2%.frank_grimes.v2.Ledger.FindingsEntryR\bfindings\x1aU\n" +
 	"\rFindingsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12.\n" +
-	"\x05value\x18\x02 \x01(\v2\x18.frank_grimes.v2.FindingR\x05value:\x028\x01\"\xda\x02\n" +
+	"\x05value\x18\x02 \x01(\v2\x18.frank_grimes.v2.FindingR\x05value:\x028\x01:\xa1\x03\xbaH\x9d\x03\x1a\x9a\x03\n" +
+	"!ledger.anchor_kind_matches_target\x12@each finding must be anchored in the kind of target under review\x1a\xb2\x02this.findings.all(k, this.target.kind == 1 ? has(this.findings[k].location.anchor.repo_line) : this.target.kind == 2 ? has(this.findings[k].location.anchor.document_part) : this.target.kind == 3 ? has(this.findings[k].location.anchor.argument_step) : has(this.findings[k].location.anchor.retrieved_source))\"\xda\x02\n" +
 	"\aVerdict\x12A\n" +
 	"\bdecision\x18\x01 \x01(\x0e2\x19.frank_grimes.v2.DecisionB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\bdecision\x12N\n" +
