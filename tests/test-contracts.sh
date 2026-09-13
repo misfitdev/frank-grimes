@@ -215,6 +215,32 @@ else
 fi
 
 echo ""
+echo "--- Report and result envelopes stay distinct ---"
+VALID_REPORT="$FIXTURES/report.p0-with-citation.valid.textproto"
+REPORT_ENV="$(mktemp)"
+"$BIN" encode-report "$VALID_REPORT" >"$REPORT_ENV"
+
+if grep -q 'GRIMES_REPORT_PROTOBUF_V2_BEGIN' "$REPORT_ENV"; then
+    pass "a report is wrapped in the report envelope"
+else
+    fail "a report is not wrapped in the report envelope"
+fi
+
+if "$BIN" decode-report "$REPORT_ENV" | grep -qE 'run_id: *"run-001"'; then
+    pass "a report envelope round-trips"
+else
+    fail "a report envelope does not round-trip"
+fi
+
+# A payload sent the wrong way must fail on the marker, not deep in validation.
+if "$BIN" decode-result "$REPORT_ENV" &>/dev/null; then
+    fail "a report envelope was accepted as a result"
+else
+    pass "a report envelope is not accepted as a result"
+fi
+rm -f "$REPORT_ENV"
+
+echo ""
 echo "--- Envelope extraction ---"
 ENVELOPE="$(mktemp)"
 {

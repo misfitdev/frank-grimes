@@ -115,3 +115,32 @@ func TestContains(t *testing.T) {
 		t.Error("want Contains false for plain prose")
 	}
 }
+
+// The two marker pairs must not accept each other's payloads: a report sent
+// where a result belongs should fail on the marker, not on validation.
+func TestMarkersDoNotCrossAccept(t *testing.T) {
+	payload := []byte("x")
+	if _, err := Extract(WrapReport(payload)); err == nil {
+		t.Error("a report envelope was accepted as a result")
+	}
+	if _, err := ExtractReport(Wrap(payload)); err == nil {
+		t.Error("a result envelope was accepted as a report")
+	}
+	if Contains(WrapReport(payload)) {
+		t.Error("Contains matched a report envelope")
+	}
+	if ContainsReport(Wrap(payload)) {
+		t.Error("ContainsReport matched a result envelope")
+	}
+}
+
+func TestReportRoundTrip(t *testing.T) {
+	want := []byte{0x08, 0x02, 0x1a, 0x03, 'a', 'b', 'c'}
+	got, err := ExtractReport("prose\n" + WrapReport(want) + "more prose\n")
+	if err != nil {
+		t.Fatalf("ExtractReport: %v", err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Errorf("got %x, want %x", got, want)
+	}
+}
