@@ -21,6 +21,10 @@ import (
 // maxUnitLabel is the contract's bound on TargetUnit.label.
 const maxUnitLabel = 512
 
+// maxDocumentLine bounds one line of a document, so a pathological file cannot
+// make collection allocate without limit.
+const maxDocumentLine = 4 * 1024 * 1024
+
 // TargetCollector resolves a caller's target into a fingerprinted target and
 // the inventory of units a review is accountable for.
 //
@@ -49,6 +53,8 @@ func (c TargetCollector) Collect(ctx context.Context, spec TargetSpec) (*pb.Targ
 		err    error
 	)
 	switch spec.Kind {
+	case pb.TargetKind_TARGET_KIND_CODE:
+		target, units, err = c.collectCode(spec)
 	case pb.TargetKind_TARGET_KIND_DOCUMENT:
 		target, units, err = c.collectDocument(spec)
 	case pb.TargetKind_TARGET_KIND_IDEA:
@@ -56,7 +62,9 @@ func (c TargetCollector) Collect(ctx context.Context, spec TargetSpec) (*pb.Targ
 	case pb.TargetKind_TARGET_KIND_EXTERNAL:
 		target, units, err = c.collectExternal(spec)
 	default:
-		target, units, err = c.collectCode(spec)
+		// Falling through to code would review a caller's unnamed kind as a
+		// repository path and report a verdict over the wrong thing.
+		return nil, nil, nil, fmt.Errorf("unsupported target kind %v", spec.Kind)
 	}
 	if err != nil {
 		return nil, nil, nil, err
@@ -85,8 +93,11 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*pb.Target, []*pb.TargetU
 	if spec.Root == "" {
 		return nil, nil, fmt.Errorf("a code target needs a repository root")
 	}
-	abs := filepath.Join(spec.Root, spec.Scope)
-	info, err := os.Stat(abs)
+	abs, base, err := contained(spec.Root, spec.Scope)
+	if err != nil {
+		return nil, nil, err
+	}
+	info, err := os.Lstat(abs)
 	if err != nil {
 		return nil, nil, fmt.Errorf("code target %q: %w", spec.Scope, err)
 	}
@@ -113,6 +124,12 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*pb.Target, []*pb.TargetU
 			return nil, nil, fmt.Errorf("code target %q: %w", spec.Scope, err)
 		}
 	} else {
+		// A walk skips anything that is not a regular file; a target named
+		// directly has to be held to the same rule, since reading a FIFO or a
+		// device blocks with nothing to cancel it.
+		if !info.Mode().IsRegular() {
+			return nil, nil, fmt.Errorf("code target %q is not a regular file", spec.Scope)
+		}
 		paths = []string{abs}
 	}
 	if len(paths) == 0 {
@@ -123,7 +140,7 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*pb.Target, []*pb.TargetU
 	sum := sha256.New()
 	units := make([]*pb.TargetUnit, 0, len(paths))
 	for _, p := range paths {
-		rel, err := filepath.Rel(spec.Root, p)
+		rel, err := filepath.Rel(base, p)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -148,6 +165,41 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*pb.Target, []*pb.TargetU
 	}, units, nil
 }
 
+// contained resolves a code scope against its root and refuses one that leaves
+// it.
+//
+// A review names the repository it covers, and a scope of "../elsewhere" would
+// walk files the caller did not put under review while the ledger still claims
+// the named root. Symlinks are resolved first, so a link out of the tree is
+// refused the same way a "../" is.
+func contained(root, scope string) (abs, base string, err error) {
+	// Absolute first, then resolved: EvalSymlinks leaves a relative root
+	// relative, and comparing a relative base against a resolved target reads
+	// every target as an escape.
+	if base, err = filepath.Abs(root); err != nil {
+		return "", "", err
+	}
+	if base, err = filepath.EvalSymlinks(base); err != nil {
+		return "", "", fmt.Errorf("repository root %q: %w", root, err)
+	}
+	if abs, err = filepath.Abs(filepath.Join(base, scope)); err != nil {
+		return "", "", err
+	}
+	// A missing target is reported by the caller's stat, so an unresolvable
+	// path is passed through rather than reported as an escape.
+	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = resolved
+	}
+	rel, err := filepath.Rel(base, abs)
+	if err != nil {
+		return "", "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", "", fmt.Errorf("code target %q resolves outside the repository root", scope)
+	}
+	return abs, base, nil
+}
+
 // collectDocument fingerprints a document's bytes and makes each heading a
 // unit. No repository is required.
 func (c TargetCollector) collectDocument(spec TargetSpec) (*pb.Target, []*pb.TargetUnit, error) {
@@ -156,12 +208,17 @@ func (c TargetCollector) collectDocument(spec TargetSpec) (*pb.Target, []*pb.Tar
 		return nil, nil, fmt.Errorf("document target %q: %w", spec.Scope, err)
 	}
 	sum := sha256.Sum256(content)
-	return &pb.Target{
+	target := &pb.Target{
 		Scope:             spec.Scope,
 		FingerprintSha256: sum[:],
 		Display:           truncate(filepath.Base(spec.Scope)),
 		Kind:              pb.TargetKind_TARGET_KIND_DOCUMENT,
-	}, sections(string(content), spec.Scope), nil
+	}
+	units, err := sections(string(content), spec.Scope)
+	if err != nil {
+		return nil, nil, err
+	}
+	return target, units, nil
 }
 
 // collectIdea fingerprints an argument's text and makes each paragraph a step.
@@ -222,25 +279,63 @@ func (c TargetCollector) collectExternal(spec TargetSpec) (*pb.Target, []*pb.Tar
 
 // sections splits a document at its ATX headings. A document with no heading is
 // one unit, since the whole of it is still accountable.
-func sections(text, name string) []*pb.TargetUnit {
+//
+// A fenced block is skipped: a shell comment or a preprocessor line inside one
+// is not a section, and counting it would inflate the denominator coverage is
+// measured against.
+func sections(text, name string) ([]*pb.TargetUnit, error) {
 	var units []*pb.TargetUnit
+	taken := map[string]int{}
+	fenced := false
 	scanner := bufio.NewScanner(strings.NewReader(text))
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
+	scanner.Buffer(make([]byte, 0, 64*1024), maxDocumentLine)
 	for scanner.Scan() {
 		line := strings.TrimRight(scanner.Text(), "\r")
-		if !strings.HasPrefix(line, "#") {
+		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "```") ||
+			strings.HasPrefix(trimmed, "~~~") {
+			fenced = !fenced
 			continue
 		}
-		title := strings.TrimSpace(strings.TrimLeft(line, "#"))
+		if fenced || !strings.HasPrefix(line, "#") {
+			continue
+		}
+		// ATX requires a space after the hashes, so "#nottag" is text.
+		rest := strings.TrimLeft(line, "#")
+		if rest != "" && !strings.HasPrefix(rest, " ") && !strings.HasPrefix(rest, "\t") {
+			continue
+		}
+		title := strings.TrimSpace(rest)
 		if title == "" {
 			continue
 		}
-		units = append(units, unit(slug(title), title))
+		units = append(units, unit(uniqueID(slug(title), title, taken), title))
+	}
+	// A line past the buffer stops the scan, and the headings after it would
+	// silently vanish from an inventory that still claims the whole document.
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("document %q: %w", name, err)
 	}
 	if len(units) == 0 {
-		return []*pb.TargetUnit{unit(name, filepath.Base(name))}
+		return []*pb.TargetUnit{unit(name, filepath.Base(name))}, nil
 	}
-	return units
+	return units, nil
+}
+
+// uniqueID keeps a unit's identifier non-empty and distinct.
+//
+// A heading of "---" or one made only of emoji slugs to nothing, and the
+// contract refuses an empty id; two identical headings would otherwise share
+// one id and coverage could not tell them apart.
+func uniqueID(id, title string, taken map[string]int) string {
+	if id == "" {
+		sum := sha256.Sum256([]byte(title))
+		id = "section-" + hex.EncodeToString(sum[:4])
+	}
+	taken[id]++
+	if n := taken[id]; n > 1 {
+		return fmt.Sprintf("%s-%d", id, n)
+	}
+	return id
 }
 
 // paragraphs numbers an argument's steps. A step is the unit an argument is

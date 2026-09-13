@@ -41,13 +41,6 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	if err != nil {
 		return nil, fmt.Errorf("collect: %w", err)
 	}
-	// The inventory is recorded before the target is attacked, so the units a
-	// later iteration is accountable for are the ones the first one resolved.
-	if e.Inventory != nil {
-		if err := e.Inventory.Save(ctx, inventory); err != nil {
-			return nil, fmt.Errorf("inventory: %w", err)
-		}
-	}
 
 	iteration, err := e.resume(ctx, target)
 	if err != nil {
@@ -60,6 +53,16 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	}
 	if err := adoptLedger(ledger, target); err != nil {
 		return nil, err
+	}
+
+	// Written only once the state and the ledger have agreed this run belongs to
+	// this target, and before the target is attacked. Writing it earlier would
+	// leave a rejected run's inventory behind, describing a target the surviving
+	// state and ledger are not about.
+	if e.Inventory != nil {
+		if err := e.Inventory.Save(ctx, inventory); err != nil {
+			return nil, fmt.Errorf("inventory: %w", err)
+		}
 	}
 
 	report, err := e.review(ctx, target, categories, mode, iteration)

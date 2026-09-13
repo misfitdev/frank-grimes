@@ -235,6 +235,80 @@ fi
 rm -rf "$WS"
 
 echo ""
+echo "--- A code target cannot leave the repository root ---"
+
+# A review names the repository it covers. Walking out of it would put files
+# under review that the caller did not name, while the record still claims the
+# named root.
+WS="$(mktemp -d)"
+OUTSIDE="$(mktemp -d)"
+mkdir -p "$WS/repo/src"
+printf 'echo inside\n' >"$WS/repo/src/a.sh"
+printf 'secret\n' >"$OUTSIDE/secret.txt"
+for escape in "../outside" "src/../../outside"; do
+    set +e
+    OUT="$(cd "$WS/repo" && "$GRIMES" run --dir=. \
+        --provider-command="$FAKES/provider-red.sh" "$escape" 2>&1)"
+    CODE=$?
+    set -e
+    if [[ "$CODE" == "1" ]] && grep -qi 'outside the repository root' <<<"$OUT"; then
+        pass "a scope of $escape is refused by name"
+    else
+        fail "a scope of $escape was not refused (exit $CODE)"
+    fi
+done
+# A symlink is the same escape wearing a different hat.
+ln -s "$OUTSIDE" "$WS/repo/link"
+set +e
+OUT="$(cd "$WS/repo" && "$GRIMES" run --dir=. \
+    --provider-command="$FAKES/provider-red.sh" link 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" == "1" ]] && grep -qi 'outside the repository root' <<<"$OUT"; then
+    pass "a symlink out of the root is refused"
+else
+    fail "a symlink out of the root was not refused (exit $CODE)"
+fi
+rm -rf "$WS" "$OUTSIDE"
+
+# A walk skips a non-regular file, so a directly named one must be refused
+# rather than read: a FIFO blocks with nothing to cancel it.
+WS="$(mktemp -d)"
+mkfifo "$WS/pipe"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. \
+    --provider-command="$FAKES/provider-red.sh" pipe 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" == "1" ]] && grep -qi 'not a regular file' <<<"$OUT"; then
+    pass "a named pipe is refused rather than read"
+else
+    fail "a named pipe was not refused (exit $CODE)"
+fi
+rm -rf "$WS"
+
+echo ""
+echo "--- A rejected run leaves the inventory alone ---"
+
+# The inventory describes the target the surviving state and ledger are about.
+# A second target in the same directory is refused, and must not replace it.
+WS="$(mktemp -d)"
+mkdir -p "$WS/src" "$WS/other"
+printf 'echo one\n' >"$WS/src/a.sh"
+printf 'echo two\n' >"$WS/other/b.sh"
+(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-red.sh" src >/dev/null 2>&1) || true
+FIRST="$(show_inventory "$WS")"
+set +e
+(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-red.sh" other >/dev/null 2>&1)
+set -e
+if [[ "$FIRST" == "$(show_inventory "$WS")" ]]; then
+    pass "a refused target does not overwrite the inventory"
+else
+    fail "a refused target overwrote the inventory"
+fi
+rm -rf "$WS"
+
+echo ""
 echo "--- The inventory belongs to the target it was taken from ---"
 
 WS="$(mktemp -d)"
