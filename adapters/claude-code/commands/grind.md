@@ -188,43 +188,68 @@ Resolve the two verdicts by the skill's table: the stricter decision wins, and a
 
 ## 3.0 STRUCTURED RETURN
 
-After the verdict is derived, output the following structured result. This is non-negotiable: it enables auto-loop orchestration:
+The engine owns the verdict, the iteration, and the ledger. Your job is to hand
+it what you found; it decides what that means. Report each surviving finding,
+then run the engine over the report.
 
-```
-GRIMES_RESULT: {
-  "iteration": <current iteration number>,
-  "max_iterations": <maximum allowed iterations>,
-  "verdict": "GREEN|YELLOW|RED",
-  "issues_found": <count of total issues identified>,
-  "issues_fixed": <count of VERIFIED closures only; never the count of edits>,
-  "verification": {
-    "status": "passed|failed|unavailable|not_applicable",
-    "command": "<exact command, or null>",
-    "exit_code": <integer, or null>,
-    "selected_by": "explicit|repo_check|documented_command|none"
-  },
-  "grime_findings": [
-    {
-      "grime_id": "grime-xxx-123",
-      "category": "Category name",
-      "severity": "P0|P1|P2|P3",
-      "status": "VERIFIED|FIXED|UNFIXED",
-      "evidence": "Specific code path, scenario, or evidence",
-      "fix_applied": "Description of fix applied, or null if unfixed"
-    }
-  ],
-  "commit_hash": "abc1234... or null",
-  "summary": "One-sentence BLUF describing the verdict"
-}
+### Record each survivor
+
+One call per finding that survived the self-grind. The contract validates each
+one as it is added, so an error names the finding at fault rather than failing
+the whole report:
+
+```bash
+grimes-contract report add \
+  --category=SEC --severity=P0 --blast=systemic --likelihood=likely \
+  --path=<repo-relative path> \
+  --tier=E2 --claim="<what the evidence establishes>" \
+  --quote="<exact quote in which the defect is visible>"
 ```
 
-Then update the state file at `.grimes-state.json`: set `last_verdict`, `issues_found`, `issues_fixed`, `new_p0_p1`, `last_commit`, `last_grind_timestamp`. Preserve all other fields, and never write `iteration`; that field belongs to the hook.
+The anchor is one of `--path`, `--document` with `--section`, `--argument` with
+`--step`, or `--source`. Evidence follows the tier: `--tier=E1` takes `--action`,
+`--cwd`, `--exit-code`, and `--output`; `--tier=E2` takes `--quote`; `--tier=E3`
+takes `--assumption`, `--reasoning`, and `--falsifier`. Add `--suggested-fix` to
+record a fix as text without applying it.
 
-`new_p0_p1` is the count of P0/P1 findings this iteration surfaced that the previous iteration did not. It is how the hook knows whether another pass is yielding anything; report `0` honestly when an iteration turned up nothing new.
+If a call is rejected, the contract is telling you the finding does not carry the
+evidence its severity requires. Lower the severity or strengthen the evidence.
+Do not restate the finding to get past the check.
 
-**Do not start the next iteration yourself, and do not change `iteration`.** The stop hook owns the loop: it decides whether another pass happens, increments the counter, and re-injects the prompt. Two components incrementing the same counter skips iterations and corrupts the cap that makes the loop terminate.
+### Seal and run
 
-End your turn after emitting the result. If another iteration is warranted, the hook will start it.
+```bash
+grimes-contract report seal \
+  --target-root="$(pwd)" --target-scope=<scope> \
+  --iteration=<n> --routed=<COR,SEC,...> \
+  --examined=<N> --disproved=<K> \
+  --summary="<one-sentence BLUF>" > .grimes/report.envelope
+
+grimes run --dir=. --auto-loop \
+  --provider-command="cat .grimes/report.envelope" <target>
+```
+
+`--examined` and `--disproved` are your self-grind arithmetic, where `N = M + K`.
+Report them honestly; they are recorded, not checked.
+
+You are the provider, so the engine cannot call you. It reads what you wrote and
+treats it as untrusted input: it recomputes each finding's identity from its own
+anchor and evidence, admits it to the ledger, derives the verdict tuple and the
+colour, and counts what this pass surfaced that the last did not.
+
+### What you must not write
+
+Do not write a verdict, a colour, a finding ID, a timestamp, loop state, or a
+result file. A review that certifies its own pass is not a review, and a
+hand-written record is rejected rather than believed. There is no field in the
+report for any of them.
+
+Do not change the iteration either. The engine advances it, and two components
+incrementing one counter skips iterations and corrupts the cap that makes the
+loop terminate.
+
+End your turn after the engine returns. If another iteration is warranted, the
+stop hook will start one.
 
 ---
 

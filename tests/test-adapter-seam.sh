@@ -80,12 +80,13 @@ export PATH="$BINDIR:$PATH"
 echo ""
 echo "--- The adapter's result format is the one the engine reads ---"
 
-# The envelope marker is the engine's only entry point for a result. An adapter
-# that never names it cannot hand one over, whatever else it emits.
-if grep -q 'GRIMES_RESULT_PROTOBUF_V2_BEGIN' "$GRIND"; then
-    pass "grind.md instructs the model to emit the result envelope"
+# grind.md builds its report through the CLI rather than naming a marker, so the
+# check that matters is whether the documented commands produce something the
+# engine accepts. That is asserted end to end below.
+if grep -q 'grimes-contract report' "$GRIND"; then
+    pass "grind.md builds its report through the contract CLI"
 else
-    fail "grind.md does not mention the envelope the engine reads"
+    fail "grind.md does not build its report through the contract CLI"
 fi
 
 # The legacy block is a different, unreadable format. Its presence means the
@@ -137,6 +138,60 @@ GRIMES_PROJECT_DIR="$SANDBOX" "$SANDBOX/hooks/stop.sh" >/dev/null 2>&1
 EMPTY_CODE=$?
 set -e
 assert_eq "$EMPTY_CODE" "0" "an untouched project allows exit"
+
+echo ""
+echo "--- The documented commands produce a record the engine accepts ---"
+
+# Run the sequence grind.md specifies, with the report a review would build.
+# This is the assertion the suite exists for: both halves, together, on the
+# real binaries.
+(
+    cd "$SANDBOX" || exit 1
+    # shellcheck disable=SC2016  # the $1 is quoted evidence, not an expansion
+    grimes-contract report add \
+        --category=SEC --severity=P0 --blast=systemic --likelihood=likely \
+        --path=bad-script.sh \
+        --tier=E2 --claim="caller-controlled deletion path" \
+        --quote='rm -rf "$1"/*' >/dev/null
+
+    grimes-contract report seal \
+        --target-root="$SANDBOX" --target-scope=bad-script.sh \
+        --iteration=1 --routed=SEC,COR --examined=4 --disproved=3 \
+        --summary="One deletion path survived." >.grimes/report.envelope
+) || fail "the documented report commands failed"
+
+set +e
+(cd "$SANDBOX" && grimes run --dir=. --auto-loop \
+    --provider-command="cat .grimes/report.envelope" bad-script.sh >/dev/null 2>&1)
+RUN_CODE=$?
+set -e
+
+# A reported P0 blocks, so 4 is the verdict exit code, not a failure.
+assert_eq "$RUN_CODE" "4" "a reported P0 drives the run to a blocking verdict"
+
+if [[ -f "$SANDBOX/.grimes/ledger.pb" ]]; then
+    pass "the engine admitted the reported finding to a ledger"
+else
+    fail "no ledger was written from the documented report"
+fi
+
+if grimes-contract state --ledger="$SANDBOX/.grimes/ledger.pb" 2>/dev/null | grep -qE 'open_p0: *1|P0: *1|open p0: *1'; then
+    pass "the ledger records the reported P0"
+else
+    # The summary wording varies; fall back to asserting one finding exists.
+    FOUND="$(grimes-contract state --ledger="$SANDBOX/.grimes/ledger.pb" --json 2>/dev/null | grep -c 'FG-SEC-' || true)"
+    if [[ "$FOUND" -ge 1 ]]; then
+        pass "the ledger records the reported P0"
+    else
+        fail "the ledger does not record the reported finding"
+    fi
+fi
+
+set +e
+GRIMES_PROJECT_DIR="$SANDBOX" "$SANDBOX/hooks/stop.sh" >/dev/null 2>&1
+LOOP_CODE=$?
+set -e
+assert_eq "$LOOP_CODE" "2" "the stop hook continues the loop after a documented run"
 
 echo ""
 echo "========================================"
