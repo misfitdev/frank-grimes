@@ -164,16 +164,18 @@ echo "--- The documented commands produce a record the engine accepts ---"
         --path=bad-script.sh \
         --tier=E2 --claim="caller-controlled deletion path" \
         --quote='rm -rf "$1"/*' >/dev/null
-
-    grimes-contract report seal \
-        --target-root="$SANDBOX" --target-scope=bad-script.sh \
-        --iteration=1 --routed=SEC,COR --examined=4 --disproved=3 \
-        --summary="One deletion path survived." >.grimes/report.envelope
 ) || fail "the documented report commands failed"
 
+# Sealing runs as the provider command, so it inherits the run identity the
+# engine exports. Sealing beforehand could not carry it: the run does not exist
+# yet, and the engine refuses a report raised against another request.
 set +e
+# --auto-loop stands in for a caller who asked to iterate; grind.md leaves the
+# flag to the caller, which is asserted separately above.
 (cd "$SANDBOX" && grimes run --dir=. --auto-loop \
-    --provider-command="cat .grimes/report.envelope" bad-script.sh >/dev/null 2>&1)
+    --provider-command="grimes-contract report seal --routed=SEC,COR \
+        --examined=4 --disproved=3 --summary=One deletion path survived." \
+    bad-script.sh >/dev/null 2>&1)
 RUN_CODE=$?
 set -e
 

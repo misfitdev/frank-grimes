@@ -145,6 +145,9 @@ func requestEnv(req engine.Request) []string {
 		"GRIMES_TARGET_ROOT=" + req.Target.GetRoot(),
 		"GRIMES_TARGET_SCOPE=" + req.Target.GetScope(),
 		"GRIMES_TARGET_FINGERPRINT=" + hex(req.Target.GetFingerprintSha256()),
+		// The kind selects what each evidence tier requires of a finding, so a
+		// provider that did not know it would cite a document as if it were code.
+		"GRIMES_TARGET_KIND=" + strings.ToLower(short(req.Target.GetKind().String(), "TARGET_KIND_")),
 	}
 	if req.Role == engine.RoleAdjudicator {
 		return append(env,
@@ -157,6 +160,7 @@ func requestEnv(req engine.Request) []string {
 	}
 	return append(env,
 		"GRIMES_ROLE=primary",
+		"GRIMES_RUN_ID="+req.RunID,
 		"GRIMES_MODE="+short(req.Mode.String(), "MODE_"),
 		"GRIMES_ITERATION="+strconv.FormatUint(uint64(req.Iteration), 10),
 		"GRIMES_CATEGORIES="+categories(req.Categories),

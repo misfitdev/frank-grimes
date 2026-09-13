@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
@@ -155,7 +157,8 @@ func cmdReportAdd(args []string) error {
 func cmdReportSeal(args []string) error {
 	fs := flag.NewFlagSet("report seal", flag.ExitOnError)
 	file := fs.String("file", DefaultReportPath, "report being built")
-	runID := fs.String("run-id", "", "run identity; defaults to a generated one")
+	runID := fs.String("run-id", "", "run identity; defaults to $GRIMES_RUN_ID, then a generated one")
+	targetFP := fs.String("target-fingerprint", "", "hex target fingerprint; defaults to $GRIMES_TARGET_FINGERPRINT")
 	root := fs.String("target-root", "", "repository root, required for a code target")
 	scope := fs.String("target-scope", "", "what was reviewed")
 	kind := fs.String("kind", "code", "code, document, idea, or external")
@@ -167,6 +170,25 @@ func cmdReportSeal(args []string) error {
 	raw := fs.Bool("raw", false, "write canonical bytes instead of the envelope")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	// The engine exports the request it is making when it invokes a provider, so
+	// sealing inside that invocation needs no flags to restate it. A report
+	// answers one request and these are what say which.
+	if *root == "" {
+		*root = os.Getenv("GRIMES_TARGET_ROOT")
+	}
+	if *scope == "" {
+		*scope = os.Getenv("GRIMES_TARGET_SCOPE")
+	}
+	if *kind == "code" && os.Getenv("GRIMES_TARGET_KIND") != "" {
+		*kind = os.Getenv("GRIMES_TARGET_KIND")
+	}
+	if !wasSetIn(fs, "iteration") && os.Getenv("GRIMES_ITERATION") != "" {
+		n, err := strconv.ParseUint(os.Getenv("GRIMES_ITERATION"), 10, 32)
+		if err != nil {
+			return fmt.Errorf("GRIMES_ITERATION is not a number: %v", err)
+		}
+		*iteration = uint(n)
 	}
 	if *scope == "" || *summary == "" {
 		return fmt.Errorf("--target-scope and --summary are required")
@@ -202,12 +224,31 @@ func cmdReportSeal(args []string) error {
 	report.SchemaMajor = contracts.SchemaMajor
 	report.RunId = *runID
 	if report.RunId == "" {
+		report.RunId = os.Getenv("GRIMES_RUN_ID")
+	}
+	if report.RunId == "" {
 		report.RunId = runID2()
+	}
+	// The engine owns the target's identity: it is taken over the target's
+	// content, which this cannot see. Echoing what the engine exported is what
+	// binds the report to the run that asked for it; the root-and-scope digest
+	// below is only for building a report outside a run.
+	fpHex := *targetFP
+	if fpHex == "" {
+		fpHex = os.Getenv("GRIMES_TARGET_FINGERPRINT")
+	}
+	fp := targetFingerprint(*root, *scope)
+	if fpHex != "" {
+		decoded, err := hex.DecodeString(fpHex)
+		if err != nil || len(decoded) != 32 {
+			return fmt.Errorf("--target-fingerprint must be 64 hex characters")
+		}
+		fp = decoded
 	}
 	report.Target = &pb.Target{
 		Root:              *root,
 		Scope:             *scope,
-		FingerprintSha256: targetFingerprint(*root, *scope),
+		FingerprintSha256: fp,
 		Display:           *scope,
 		Kind:              targetKind,
 	}

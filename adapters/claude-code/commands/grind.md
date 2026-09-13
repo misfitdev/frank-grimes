@@ -221,19 +221,27 @@ Do not restate the finding to get past the check.
 
 ### Seal and run
 
-```bash
-grimes-contract report seal \
-  --target-root="$(pwd)" --target-scope=<scope> \
-  --iteration=<n> --routed=<COR,SEC,...> \
-  --examined=<N> --disproved=<K> \
-  --summary="<one-sentence BLUF>" > .grimes/report.envelope
+Sealing happens inside the run, as the provider command. A report answers one
+request, and the run's identity — which run, which target fingerprint, which
+iteration — does not exist until the engine starts. The engine exports it to the
+provider it invokes, and `report seal` reads it from there, so the flags below
+carry only what you know.
 
+```bash
 grimes run --dir=. \
-  --provider-command="cat .grimes/report.envelope" <target>
+  --provider-command="grimes-contract report seal \
+    --routed=<COR,SEC,...> --examined=<N> --disproved=<K> \
+    --summary='<one-sentence BLUF>'" \
+  <target>
 ```
 
-Add `--auto-loop` only when the caller asked for it. It is off by default, and
-passing it unasked arms further iterations nobody requested.
+The target goes last: flags after it are not parsed. Add `--auto-loop` only when
+the caller asked for it. It is off by default, and passing it unasked arms
+further iterations nobody requested.
+
+The engine refuses a report raised against another run, target, mode, or
+iteration, so a file left over from a previous pass is rejected rather than
+believed.
 
 `--examined` and `--disproved` are your self-grind arithmetic, where `N = M + K`.
 Report them honestly; they are recorded, not checked.

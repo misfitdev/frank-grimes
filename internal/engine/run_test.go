@@ -187,15 +187,23 @@ func testTarget(t *testing.T) *pb.Target {
 
 func testSpec() TargetSpec { return TargetSpec{Root: "/repo", Scope: "bad.sh"} }
 
-// report renders provider output carrying the given candidates.
+// report renders provider output carrying the given candidates, answering the
+// first iteration.
 func report(t *testing.T, candidates ...*pb.CandidateFinding) []byte {
+	t.Helper()
+	return reportAt(t, 1, candidates...)
+}
+
+// reportAt renders provider output for a named iteration. A report answers one
+// request, so the iteration it declares is part of what binds it to that one.
+func reportAt(t *testing.T, iteration uint32, candidates ...*pb.CandidateFinding) []byte {
 	t.Helper()
 	r := &pb.ProviderReport{
 		SchemaMajor:         contracts.SchemaMajor,
-		RunId:               "run-provider",
+		RunId:               "run-001",
 		Target:              testTarget(t),
 		Mode:                pb.Mode_MODE_REPORT,
-		Iteration:           1,
+		Iteration:           iteration,
 		Candidates:          candidates,
 		RoutedCategories:    []pb.Category{pb.Category_CATEGORY_SEC, pb.Category_CATEGORY_COR},
 		CandidatesExamined:  uint32(len(candidates)) + 3,
@@ -448,7 +456,7 @@ func unvalidatedReport(t *testing.T, candidates ...*pb.CandidateFinding) []byte 
 	t.Helper()
 	r := &pb.ProviderReport{
 		SchemaMajor: contracts.SchemaMajor,
-		RunId:       "run-provider",
+		RunId:       "run-001",
 		Target:      testTarget(t),
 		Mode:        pb.Mode_MODE_REPORT,
 		Iteration:   1,
@@ -528,7 +536,9 @@ func TestRunWithoutAutoLoopLeavesNoState(t *testing.T) {
 		Mode: pb.Mode_MODE_REPORT, Iteration: 1, MaxIterations: 5,
 		LedgerDigestSha256: make([]byte, 32), LastResultSha256: make([]byte, 32),
 	}
-	e := newEngine(&fakeProvider{out: report(t, seedCandidate())}, l, s, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
+	// The seeded state puts this run at iteration 2, and a report answers the
+	// iteration it was asked for.
+	e := newEngine(&fakeProvider{out: reportAt(t, 2, seedCandidate())}, l, s, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
 	e.Results = results
 	e.AutoLoop = false
 
@@ -744,5 +754,71 @@ func TestRunDerivesMarginalYield(t *testing.T) {
 	// The provider's self-grind arithmetic passes through untouched.
 	if got := r.GetMarginalYield().GetCandidatesExamined(); got != 4 {
 		t.Errorf("candidates_examined = %d, want the reported 4", got)
+	}
+}
+
+// A report answers one request. These are the fields that say which, each
+// defeated on its own, because the adapter's documented `cat` of a file on disk
+// makes a stale answer the ordinary case rather than the adversarial one.
+func TestRunRejectsAReportForAnotherRequest(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		mutate func(*pb.ProviderReport)
+	}{
+		{"another run", func(r *pb.ProviderReport) { r.RunId = "run-999" }},
+		{"another target", func(r *pb.ProviderReport) {
+			r.Target = &pb.Target{
+				Root: "/repo", Scope: "elsewhere",
+				FingerprintSha256: bytesOf(0xbb), Kind: pb.TargetKind_TARGET_KIND_CODE,
+			}
+		}},
+		{"another iteration", func(r *pb.ProviderReport) { r.Iteration = 4 }},
+		{"another contract major", func(r *pb.ProviderReport) { r.SchemaMajor = 3 }},
+	} {
+		raw := report(t, seedCandidate())
+		decoded := &pb.ProviderReport{}
+		body, err := envelope.ExtractReport(string(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := contracts.UnmarshalCanonical(body, decoded); err != nil {
+			t.Fatal(err)
+		}
+		c.mutate(decoded)
+		if why := reportBinding(decoded, "run-001", testTarget(t), pb.Mode_MODE_REPORT, 1); why == "" {
+			t.Errorf("%s: a report for another request was accepted", c.name)
+		}
+	}
+
+	// The control: an unmutated report is the answer to this request.
+	raw := report(t, seedCandidate())
+	body, err := envelope.ExtractReport(string(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded := &pb.ProviderReport{}
+	if err := contracts.UnmarshalCanonical(body, decoded); err != nil {
+		t.Fatal(err)
+	}
+	if why := reportBinding(decoded, "run-001", testTarget(t), pb.Mode_MODE_REPORT, 1); why != "" {
+		t.Errorf("a matching report was rejected: %s", why)
+	}
+}
+
+// The binding has to be applied, not merely available: a stale report reaching
+// the ledger is the failure fg-64y.26 describes.
+func TestRunRejectsAStaleReport(t *testing.T) {
+	l := &memLedger{}
+	// A report for iteration 4 handed to a run at iteration 1.
+	e := newEngine(&fakeProvider{out: reportAt(t, 4, seedCandidate())}, l, &memState{}, nil)
+	_, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
+	if err == nil {
+		t.Fatal("a report for another iteration was accepted")
+	}
+	if !errors.Is(err, ErrProviderOutput) {
+		t.Errorf("err = %v, want a provider-output rejection", err)
+	}
+	if l.saves != 0 {
+		t.Errorf("a rejected report still wrote the ledger %d times", l.saves)
 	}
 }
