@@ -157,31 +157,6 @@ func TestTruncateHoldsTheLabelBoundWithoutSplittingARune(t *testing.T) {
 	}
 }
 
-func TestCollectRefusesAnEmptyScope(t *testing.T) {
-	if _, _, _, err := (TargetCollector{}).Collect(context.Background(), TargetSpec{Root: "/repo"}); err == nil {
-		t.Error("a target with no scope was accepted")
-	}
-}
-
-func TestCollectIdeaReadsStdin(t *testing.T) {
-	c := TargetCollector{Stdin: strings.NewReader("one\n\ntwo\n")}
-	target, inventory, _, err := c.Collect(context.Background(), TargetSpec{
-		Scope: "-", Kind: pb.TargetKind_TARGET_KIND_IDEA,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if target.GetRoot() != "" {
-		t.Errorf("root = %q, want empty for an idea", target.GetRoot())
-	}
-	if target.GetScope() != "stdin" {
-		t.Errorf("scope = %q, want stdin", target.GetScope())
-	}
-	if len(inventory.GetUnits()) != 2 {
-		t.Errorf("got %d steps, want 2", len(inventory.GetUnits()))
-	}
-}
-
 // The CLI refuses a missing snapshot before collection is reached, so this
 // guard is only observable here. It is the guarantee that no code path fetches
 // an external source, which is what makes an external review repeatable.
@@ -221,5 +196,19 @@ func TestCollectRefusesAnUnnamedKind(t *testing.T) {
 		if err == nil {
 			t.Errorf("kind %v was collected as a code target", kind)
 		}
+	}
+}
+
+// Only the delimiter that opened a block closes it. A quoted "~~~" inside a
+// backtick block would otherwise end it and expose the commented-out lines
+// after it as sections that do not exist.
+func TestSectionsDoNotMixFenceDelimiters(t *testing.T) {
+	text := "# Real\n\n```md\n~~~\n# not a heading\n~~~\n# still not\n```\n\n## Also Real\n"
+	if units := mustSections(t, text); len(units) != 2 {
+		var got []string
+		for _, u := range units {
+			got = append(got, u.GetLabel())
+		}
+		t.Errorf("got %d units (%v), want 2", len(units), got)
 	}
 }

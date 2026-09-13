@@ -286,17 +286,24 @@ func (c TargetCollector) collectExternal(spec TargetSpec) (*pb.Target, []*pb.Tar
 func sections(text, name string) ([]*pb.TargetUnit, error) {
 	var units []*pb.TargetUnit
 	taken := map[string]int{}
-	fenced := false
+	fence := ""
 	scanner := bufio.NewScanner(strings.NewReader(text))
 	scanner.Buffer(make([]byte, 0, 64*1024), maxDocumentLine)
 	for scanner.Scan() {
 		line := strings.TrimRight(scanner.Text(), "\r")
-		if trimmed := strings.TrimSpace(line); strings.HasPrefix(trimmed, "```") ||
-			strings.HasPrefix(trimmed, "~~~") {
-			fenced = !fenced
+		// Only the delimiter that opened a block can close it, so a "~~~" line
+		// quoted inside a backtick block does not end it and expose the
+		// commented-out text after it as sections.
+		if d := opener(line); d != "" {
+			switch {
+			case fence == "":
+				fence = d
+			case fence == d:
+				fence = ""
+			}
 			continue
 		}
-		if fenced || !strings.HasPrefix(line, "#") {
+		if fence != "" || !strings.HasPrefix(line, "#") {
 			continue
 		}
 		// ATX requires a space after the hashes, so "#nottag" is text.
@@ -319,6 +326,18 @@ func sections(text, name string) ([]*pb.TargetUnit, error) {
 		return []*pb.TargetUnit{unit(name, filepath.Base(name))}, nil
 	}
 	return units, nil
+}
+
+// opener returns the fence delimiter a line opens or closes with, or "" when
+// the line is not a fence.
+func opener(line string) string {
+	trimmed := strings.TrimSpace(line)
+	for _, d := range []string{"```", "~~~"} {
+		if strings.HasPrefix(trimmed, d) {
+			return d
+		}
+	}
+	return ""
 }
 
 // uniqueID keeps a unit's identifier non-empty and distinct.

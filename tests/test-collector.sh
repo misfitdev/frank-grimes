@@ -142,6 +142,32 @@ else
 fi
 UNITS="$(units_in "$WS")"
 assert_eq "$UNITS" "3" "each step of the argument is one unit"
+# A pasted argument has no file and no repository, so the record names it as
+# stdin and roots it nowhere.
+if echo "$OUT" | grep -qE 'scope: +"stdin"'; then
+    pass "a pasted argument is recorded as stdin"
+else
+    fail "a pasted argument is not recorded as stdin"
+fi
+if echo "$OUT" | grep -qE 'root: +"'; then
+    fail "a pasted argument recorded a repository root"
+else
+    pass "a pasted argument records no repository root"
+fi
+rm -rf "$WS"
+
+# An empty target names nothing. The CLI counts it as an argument, so the
+# refusal has to come from collection.
+WS="$(mktemp -d)"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-red.sh" "" 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" == "1" ]] && grep -qi 'scope' <<<"$OUT"; then
+    pass "an empty target is refused by name"
+else
+    fail "an empty target was not refused (exit $CODE)"
+fi
 rm -rf "$WS"
 
 echo ""
