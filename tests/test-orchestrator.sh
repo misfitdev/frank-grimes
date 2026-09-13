@@ -256,6 +256,87 @@ assert_eq "$CODE" "1" "fix mode is refused rather than ignored"
 rm -rf "$WS"
 
 echo ""
+echo "--- A re-reported finding's severity only ratchets upward ---"
+
+# The finding ID is derived over category, anchor, and claim, so the same claim
+# at a worse severity lands on the record the first iteration wrote.
+WS="$(workspace)"
+CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-p2.sh")"
+assert_eq "$CODE" "3" "a lone P2 is conditional rather than blocking"
+BEFORE="$(grimes-contract state --ledger="$WS/.grimes/ledger.pb" --json)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-p0-escalation.sh" --format=prototext)"
+AFTER="$(grimes-contract state --ledger="$WS/.grimes/ledger.pb" --json)"
+if echo "$OUT" | grep -qE 'decision: +DECISION_BLOCK'; then
+    pass "the same claim re-reported at P0 blocks"
+else
+    fail "the same claim re-reported at P0 does not block"
+fi
+if echo "$OUT" | grep -qE 'open_p0: +1'; then
+    pass "the escalated finding is counted as an open P0"
+else
+    fail "the escalated finding is not counted as an open P0"
+fi
+# Learning that a known finding is critical is new P0/P1 material. Counting it
+# as nothing would let the loop stop on the iteration that found the worst news.
+if echo "$OUT" | grep -qE 'new_p0_p1: +1'; then
+    pass "an escalation counts toward the marginal yield"
+else
+    fail "an escalation does not count toward the marginal yield"
+fi
+# One record, not two: the escalation must not mint a second finding.
+if [[ "$(echo "$OUT" | grep -cE 'id: +"FG-SEC-')" == "1" ]]; then
+    pass "the escalation updates one record rather than adding a second"
+else
+    fail "the escalation did not leave exactly one finding"
+fi
+
+# The severity is the visible half of an escalation; the evidence that earned it
+# is the half a verdict is later defended with. A record keeping the old
+# evidence under the new severity would claim proof it does not hold.
+#
+# protojson is a read-only projection, so these are greps over it rather than a
+# jq dependency the rest of the suite does not carry.
+digest_of() { grep -oE '"evidenceSha256": *"[^"]*"' <<<"$1" | head -1; }
+events_in() { grep -c '"iteration"' <<<"$1"; }
+
+if [[ "$(digest_of "$BEFORE")" != "$(digest_of "$AFTER")" ]]; then
+    pass "an escalation replaces the evidence digest"
+else
+    fail "an escalation left the old evidence digest in place"
+fi
+if grep -q 'eval' <<<"$AFTER" && ! grep -q 'eval' <<<"$BEFORE"; then
+    pass "an escalation replaces the evidence itself"
+else
+    fail "an escalation left the old evidence in place"
+fi
+# The history is where a reader sees when the finding turned critical.
+if [[ "$(events_in "$AFTER")" -gt "$(events_in "$BEFORE")" ]]; then
+    pass "an escalation is recorded in the finding's history"
+else
+    fail "an escalation left no trace in the finding's history"
+fi
+rm -rf "$WS"
+
+# A provider may report one claim twice in a single report. That is one finding
+# surfaced, not two, and counting it twice would overstate the yield the loop
+# stops on.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-p2-then-p1.sh" --format=prototext)"
+if echo "$OUT" | grep -qE 'new_p0_p1: +1'; then
+    pass "one claim reported twice in one report counts once"
+else
+    fail "one claim reported twice in one report was counted more than once"
+fi
+rm -rf "$WS"
+
+WS="$(workspace)"
+CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-p0-escalation.sh")"
+assert_eq "$CODE" "4" "a reported P0 blocks"
+CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-p3-downgrade.sh")"
+assert_eq "$CODE" "4" "the same claim re-reported at P3 does not defuse the block"
+rm -rf "$WS"
+
+echo ""
 echo "--- A mid-loop iteration is not recorded as a finished review ---"
 
 WS="$(workspace)"

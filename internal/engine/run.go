@@ -59,7 +59,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		return nil, err
 	}
 
-	admitted, oscillation, err := e.apply(ctx, ledger, report, iteration)
+	surfaced, oscillation, err := e.apply(ctx, ledger, report, iteration)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		return nil, fmt.Errorf("ledger: %w", err)
 	}
 
-	yield := marginalYield(report, ledger, admitted)
+	yield := marginalYield(report, ledger, surfaced)
 	result := e.assemble(target, mode, iteration, final, review, verification, ledger, digest, oscillation, yield)
 	if _, err := contracts.EncodeCanonical(result); err != nil {
 		return nil, fmt.Errorf("derived result rejected by the contract: %w", err)
@@ -186,10 +186,17 @@ func (e *Engine) review(ctx context.Context, target *pb.Target, categories []pb.
 // find the same defect in the same place with the same evidence therefore
 // produce the same finding, and a reappearance is a regression rather than a
 // duplicate.
-func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, report *pb.ProviderReport, iteration uint32) (admitted []string, oscillation bool, err error) {
+//
+// Surfaced names the findings whose severity is new information this iteration:
+// the ones just admitted and the ones a re-report escalated. The marginal yield
+// counts both, so an iteration that only learns an existing finding is critical
+// is not mistaken for one that learned nothing. Each is named once however many
+// candidates reached it, since the yield counts findings rather than mentions.
+func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, report *pb.ProviderReport, iteration uint32) (surfaced []string, oscillation bool, err error) {
 	if ledger.Findings == nil {
 		ledger.Findings = map[string]*pb.Finding{}
 	}
+	named := map[string]bool{}
 	for _, candidate := range report.GetCandidates() {
 		if err := ctx.Err(); err != nil {
 			return nil, false, err
@@ -198,9 +205,19 @@ func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, report *pb.Provid
 		if err != nil {
 			return nil, false, err
 		}
-		if _, known := ledger.GetFindings()[finding.GetId()]; !known {
-			ledger.Findings[finding.GetId()] = finding
-			admitted = append(admitted, finding.GetId())
+		id := finding.GetId()
+		known, present := ledger.GetFindings()[id]
+		switch {
+		case !present:
+			ledger.Findings[id] = finding
+		case finding.GetRisk().GetSeverity() < known.GetRisk().GetSeverity():
+			escalate(known, finding, iteration)
+		default:
+			id = ""
+		}
+		if id != "" && !named[id] {
+			named[id] = true
+			surfaced = append(surfaced, id)
 		}
 		osc, err := contracts.Observe(ledger, finding.GetId(), iteration, actorName)
 		if err != nil {
@@ -208,7 +225,28 @@ func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, report *pb.Provid
 		}
 		oscillation = oscillation || osc
 	}
-	return admitted, oscillation, nil
+	return surfaced, oscillation, nil
+}
+
+// escalate adopts a re-report's stricter risk and the evidence that earned it.
+//
+// The finding ID is derived over category, anchor, and claim, so the same claim
+// reported at a worse severity lands on the existing record. Severity only
+// ratchets: a re-report at a milder severity is left alone, since a provider
+// must not be able to defuse a finding by restating it. Retiring one goes
+// through a status transition, which is evidenced and legal-transition checked.
+func escalate(known, reported *pb.Finding, iteration uint32) {
+	known.Risk = reported.GetRisk()
+	known.Evidence = reported.GetEvidence()
+	known.EvidenceSha256 = reported.GetEvidenceSha256()
+	known.History = append(known.GetHistory(), &pb.FindingEvent{
+		Iteration:      iteration,
+		From:           known.GetStatus(),
+		To:             known.GetStatus(),
+		EvidenceSha256: reported.GetEvidenceSha256(),
+		At:             reported.GetLastSeen(),
+		Actor:          actorName,
+	})
 }
 
 // admit turns a candidate into a ledger finding, assigning everything the
@@ -307,12 +345,12 @@ func (e *Engine) persist(ctx context.Context, target *pb.Target, mode pb.Mode, i
 // loop stops, so a provider stating them would choose how long its own review
 // ran. The examined and disproved counts are the provider's declared self-grind
 // arithmetic and drive nothing.
-func marginalYield(report *pb.ProviderReport, ledger *pb.Ledger, admitted []string) *pb.MarginalYield {
+func marginalYield(report *pb.ProviderReport, ledger *pb.Ledger, surfaced []string) *pb.MarginalYield {
 	y := &pb.MarginalYield{
 		CandidatesExamined:  report.GetCandidatesExamined(),
 		CandidatesDisproved: report.GetCandidatesDisproved(),
 	}
-	for _, id := range admitted {
+	for _, id := range surfaced {
 		switch ledger.GetFindings()[id].GetRisk().GetSeverity() {
 		case pb.Severity_SEVERITY_P0, pb.Severity_SEVERITY_P1:
 			y.NewP0P1++
