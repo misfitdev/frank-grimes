@@ -190,11 +190,13 @@ func (e *Engine) review(ctx context.Context, target *pb.Target, categories []pb.
 // Surfaced names the findings whose severity is new information this iteration:
 // the ones just admitted and the ones a re-report escalated. The marginal yield
 // counts both, so an iteration that only learns an existing finding is critical
-// is not mistaken for one that learned nothing.
+// is not mistaken for one that learned nothing. Each is named once however many
+// candidates reached it, since the yield counts findings rather than mentions.
 func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, report *pb.ProviderReport, iteration uint32) (surfaced []string, oscillation bool, err error) {
 	if ledger.Findings == nil {
 		ledger.Findings = map[string]*pb.Finding{}
 	}
+	named := map[string]bool{}
 	for _, candidate := range report.GetCandidates() {
 		if err := ctx.Err(); err != nil {
 			return nil, false, err
@@ -203,14 +205,19 @@ func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, report *pb.Provid
 		if err != nil {
 			return nil, false, err
 		}
-		known, present := ledger.GetFindings()[finding.GetId()]
+		id := finding.GetId()
+		known, present := ledger.GetFindings()[id]
 		switch {
 		case !present:
-			ledger.Findings[finding.GetId()] = finding
-			surfaced = append(surfaced, finding.GetId())
+			ledger.Findings[id] = finding
 		case finding.GetRisk().GetSeverity() < known.GetRisk().GetSeverity():
 			escalate(known, finding, iteration)
-			surfaced = append(surfaced, finding.GetId())
+		default:
+			id = ""
+		}
+		if id != "" && !named[id] {
+			named[id] = true
+			surfaced = append(surfaced, id)
 		}
 		osc, err := contracts.Observe(ledger, finding.GetId(), iteration, actorName)
 		if err != nil {

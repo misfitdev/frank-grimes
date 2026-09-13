@@ -9,7 +9,7 @@ candidates {
   category: CATEGORY_SEC
   location { anchor { repo_line { path { value: "bad-script.sh" } line: 22 } } }
   risk { severity: SEVERITY_P0 likelihood: LIKELIHOOD_LIKELY blast_radius: BLAST_RADIUS_SYSTEMIC }
-  evidence { tier: EVIDENCE_TIER_E2 claim: "caller-controlled deletion path" citation { anchor { repo_line { path { value: "bad-script.sh" } line: 22 } } quote: "rm -rf \"$1\"/*" } }
+  evidence { tier: EVIDENCE_TIER_E2 claim: "caller-controlled deletion path" citation { anchor { repo_line { path { value: "bad-script.sh" } line: 22 } } quote: "eval \"$UNTRUSTED\"; rm -rf \"$1\"/*" } }
   suggested_fix: "Validate the argument against an allowlist before deleting."
 }
 candidates_examined: 5

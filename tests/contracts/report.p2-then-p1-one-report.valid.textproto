@@ -1,0 +1,24 @@
+# One report, one claim, twice: P2 and then P1. The contract makes candidates
+# unique only by position, so this is a report a provider may legitimately send.
+# It is one finding surfaced, not two.
+schema_major: 2
+run_id: "run-001"
+target { root: "/repo" scope: "bad-script.sh" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
+mode: MODE_REPORT
+iteration: 1
+routed_categories: [CATEGORY_SEC, CATEGORY_COR, CATEGORY_REL, CATEGORY_OPS, CATEGORY_VER]
+candidates {
+  category: CATEGORY_SEC
+  location { anchor { repo_line { path { value: "bad-script.sh" } line: 22 } } }
+  risk { severity: SEVERITY_P2 likelihood: LIKELIHOOD_UNLIKELY blast_radius: BLAST_RADIUS_LOCAL_COMPONENT }
+  evidence { tier: EVIDENCE_TIER_E2 claim: "caller-controlled deletion path" citation { anchor { repo_line { path { value: "bad-script.sh" } line: 22 } } quote: "rm -rf \"$1\"/*" } }
+}
+candidates {
+  category: CATEGORY_SEC
+  location { anchor { repo_line { path { value: "bad-script.sh" } line: 22 } } }
+  risk { severity: SEVERITY_P1 likelihood: LIKELIHOOD_LIKELY blast_radius: BLAST_RADIUS_SERVICE }
+  evidence { tier: EVIDENCE_TIER_E2 claim: "caller-controlled deletion path" citation { anchor { repo_line { path { value: "bad-script.sh" } line: 22 } } quote: "rm -rf \"$1\"/*" } }
+}
+candidates_examined: 4
+candidates_disproved: 2
+summary: "The deletion path looked minor, then worse."

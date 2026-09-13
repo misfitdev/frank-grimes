@@ -263,7 +263,9 @@ echo "--- A re-reported finding's severity only ratchets upward ---"
 WS="$(workspace)"
 CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-p2.sh")"
 assert_eq "$CODE" "3" "a lone P2 is conditional rather than blocking"
+BEFORE="$(grimes-contract state --ledger="$WS/.grimes/ledger.pb" --json)"
 OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-p0-escalation.sh" --format=prototext)"
+AFTER="$(grimes-contract state --ledger="$WS/.grimes/ledger.pb" --json)"
 if echo "$OUT" | grep -qE 'decision: +DECISION_BLOCK'; then
     pass "the same claim re-reported at P0 blocks"
 else
@@ -286,6 +288,44 @@ if [[ "$(echo "$OUT" | grep -cE 'id: +"FG-SEC-')" == "1" ]]; then
     pass "the escalation updates one record rather than adding a second"
 else
     fail "the escalation did not leave exactly one finding"
+fi
+
+# The severity is the visible half of an escalation; the evidence that earned it
+# is the half a verdict is later defended with. A record keeping the old
+# evidence under the new severity would claim proof it does not hold.
+#
+# protojson is a read-only projection, so these are greps over it rather than a
+# jq dependency the rest of the suite does not carry.
+digest_of() { grep -oE '"evidenceSha256": *"[^"]*"' <<<"$1" | head -1; }
+events_in() { grep -c '"iteration"' <<<"$1"; }
+
+if [[ "$(digest_of "$BEFORE")" != "$(digest_of "$AFTER")" ]]; then
+    pass "an escalation replaces the evidence digest"
+else
+    fail "an escalation left the old evidence digest in place"
+fi
+if grep -q 'eval' <<<"$AFTER" && ! grep -q 'eval' <<<"$BEFORE"; then
+    pass "an escalation replaces the evidence itself"
+else
+    fail "an escalation left the old evidence in place"
+fi
+# The history is where a reader sees when the finding turned critical.
+if [[ "$(events_in "$AFTER")" -gt "$(events_in "$BEFORE")" ]]; then
+    pass "an escalation is recorded in the finding's history"
+else
+    fail "an escalation left no trace in the finding's history"
+fi
+rm -rf "$WS"
+
+# A provider may report one claim twice in a single report. That is one finding
+# surfaced, not two, and counting it twice would overstate the yield the loop
+# stops on.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-p2-then-p1.sh" --format=prototext)"
+if echo "$OUT" | grep -qE 'new_p0_p1: +1'; then
+    pass "one claim reported twice in one report counts once"
+else
+    fail "one claim reported twice in one report was counted more than once"
 fi
 rm -rf "$WS"
 
