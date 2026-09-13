@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"math"
@@ -180,7 +181,7 @@ func cmdReportSeal(args []string) error {
 	if *scope == "" {
 		*scope = os.Getenv("GRIMES_TARGET_SCOPE")
 	}
-	if *kind == "code" && os.Getenv("GRIMES_TARGET_KIND") != "" {
+	if !wasSetIn(fs, "kind") && os.Getenv("GRIMES_TARGET_KIND") != "" {
 		*kind = os.Getenv("GRIMES_TARGET_KIND")
 	}
 	if !wasSetIn(fs, "iteration") && os.Getenv("GRIMES_ITERATION") != "" {
@@ -263,6 +264,15 @@ func cmdReportSeal(args []string) error {
 	if err != nil {
 		return err
 	}
+
+	// Sealing ends this report. The candidates accumulated in the working file
+	// answered the request just sealed, and leaving them would let the next seal
+	// stamp the current run's identity onto them: they would pass the binding
+	// and be admitted again, re-reporting findings this pass never made.
+	if err := os.Remove(*file); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("clearing the sealed report: %w", err)
+	}
+
 	if *raw {
 		_, err := os.Stdout.Write(encoded)
 		return err

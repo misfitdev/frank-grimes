@@ -486,7 +486,10 @@ func resultFrom(d Derived, in DeriveInput) *pb.GrimesResult {
 		LegacyColor:     d.Color,
 		MarginalYield:   &pb.MarginalYield{},
 		Counts:          d.Counts,
-		Verification:    &pb.Verification{Status: pb.VerificationStatus_VERIFICATION_STATUS_NOT_APPLICABLE},
+		Verification: &pb.Verification{
+			Status:     pb.VerificationStatus_VERIFICATION_STATUS_NOT_APPLICABLE,
+			SelectedBy: pb.GateSelection_GATE_SELECTION_UNAVAILABLE,
+		},
 		Ledger: &pb.LedgerRef{
 			Path:                contracts.LedgerPath,
 			DigestSha256:        digest,

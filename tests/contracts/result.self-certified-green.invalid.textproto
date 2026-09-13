@@ -12,6 +12,6 @@ verdict { decision: DECISION_PASS residual_risk: RESIDUAL_RISK_LOW review_confid
 legacy_color: LEGACY_COLOR_GREEN
 marginal_yield { candidates_examined: 4 candidates_disproved: 4 }
 counts { total: 0 }
-verification { status: VERIFICATION_STATUS_NOT_APPLICABLE }
+verification { status: VERIFICATION_STATUS_NOT_APPLICABLE selected_by: GATE_SELECTION_UNAVAILABLE }
 ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678901" }
 summary: "Nothing found."

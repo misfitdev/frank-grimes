@@ -68,16 +68,18 @@ proto-lint:
 
 # Refuse a wire-incompatible change to the contract.
 #
-# The baseline is the last wire state deliberately accepted. Breaking it is
+# The baseline lives outside proto/ because that path is the buf module: an
+# artifact inside it is read as part of the module by any tool that globs the
+# directory. The baseline is the last wire state deliberately accepted. Breaking it is
 # sometimes right, and `just proto-baseline` is how that is said out loud: the
 # regenerated baseline lands in the same commit as the break and the schema
 # major bump, so the acknowledgement is reviewable rather than silent.
 proto-breaking:
-    buf breaking --against proto/baseline.binpb
+    buf breaking --against .buf/baseline.binpb
 
 # Accept the current contract as the baseline. See proto-breaking.
 proto-baseline:
-    buf build -o proto/baseline.binpb
+    buf build -o .buf/baseline.binpb
 
 # Run the adapter/engine seam tests
 test-adapter-seam:

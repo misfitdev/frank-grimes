@@ -47,10 +47,13 @@ func loopResult(t *testing.T, mutate func(*pb.GrimesResult)) *pb.GrimesResult {
 		LegacyColor:   pb.LegacyColor_LEGACY_COLOR_RED,
 		MarginalYield: &pb.MarginalYield{CandidatesExamined: 4, NewP0P1: 2},
 		Counts:        &pb.FindingCounts{Total: 1, OpenP0: 1},
-		Verification:  &pb.Verification{Status: pb.VerificationStatus_VERIFICATION_STATUS_NOT_APPLICABLE},
-		Ledger:        &pb.LedgerRef{Path: contracts.LedgerPath, DigestSha256: make([]byte, 32)},
-		UnmetGates:    []string{"decision"},
-		Summary:       "An open P0 blocks this target.",
+		Verification: &pb.Verification{
+			Status:     pb.VerificationStatus_VERIFICATION_STATUS_NOT_APPLICABLE,
+			SelectedBy: pb.GateSelection_GATE_SELECTION_UNAVAILABLE,
+		},
+		Ledger:     &pb.LedgerRef{Path: contracts.LedgerPath, DigestSha256: make([]byte, 32)},
+		UnmetGates: []string{"decision"},
+		Summary:    "An open P0 blocks this target.",
 	}
 	if mutate != nil {
 		mutate(r)

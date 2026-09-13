@@ -2935,14 +2935,17 @@ func (x *Verdict) GetReviewCompleteness() ReviewCompleteness {
 }
 
 type Verification struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Status        VerificationStatus     `protobuf:"varint,1,opt,name=status,proto3,enum=frank_grimes.v2.VerificationStatus" json:"status,omitempty"`
-	Command       string                 `protobuf:"bytes,2,opt,name=command,proto3" json:"command,omitempty"`
-	Cwd           *RepoPath              `protobuf:"bytes,3,opt,name=cwd,proto3" json:"cwd,omitempty"`
-	ExitCode      int32                  `protobuf:"varint,4,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
-	OutputSha256  []byte                 `protobuf:"bytes,5,opt,name=output_sha256,json=outputSha256,proto3" json:"output_sha256,omitempty"`
-	CompletedAt   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
-	SelectedBy    GateSelection          `protobuf:"varint,7,opt,name=selected_by,json=selectedBy,proto3,enum=frank_grimes.v2.GateSelection" json:"selected_by,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Status       VerificationStatus     `protobuf:"varint,1,opt,name=status,proto3,enum=frank_grimes.v2.VerificationStatus" json:"status,omitempty"`
+	Command      string                 `protobuf:"bytes,2,opt,name=command,proto3" json:"command,omitempty"`
+	Cwd          *RepoPath              `protobuf:"bytes,3,opt,name=cwd,proto3" json:"cwd,omitempty"`
+	ExitCode     int32                  `protobuf:"varint,4,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
+	OutputSha256 []byte                 `protobuf:"bytes,5,opt,name=output_sha256,json=outputSha256,proto3" json:"output_sha256,omitempty"`
+	CompletedAt  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	// Not optional: "the repository's own check passed" and "no gate was
+	// available" are different facts, and a record that omits which rule applied
+	// cannot tell them apart.
+	SelectedBy    GateSelection `protobuf:"varint,7,opt,name=selected_by,json=selectedBy,proto3,enum=frank_grimes.v2.GateSelection" json:"selected_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3889,7 +3892,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x11review_confidence\x18\x03 \x01(\x0e2!.frank_grimes.v2.ReviewConfidenceB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x10reviewConfidence\x12`\n" +
 	"\x13review_completeness\x18\x04 \x01(\x0e2#.frank_grimes.v2.ReviewCompletenessB\n" +
-	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x12reviewCompleteness\"\xd4\x06\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x12reviewCompleteness\"\xbd\x06\n" +
 	"\fVerification\x12G\n" +
 	"\x06status\x18\x01 \x01(\x0e2#.frank_grimes.v2.VerificationStatusB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12\x18\n" +
@@ -3897,11 +3900,12 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x03cwd\x18\x03 \x01(\v2\x19.frank_grimes.v2.RepoPathR\x03cwd\x12\x1b\n" +
 	"\texit_code\x18\x04 \x01(\x05R\bexitCode\x12#\n" +
 	"\routput_sha256\x18\x05 \x01(\fR\foutputSha256\x12=\n" +
-	"\fcompleted_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\x12I\n" +
-	"\vselected_by\x18\a \x01(\x0e2\x1e.frank_grimes.v2.GateSelectionB\b\xbaH\x05\x82\x01\x02\x10\x01R\n" +
-	"selectedBy:\xe7\x03\xbaH\xe3\x03\x1a\xf2\x01\n" +
-	"$verification.passed_requires_success\x12Mpassed verification requires command, zero exit, output digest, and timestamp\x1a{this.status != 1 || (this.command != '' && this.exit_code == 0 && size(this.output_sha256) == 32 && has(this.completed_at))\x1a\xeb\x01\n" +
-	"%verification.selection_matches_status\x12fa gate that ran records which rule selected it, and an unavailable one records that it was unavailable\x1aZthis.selected_by == 0 || (this.status == 3 || this.status == 4) == (this.selected_by == 4)\"\x88\x03\n" +
+	"\fcompleted_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\x12K\n" +
+	"\vselected_by\x18\a \x01(\x0e2\x1e.frank_grimes.v2.GateSelectionB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\n" +
+	"selectedBy:\xce\x03\xbaH\xca\x03\x1a\xf2\x01\n" +
+	"$verification.passed_requires_success\x12Mpassed verification requires command, zero exit, output digest, and timestamp\x1a{this.status != 1 || (this.command != '' && this.exit_code == 0 && size(this.output_sha256) == 32 && has(this.completed_at))\x1a\xd2\x01\n" +
+	"%verification.selection_matches_status\x12fa gate that ran records which rule selected it, and an unavailable one records that it was unavailable\x1aA(this.status == 3 || this.status == 4) == (this.selected_by == 4)\"\x88\x03\n" +
 	"\x11IndependentReview\x12\x1e\n" +
 	"\x06run_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05runId\x12(\n" +
 	"\vreviewer_id\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\n" +

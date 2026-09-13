@@ -285,10 +285,13 @@ func sampleResult() *pb.GrimesResult {
 		LegacyColor:   pb.LegacyColor_LEGACY_COLOR_RED,
 		MarginalYield: &pb.MarginalYield{CandidatesExamined: 4},
 		Counts:        &pb.FindingCounts{Total: 1, OpenP0: 1},
-		Verification:  &pb.Verification{Status: pb.VerificationStatus_VERIFICATION_STATUS_NOT_APPLICABLE},
-		Ledger:        &pb.LedgerRef{Path: contracts.LedgerPath, DigestSha256: digest},
-		UnmetGates:    []string{"decision"},
-		Summary:       "An open P0 blocks this target.",
+		Verification: &pb.Verification{
+			Status:     pb.VerificationStatus_VERIFICATION_STATUS_NOT_APPLICABLE,
+			SelectedBy: pb.GateSelection_GATE_SELECTION_UNAVAILABLE,
+		},
+		Ledger:     &pb.LedgerRef{Path: contracts.LedgerPath, DigestSha256: digest},
+		UnmetGates: []string{"decision"},
+		Summary:    "An open P0 blocks this target.",
 	}
 }
 

@@ -40,6 +40,36 @@ func TestWriteAtomicSyncsTheDirectory(t *testing.T) {
 	}
 }
 
+// Two directories are created here, and both are new names in their own
+// parents. Syncing only the innermost would leave the record reachable through
+// a path that did not survive.
+func TestWriteAtomicSyncsEveryDirectoryItCreates(t *testing.T) {
+	var synced []string
+	original := syncDirectory
+	syncDirectory = func(d string) error {
+		synced = append(synced, d)
+		return nil
+	}
+	defer func() { syncDirectory = original }()
+
+	root := t.TempDir()
+	deep := filepath.Join(root, "a", "b")
+	if err := WriteAtomic(filepath.Join(deep, "record.pb"), []byte("payload")); err != nil {
+		t.Fatalf("WriteAtomic: %v", err)
+	}
+	for _, want := range []string{deep, filepath.Join(root, "a"), root} {
+		found := false
+		for _, got := range synced {
+			if got == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%s was never synced (synced %v)", want, synced)
+		}
+	}
+}
+
 func TestWriteAtomicReportsAFailedDirectorySync(t *testing.T) {
 	var synced string
 	original := syncDirectory

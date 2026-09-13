@@ -12,6 +12,6 @@ verdict { decision: DECISION_BLOCK residual_risk: RESIDUAL_RISK_CRITICAL review_
 legacy_color: LEGACY_COLOR_RED
 marginal_yield { candidates_examined: 3 }
 counts { total: 1 open_p0: 1 }
-verification { status: VERIFICATION_STATUS_NOT_APPLICABLE }
+verification { status: VERIFICATION_STATUS_NOT_APPLICABLE selected_by: GATE_SELECTION_UNAVAILABLE }
 ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678901" }
 summary: "Verifier speaking out of turn."

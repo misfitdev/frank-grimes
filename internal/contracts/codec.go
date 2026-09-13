@@ -141,7 +141,12 @@ func ParseTextProto(b []byte, m proto.Message) error {
 // write succeeded and find no file after power loss.
 func WriteAtomic(path string, data []byte) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	// Directories MkdirAll has to create are new names in their own parents, and
+	// a name is only durable once the parent that holds it is synced. Syncing
+	// the file's directory alone would leave the record reachable through a path
+	// that did not survive.
+	created, err := makeDirs(dir)
+	if err != nil {
 		return err
 	}
 	tmp, err := os.CreateTemp(dir, ".tmp-*")
@@ -165,7 +170,37 @@ func WriteAtomic(path string, data []byte) error {
 	if err := os.Rename(tmpName, path); err != nil {
 		return err
 	}
-	return syncDirectory(dir)
+	if err := syncDirectory(dir); err != nil {
+		return err
+	}
+	// Parents outward, so a directory is synced only after the one it holds.
+	for _, d := range created {
+		if err := syncDirectory(filepath.Dir(d)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// makeDirs creates dir and returns the directories it had to create, innermost
+// first. An existing dir returns nothing to sync.
+func makeDirs(dir string) ([]string, error) {
+	var created []string
+	for d := dir; ; d = filepath.Dir(d) {
+		if _, err := os.Stat(d); err == nil {
+			break
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		created = append(created, d)
+		if parent := filepath.Dir(d); parent == d {
+			break
+		}
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	return created, nil
 }
 
 // syncDirectory is a variable so a test can observe that it was called. An
