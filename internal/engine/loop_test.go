@@ -336,7 +336,7 @@ func greenResult(t *testing.T) *pb.GrimesResult {
 }
 
 // The stopping rule lives in Go and again in CEL as
-// result.review_complete_is_earned. Two statements of one rule drift, so every
+// result.report_completion_is_derived. Two statements of one rule drift, so every
 // shape the rule can produce is checked against the contract here rather than
 // trusted to stay aligned.
 func TestCompletionStateAgreesWithTheContract(t *testing.T) {
