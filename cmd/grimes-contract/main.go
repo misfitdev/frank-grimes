@@ -33,6 +33,12 @@ Usage:
   grimes-contract encode-result [--format=textproto] [file]
       Read a GrimesResult, validate it, emit the canonical envelope.
 
+  grimes-contract encode-report [--format=textproto|binary] [--raw] [file]
+      Wrap a ProviderReport in the report envelope a provider hands back.
+
+  grimes-contract decode-report [file]
+      Decode a report envelope or canonical report bytes.
+
   grimes-contract decode-result [file]
       Read an envelope or raw binary, validate, emit TextProto.
 
@@ -63,6 +69,10 @@ func main() {
 		err = cmdEncodeResult(os.Args[2:])
 	case "decode-result":
 		err = cmdDecodeResult(os.Args[2:])
+	case "encode-report":
+		err = cmdEncodeReport(os.Args[2:])
+	case "decode-report":
+		err = cmdDecodeReport(os.Args[2:])
 	case "ledger":
 		err = cmdLedger(os.Args[2:])
 	case "state":
@@ -265,6 +275,66 @@ func cmdEncodeResult(args []string) error {
 		return err
 	}
 	fmt.Print(envelope.Wrap(encoded))
+	return nil
+}
+
+// cmdEncodeReport is the provider-side mirror of encode-result: it wraps a
+// ProviderReport in the report envelope.
+func cmdEncodeReport(args []string) error {
+	fs := flag.NewFlagSet("encode-report", flag.ExitOnError)
+	format := fs.String("format", "textproto", "textproto or binary")
+	raw := fs.Bool("raw", false, "write canonical bytes instead of the envelope")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	data, err := readInput(fs.Args())
+	if err != nil {
+		return err
+	}
+	report := &pb.ProviderReport{}
+	if *format == "textproto" {
+		if err := contracts.ParseTextProto(data, report); err != nil {
+			return err
+		}
+	} else if err := contracts.UnmarshalCanonical(data, report); err != nil {
+		return err
+	}
+	encoded, err := contracts.EncodeCanonical(report)
+	if err != nil {
+		return err
+	}
+	if *raw {
+		_, err := os.Stdout.Write(encoded)
+		return err
+	}
+	fmt.Print(envelope.WrapReport(encoded))
+	return nil
+}
+
+func cmdDecodeReport(args []string) error {
+	fs := flag.NewFlagSet("decode-report", flag.ExitOnError)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	data, err := readInput(fs.Args())
+	if err != nil {
+		return err
+	}
+	if envelope.ContainsReport(string(data)) {
+		data, err = envelope.ExtractReport(string(data))
+		if err != nil {
+			return err
+		}
+	}
+	report := &pb.ProviderReport{}
+	if err := contracts.UnmarshalCanonical(data, report); err != nil {
+		return err
+	}
+	out, err := prototextMarshal(report)
+	if err != nil {
+		return err
+	}
+	fmt.Print(out)
 	return nil
 }
 
