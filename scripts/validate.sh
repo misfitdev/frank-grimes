@@ -418,7 +418,9 @@ fi
 
 # The run record's completion state and the stop hook's decision are the same
 # claim about the same iteration. A second place that names a completion state
-# lets the record say a review finished while the loop keeps going.
+# lets the record say a review finished while the loop keeps going. The pattern
+# matches any named constant rather than a set of assignment syntaxes, since a
+# plain assignment or a local variable would otherwise carry one past it.
 DUPLICATES=""
 while IFS= read -r match; do
     rel="${match%%:*}"
@@ -427,11 +429,11 @@ while IFS= read -r match; do
         internal/engine/loop.go | *_test.go) continue ;;
     esac
     DUPLICATES="$DUPLICATES $rel"
-done < <(grep -rnE 'return pb\.CompletionState_|CompletionState: +pb\.CompletionState_' \
+done < <(grep -rn 'pb\.CompletionState_' \
     "$PROJECT_ROOT/internal" "$PROJECT_ROOT/cmd" --include='*.go' 2>/dev/null || true)
 
 if [[ -n "$DUPLICATES" ]]; then
-    fail "completion state set outside internal/engine/loop.go:$DUPLICATES"
+    fail "completion state named outside internal/engine/loop.go:$DUPLICATES"
 else
     pass "the completion state is derived in one place"
 fi
