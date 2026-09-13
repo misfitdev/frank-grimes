@@ -114,6 +114,8 @@ func newMessage(name string) (proto.Message, error) {
 		return &pb.AdjudicationReport{}, nil
 	case "CandidateFinding", "frank_grimes.v2.CandidateFinding":
 		return &pb.CandidateFinding{}, nil
+	case "TargetInventory", "frank_grimes.v2.TargetInventory":
+		return &pb.TargetInventory{}, nil
 	default:
 		return nil, fmt.Errorf("unknown message type %q", name)
 	}

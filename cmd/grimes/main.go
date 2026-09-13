@@ -25,6 +25,10 @@ const usage = `grimes - run a Grimes review and derive its result
 Usage:
   grimes run <target> [flags]
       Run one review iteration. The provider proposes; the engine decides.
+      --kind selects what the target is: code (default), document, idea, or
+      external. A code target is a path under --dir; a document or an idea is a
+      file, or "-" to read an idea from stdin; an external source is a URI and
+      requires --snapshot, since nothing here fetches it.
 
   grimes loop [--dir=<repo>]
       Decide whether a review may end, from a verified run record.
@@ -96,7 +100,7 @@ func cmdRun(args []string) (int, error) {
 	defer stop()
 
 	e := &engine.Engine{
-		Collector: engine.PathCollector{},
+		Collector: engine.TargetCollector{Stdin: os.Stdin},
 		Provider: &provider.Exec{
 			Command: cfg.ProviderCommand, Dir: cfg.Dir,
 			MaxOutputBytes: cfg.MaxOutputBytes, Timeout: cfg.ProviderTimeout,
@@ -104,6 +108,7 @@ func cmdRun(args []string) (int, error) {
 		Broker:        engine.StrictBroker{},
 		Adjudicator:   adjudicatorFor(cfg),
 		Gate:          engine.NotApplicableGate{},
+		Inventory:     store.NewFileInventoryStore(cfg.Dir),
 		Ledger:        store.NewFileLedger(cfg.Dir),
 		Results:       store.NewFileResultStore(cfg.Dir),
 		State:         store.NewFileStateStore(cfg.Dir),
@@ -116,7 +121,8 @@ func cmdRun(args []string) (int, error) {
 	}
 
 	result, err := e.Run(ctx, engine.TargetSpec{
-		Root: cfg.Dir, Scope: cfg.Target, Categories: cfg.Categories,
+		Root: cfg.Root(), Scope: cfg.Target, Kind: cfg.Kind,
+		Snapshot: cfg.Snapshot, Categories: cfg.Categories,
 	}, cfg.Mode)
 	if err != nil {
 		return 0, err

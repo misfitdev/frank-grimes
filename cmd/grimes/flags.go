@@ -82,6 +82,18 @@ type config struct {
 	MaxOutputBytes     int64
 	Format             string
 	Dir                string
+	Kind               pb.TargetKind
+	Snapshot           string
+}
+
+// Root is the repository root a code target is taken from. Only a code target
+// has one; a document, an argument, or an external source is named in full by
+// its own scope and needs no repository to exist.
+func (c *config) Root() string {
+	if c.Kind == pb.TargetKind_TARGET_KIND_CODE {
+		return c.Dir
+	}
+	return ""
 }
 
 var errUsage = errors.New("usage")
@@ -105,6 +117,8 @@ func parseRun(args []string) (*config, error) {
 	maxBytes := fs.Int64("max-output-bytes", 1<<20, "maximum bytes accepted from a provider")
 	format := fs.String("format", "envelope", "envelope or prototext")
 	dir := fs.String("dir", ".", "repository root")
+	kind := fs.String("kind", "code", "code, document, idea, or external")
+	snapshot := fs.String("snapshot", "", "frozen snapshot of an external source; required with --kind=external")
 
 	if err := rejectSwallowedFlags(fs, args); err != nil {
 		return nil, err
@@ -129,10 +143,14 @@ func parseRun(args []string) (*config, error) {
 		MaxOutputBytes:  *maxBytes,
 		Format:          *format,
 		Dir:             *dir,
+		Snapshot:        *snapshot,
 	}
 
 	var err error
 	if c.Mode, err = parseMode(*mode); err != nil {
+		return nil, err
+	}
+	if c.Kind, err = parseKind(*kind); err != nil {
 		return nil, err
 	}
 	if c.Categories, err = parseCategories(*categories); err != nil {
@@ -164,6 +182,14 @@ func (c *config) validate() error {
 	// one. Refused until collection can honour it.
 	if c.ScopeSet {
 		return fmt.Errorf("--scope is not implemented; the target argument selects the scope")
+	}
+	// A snapshot is the whole of an external target, and it is meaningless for
+	// the kinds that are read from disk directly.
+	if c.Kind == pb.TargetKind_TARGET_KIND_EXTERNAL && c.Snapshot == "" {
+		return fmt.Errorf("--kind external requires --snapshot; nothing fetches the source")
+	}
+	if c.Kind != pb.TargetKind_TARGET_KIND_EXTERNAL && c.Snapshot != "" {
+		return fmt.Errorf("--snapshot applies only to --kind external")
 	}
 	if c.Format != "envelope" && c.Format != "prototext" {
 		return fmt.Errorf("unknown format %q", c.Format)
@@ -206,6 +232,21 @@ func parseMode(s string) (pb.Mode, error) {
 		return pb.Mode_MODE_FIX, nil
 	default:
 		return pb.Mode_MODE_UNSPECIFIED, fmt.Errorf("unknown mode %q", s)
+	}
+}
+
+func parseKind(s string) (pb.TargetKind, error) {
+	switch s {
+	case "code":
+		return pb.TargetKind_TARGET_KIND_CODE, nil
+	case "document":
+		return pb.TargetKind_TARGET_KIND_DOCUMENT, nil
+	case "idea":
+		return pb.TargetKind_TARGET_KIND_IDEA, nil
+	case "external":
+		return pb.TargetKind_TARGET_KIND_EXTERNAL, nil
+	default:
+		return pb.TargetKind_TARGET_KIND_UNSPECIFIED, fmt.Errorf("unknown kind %q", s)
 	}
 }
 

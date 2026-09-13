@@ -18,6 +18,7 @@ type Engine struct {
 	Broker      EvidenceBroker
 	Adjudicator Adjudicator
 	Gate        GateRunner
+	Inventory   InventoryStore
 	Ledger      Ledger
 	Results     ResultStore
 	State       StateStore
@@ -36,7 +37,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		return nil, ErrFixModeUnsupported
 	}
 
-	target, categories, err := e.Collector.Collect(ctx, spec)
+	target, inventory, categories, err := e.Collector.Collect(ctx, spec)
 	if err != nil {
 		return nil, fmt.Errorf("collect: %w", err)
 	}
@@ -52,6 +53,16 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	}
 	if err := adoptLedger(ledger, target); err != nil {
 		return nil, err
+	}
+
+	// Written only once the state and the ledger have agreed this run belongs to
+	// this target, and before the target is attacked. Writing it earlier would
+	// leave a rejected run's inventory behind, describing a target the surviving
+	// state and ledger are not about.
+	if e.Inventory != nil {
+		if err := e.Inventory.Save(ctx, inventory); err != nil {
+			return nil, fmt.Errorf("inventory: %w", err)
+		}
 	}
 
 	report, err := e.review(ctx, target, categories, mode, iteration)

@@ -1,0 +1,4 @@
+# A short digest cannot bind an inventory to the target it was taken from.
+schema_major: 2
+target_fingerprint_sha256: "tooshort"
+units { id: "README.md" label: "README.md" }

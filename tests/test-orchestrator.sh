@@ -58,9 +58,16 @@ else
 fi
 
 # Each case gets its own workspace so a leftover ledger cannot leak between them.
+#
+# The collector fingerprints a target's content, so a target has to exist. Both
+# trees are written here: "src" is what run_grimes reviews, and "other-target"
+# is the second, differently-fingerprinted target the ledger must refuse.
 workspace() {
     local dir
     dir="$(mktemp -d)"
+    mkdir -p "$dir/src" "$dir/other-target"
+    printf 'rm -rf ./build/*\n' >"$dir/src/app.sh"
+    printf 'echo other\n' >"$dir/other-target/app.sh"
     echo "$dir"
 }
 

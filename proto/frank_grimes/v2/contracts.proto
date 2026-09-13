@@ -99,6 +99,29 @@ message Target {
   }];
 }
 
+// One reviewable unit of the target, in whatever unit the target is made of: a
+// file for code, a section for a document, a numbered step for an argument, a
+// source for an external artifact.
+message TargetUnit {
+  // Stable within one inventory, so coverage can name what it examined: a
+  // repository-relative path, a section slug, a step number, a URI.
+  string id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+  }];
+  string label = 2 [(buf.validate.field).string.max_len = 512];
+}
+
+// What collection resolved. The unit list is the denominator coverage is later
+// counted against, so it is fixed before the target is attacked.
+message TargetInventory {
+  uint32 schema_major = 1 [(buf.validate.field).uint32.const = 2];
+  // An inventory belongs to the target it was taken from; one carried to a
+  // different target would count the wrong units.
+  bytes target_fingerprint_sha256 = 2 [(buf.validate.field).bytes.len = 32];
+  repeated TargetUnit units = 3 [(buf.validate.field).repeated.min_items = 1];
+}
+
 // A repository-relative path that cannot escape the repository root.
 message RepoPath {
   option (buf.validate.message).cel = {

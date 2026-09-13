@@ -3,7 +3,6 @@ package engine
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"fmt"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
@@ -17,36 +16,6 @@ var AllCategories = []pb.Category{
 	pb.Category_CATEGORY_REL, pb.Category_CATEGORY_OPS, pb.Category_CATEGORY_PER,
 	pb.Category_CATEGORY_VER, pb.Category_CATEGORY_MNT, pb.Category_CATEGORY_DEP,
 	pb.Category_CATEGORY_HUM,
-}
-
-// PathCollector fingerprints a code target by its root and scope. Document,
-// idea, and external targets need a collector that can resolve them.
-//
-// It does not enumerate or hash the target's contents, so it cannot report that
-// a routed category reached its stop; completeness therefore stays below
-// sufficient until real collection lands.
-type PathCollector struct{}
-
-func (PathCollector) Collect(ctx context.Context, spec TargetSpec) (*pb.Target, []pb.Category, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, nil, err
-	}
-	if spec.Root == "" || spec.Scope == "" {
-		return nil, nil, fmt.Errorf("target needs both a root and a scope")
-	}
-	sum := sha256.Sum256([]byte(spec.Root + "\x00" + spec.Scope))
-	target := &pb.Target{
-		Root:              spec.Root,
-		Scope:             spec.Scope,
-		FingerprintSha256: sum[:],
-		Display:           spec.Scope,
-		Kind:              pb.TargetKind_TARGET_KIND_CODE,
-	}
-	categories := spec.Categories
-	if len(categories) == 0 {
-		categories = AllCategories
-	}
-	return target, categories, nil
 }
 
 // StrictBroker admits a finding only when the contract accepts it whole.

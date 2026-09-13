@@ -15,6 +15,8 @@ import (
 type TargetSpec struct {
 	Root       string
 	Scope      string
+	Kind       pb.TargetKind
+	Snapshot   string
 	Categories []pb.Category
 }
 
@@ -45,10 +47,10 @@ type ProviderOutput struct {
 	Raw []byte
 }
 
-// Collector resolves a caller's target spec into a fingerprinted target and the
-// categories to route.
+// Collector resolves a caller's target spec into a fingerprinted target, the
+// inventory of units a review is accountable for, and the categories to route.
 type Collector interface {
-	Collect(ctx context.Context, spec TargetSpec) (*pb.Target, []pb.Category, error)
+	Collect(ctx context.Context, spec TargetSpec) (*pb.Target, *pb.TargetInventory, []pb.Category, error)
 }
 
 // Provider runs one review and returns its untrusted output.
@@ -84,6 +86,12 @@ type Ledger interface {
 type ResultStore interface {
 	Load(ctx context.Context) (*pb.GrimesResult, error)
 	Save(ctx context.Context, r *pb.GrimesResult) ([]byte, error)
+}
+
+// InventoryStore persists what collection resolved, so a later iteration is
+// accountable to the same units the first one was.
+type InventoryStore interface {
+	Save(ctx context.Context, i *pb.TargetInventory) error
 }
 
 // StateStore persists loop state between iterations.
