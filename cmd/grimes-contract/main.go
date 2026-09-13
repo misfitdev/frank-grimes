@@ -46,6 +46,10 @@ Usage:
       [--iteration=N] [--actor=<s>] [--evidence-sha256=<hex>]
       Apply one lifecycle transition and rewrite the ledger atomically.
 
+  grimes-contract report add|seal|show ...
+      Build a provider report one candidate at a time. Each candidate is
+      validated as it is added, so an error names the finding at fault.
+
   grimes-contract state --ledger=<f> [--json]
       Summarize ledger state.
 
@@ -75,6 +79,8 @@ func main() {
 		err = cmdDecodeReport(os.Args[2:])
 	case "ledger":
 		err = cmdLedger(os.Args[2:])
+	case "report":
+		err = cmdReport(os.Args[2:])
 	case "state":
 		err = cmdState(os.Args[2:])
 	case "-h", "--help", "help":

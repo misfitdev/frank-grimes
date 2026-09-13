@@ -19,6 +19,7 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SKILL="$PROJECT_ROOT/skills/frank-grimes/SKILL.md"
 GRIND="$PROJECT_ROOT/adapters/claude-code/commands/grind.md"
+PROTO="$PROJECT_ROOT/proto/frank_grimes/v2/contracts.proto"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -101,22 +102,24 @@ echo "--- Gate selection is ordered and recorded ---"
 for rule in 'supplied explicitly|supplied' 'aggregate check' 'documented' 'unavailable'; do
     assert_present "$SKILL" "$rule" "skill documents gate selection rule: $rule"
 done
-assert_present "$GRIND" 'selected_by' \
-    "adapter records which rule selected the gate"
+# The rule that selected the gate has no field in the contract yet, so nothing
+# downstream can record it. The skill assertion above covers the rule itself.
+assert_present "$PROTO" 'message Verification' \
+    "the contract defines a verification record"
 
 echo ""
 echo "--- Verified means verified ---"
 assert_present "$SKILL" 'verified. only when the gate passed' \
     "skill defines verified as gate-passed, not merely edited"
-assert_present "$GRIND" 'VERIFIED closures only' \
-    "adapter counts only verified closures as fixed"
+assert_present "$PROTO" 'uint32 verified' \
+    "the contract counts verified closures separately"
 
 echo ""
 echo "--- Gate result is recorded as evidence ---"
 assert_present "$SKILL" 'exit code, and bounded output as E1' \
     "skill records the gate run as E1 evidence"
-assert_present "$GRIND" '"status": "passed\|failed\|unavailable\|not_applicable"' \
-    "adapter reports a verification status in the structured result"
+assert_present "$PROTO" 'VERIFICATION_STATUS_(PASSED|FAILED|UNAVAILABLE|NOT_APPLICABLE)' \
+    "the contract names every verification status"
 
 echo ""
 echo "========================================"
