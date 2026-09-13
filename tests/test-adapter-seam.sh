@@ -56,6 +56,7 @@ fi
 BINDIR="$(mktemp -d)"
 SANDBOX=""
 cleanup() {
+    rm -f "${JOINED:-}"
     rm -rf "$BINDIR"
     [[ -n "$SANDBOX" ]] && rm -rf "$SANDBOX"
 }
@@ -76,6 +77,11 @@ else
     exit 1
 fi
 export PATH="$BINDIR:$PATH"
+
+# A shell command may be spread over continuation lines, so a grep over physical
+# lines can be defeated by a line break. Both checks below read the joined form.
+JOINED="$(mktemp)"
+sed -e :a -e '/\\$/N; s/\\\n//; ta' "$GRIND" >"$JOINED"
 
 echo ""
 echo "--- The adapter's result format is the one the engine reads ---"
@@ -129,10 +135,22 @@ cp "$HOOK" "$SANDBOX/hooks/stop.sh"
 chmod +x "$SANDBOX/hooks/stop.sh"
 
 # The adapter is expected to drive the engine rather than hand-write a record.
-if grep -qE 'grimes run|grimes-contract encode-result' "$GRIND"; then
+# `grimes-contract encode-result` would not satisfy that: it is a codec call
+# that produces no engine-owned run record, and accepting it here would let the
+# end-to-end case below validate a test-authored invocation instead.
+if grep -qE '(^|[^-])grimes run ' "$JOINED"; then
     pass "grind.md drives the engine to produce its result"
 else
     fail "grind.md never invokes the engine, so no run record is ever produced"
+fi
+
+# auto-loop is documented as off by default, so the documented command must not
+# hand it to the engine unasked: every ordinary grind would otherwise write loop
+# state and arm iterations the caller did not request.
+if grep -qE 'grimes run .*--auto-loop' "$JOINED"; then
+    fail "grind.md passes --auto-loop unconditionally"
+else
+    pass "grind.md leaves --auto-loop to the caller"
 fi
 
 set +e
@@ -155,16 +173,18 @@ echo "--- The documented commands produce a record the engine accepts ---"
         --path=bad-script.sh \
         --tier=E2 --claim="caller-controlled deletion path" \
         --quote='rm -rf "$1"/*' >/dev/null
-
-    grimes-contract report seal \
-        --target-root="$SANDBOX" --target-scope=bad-script.sh \
-        --iteration=1 --routed=SEC,COR --examined=4 --disproved=3 \
-        --summary="One deletion path survived." >.grimes/report.envelope
 ) || fail "the documented report commands failed"
 
+# Sealing runs as the provider command, so it inherits the run identity the
+# engine exports. Sealing beforehand could not carry it: the run does not exist
+# yet, and the engine refuses a report raised against another request.
 set +e
+# --auto-loop stands in for a caller who asked to iterate; grind.md leaves the
+# flag to the caller, which is asserted separately above.
 (cd "$SANDBOX" && grimes run --dir=. --auto-loop \
-    --provider-command="cat .grimes/report.envelope" bad-script.sh >/dev/null 2>&1)
+    --provider-command="grimes-contract report seal --routed=SEC,COR \
+        --examined=4 --disproved=3 --summary=One deletion path survived." \
+    bad-script.sh >/dev/null 2>&1)
 RUN_CODE=$?
 set -e
 

@@ -11,7 +11,7 @@ verdict { decision: DECISION_BLOCK residual_risk: RESIDUAL_RISK_CRITICAL review_
 legacy_color: LEGACY_COLOR_RED
 marginal_yield { candidates_examined: 9 candidates_disproved: 3 new_p0_p1: 2 }
 counts { total: 6 open_p0: 2 open_p1: 2 }
-verification { status: VERIFICATION_STATUS_NOT_APPLICABLE }
+verification { status: VERIFICATION_STATUS_NOT_APPLICABLE selected_by: GATE_SELECTION_UNAVAILABLE }
 ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678901" }
 unmet_gates: "decision"
 unmet_gates: "residual_risk"

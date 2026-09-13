@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# Reports one cited P0 as a provider report.
+# Reports one cited P0, anchored in whatever kind of target this is.
 set -euo pipefail
-FIXTURES="$(cd "$(dirname "$0")/../contracts" && pwd)"
-echo "I looked at the target and found problems."
-grimes-contract encode-report "$FIXTURES/report.p0-with-citation.valid.textproto"
+FAKES="$(cd "$(dirname "$0")" && pwd)"
+cd "$(mktemp -d)"
+echo "I looked at the target and found what I found."
+# shellcheck disable=SC2016  # the quoted text is evidence, not an expansion
+"$FAKES/add-finding.sh" P0 systemic likely \
+    "caller-controlled deletion path" 'rm -rf "$1"/*'
+"$FAKES/seal.sh" 6 5 "One caller-controlled deletion path survived the grind."

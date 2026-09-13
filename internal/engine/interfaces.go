@@ -33,6 +33,7 @@ const (
 // Claimed and no findings, evidence, or ledger data.
 type Request struct {
 	Role       Role
+	RunID      string
 	Target     *pb.Target
 	Mode       pb.Mode
 	Iteration  uint32

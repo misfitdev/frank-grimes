@@ -207,30 +207,34 @@ grimes-contract report add \
 ```
 
 The anchor is one of `--path`, `--document` with `--section`, `--argument` with
-`--step`, or `--source`. Evidence follows the tier: `--tier=E1` takes `--action`,
+`--step`, or `--source` with `--publisher`, `--snapshot-sha256`,
+`--retrieved-at`, and optionally `--source-section`. Evidence follows the tier: `--tier=E1` takes `--action`,
 `--cwd`, `--exit-code`, and `--output`; `--tier=E2` takes `--quote`; `--tier=E3`
 takes `--assumption`, `--reasoning`, and `--falsifier`. Add `--suggested-fix` to
 record a fix as text without applying it.
 
-If a call is rejected, the contract is telling you the finding does not carry the
-evidence its severity requires. Lower the severity or strengthen the evidence.
-Do not restate the finding to get past the check.
+A rejected call prints the contract rule it failed. The skill governs what to do
+about it.
 
 ### Seal and run
 
-```bash
-grimes-contract report seal \
-  --target-root="$(pwd)" --target-scope=<scope> \
-  --iteration=<n> --routed=<COR,SEC,...> \
-  --examined=<N> --disproved=<K> \
-  --summary="<one-sentence BLUF>" > .grimes/report.envelope
+Sealing happens inside the run, as the provider command: the engine exports the
+run identity to the provider it invokes, and `report seal` reads it from there,
+so the flags below carry only what the caller supplies.
 
-grimes run --dir=. --auto-loop \
-  --provider-command="cat .grimes/report.envelope" <target>
+```bash
+grimes run --dir=. \
+  --provider-command="grimes-contract report seal \
+    --routed=<COR,SEC,...> --examined=<N> --disproved=<K> \
+    --summary='<one-sentence BLUF>'" \
+  <target>
 ```
 
-`--examined` and `--disproved` are your self-grind arithmetic, where `N = M + K`.
-Report them honestly; they are recorded, not checked.
+The target goes last: flags after it are not parsed. Pass `--auto-loop` only when
+the caller asked for it; it is off by default.
+
+`--examined` and `--disproved` are the self-grind counts the skill defines. They
+are recorded, not checked.
 
 You are the provider, so the engine cannot call you. It reads what you wrote and
 treats it as untrusted input: it recomputes each finding's identity from its own

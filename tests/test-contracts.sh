@@ -152,6 +152,7 @@ for fixture in "$FIXTURES"/*.textproto; do
         report.*) msg="ProviderReport" ;;
         adjudication.*) msg="AdjudicationReport" ;;
         inventory.*) msg="TargetInventory" ;;
+        verification.*) msg="Verification" ;;
         *)
             fail "fixture $name has no recognized type prefix"
             continue
@@ -276,6 +277,127 @@ else
 fi
 
 rm -f "$BIN_OUT" "$BIN_OUT2" "$TAMPERED" "$DUPED" "$ENVELOPE" "$TRAILING"
+
+echo ""
+echo "--- A count the contract cannot hold is refused, not wrapped ---"
+
+# The contract carries these counters as uint32 and the exit code as int32. A
+# wider value narrowed silently would seal a report recording a number nobody
+# supplied, and it would validate, because the wrapped value is in range.
+WORK="$(mktemp -d)"
+(
+    cd "$WORK" || exit 1
+    mkdir -p .grimes
+    "$BIN" report add --category=SEC --severity=P2 --blast=local_component \
+        --likelihood=unlikely --path=a.sh --tier=E2 --claim="c" --quote="q" >/dev/null
+) || fail "report add rejected the seed candidate"
+
+for flag in examined disproved; do
+    set +e
+    OUT="$(cd "$WORK" && "$BIN" report seal --target-root=/repo --target-scope=a.sh \
+        --iteration=1 --routed=SEC --"$flag"=4294967296 --summary="s" 2>&1)"
+    CODE=$?
+    set -e
+    if [[ "$CODE" != "0" ]] && grep -q -- "--$flag" <<<"$OUT"; then
+        pass "--$flag above uint32 is refused by name"
+    else
+        fail "--$flag above uint32 was accepted (exit $CODE)"
+    fi
+done
+
+set +e
+OUT="$(cd "$WORK" && "$BIN" report add --category=SEC --severity=P2 \
+    --blast=local_component --likelihood=unlikely --path=b.sh \
+    --tier=E1 --claim="c" --action="go test" --cwd=. --exit-code=2147483648 --output="x" 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" != "0" ]] && grep -q -- '--exit-code' <<<"$OUT"; then
+    pass "--exit-code above int32 is refused by name"
+else
+    fail "--exit-code above int32 was accepted (exit $CODE)"
+fi
+rm -rf "$WORK"
+
+echo ""
+echo "--- Sealing ends the report it sealed ---"
+
+# The next seal stamps the current run's identity onto whatever candidates it
+# finds. Leaving them would let a later request adopt findings its own pass
+# never made, and they would pass the engine's binding check because the
+# identity is current.
+WORK="$(mktemp -d)"
+mkdir -p "$WORK/.grimes"
+(
+    cd "$WORK" || exit 1
+    "$BIN" report add --category=SEC --severity=P2 --blast=local_component \
+        --likelihood=unlikely --path=a.sh --tier=E2 --claim="c" --quote="q" >/dev/null
+    "$BIN" report seal --target-root=/repo --target-scope=a.sh --iteration=1 \
+        --routed=SEC --examined=1 --disproved=0 --summary="s" >/dev/null
+) || fail "the seal sequence failed"
+
+if [[ -f "$WORK/.grimes/report.textproto" ]]; then
+    fail "the working report survived its own sealing"
+else
+    pass "sealing clears the candidates it sealed"
+fi
+
+SECOND="$(cd "$WORK" && "$BIN" report seal --target-root=/repo --target-scope=a.sh \
+    --iteration=2 --routed=SEC --examined=0 --disproved=0 --summary="s" |
+    "$BIN" decode-report)"
+if grep -q 'candidates' <<<"$SECOND"; then
+    fail "a later seal readopted the previous report's candidates"
+else
+    pass "a later seal carries no candidate it was not given"
+fi
+rm -rf "$WORK"
+
+echo ""
+echo "--- A retrieved source carries its retrieval identity ---"
+
+# Every --source candidate was rejected by validation, because the anchor was
+# built with only the URI while the contract also requires a publisher, a
+# snapshot digest, and a retrieval time.
+WORK="$(mktemp -d)"
+mkdir -p "$WORK/.grimes"
+DIGEST="$(printf 'a%.0s' $(seq 1 64))"
+set +e
+OUT="$(cd "$WORK" && "$BIN" report add --category=SEC --severity=P2 \
+    --blast=local_component --likelihood=unlikely --source="https://example.com/p" \
+    --tier=E2 --claim="c" --quote="q" 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" != "0" ]] && grep -q -- '--publisher' <<<"$OUT"; then
+    pass "a source without its retrieval identity is refused by name"
+else
+    fail "a source without its retrieval identity was accepted (exit $CODE)"
+fi
+
+if (cd "$WORK" && "$BIN" report add --category=SEC --severity=P2 \
+    --blast=local_component --likelihood=unlikely --source="https://example.com/p" \
+    --publisher="Example" --snapshot-sha256="$DIGEST" \
+    --retrieved-at="2026-01-02T15:04:05Z" --source-section="Clause 4" \
+    --tier=E2 --claim="c" --quote="q" >/dev/null 2>&1); then
+    pass "a source with its retrieval identity is admitted"
+else
+    fail "a complete source candidate was still rejected"
+fi
+
+for bad in "--snapshot-sha256=zz --retrieved-at=2026-01-02T15:04:05Z" \
+    "--snapshot-sha256=$DIGEST --retrieved-at=yesterday"; do
+    set +e
+    # shellcheck disable=SC2086  # the pair under test is two flags, not one word
+    OUT="$(cd "$WORK" && "$BIN" report add --category=SEC --severity=P3 \
+        --blast=local_component --likelihood=unlikely --source="https://example.com/q" \
+        --publisher="Example" $bad --tier=E2 --claim="c2" --quote="q" 2>&1)"
+    CODE=$?
+    set -e
+    if [[ "$CODE" != "0" ]]; then
+        pass "a malformed source identity is refused ($bad)"
+    else
+        fail "a malformed source identity was accepted ($bad)"
+    fi
+done
+rm -rf "$WORK"
 
 echo ""
 echo "========================================"

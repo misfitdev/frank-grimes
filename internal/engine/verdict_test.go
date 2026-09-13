@@ -29,6 +29,23 @@ func clean() DeriveInput {
 	}
 }
 
+// Every other weight predicate skips an unweighted finding. This one deciding
+// the verdict on a finding the counts and the residual risk both ignore would
+// report a conditional nothing else can account for.
+func TestDeriveIgnoresAnUnweightedAcceptedP0(t *testing.T) {
+	in := clean()
+	in.Candidates = []Candidate{{
+		Severity:       pb.Severity_SEVERITY_P0,
+		Status:         pb.FindingStatus_FINDING_STATUS_ACCEPTED,
+		Tier:           pb.EvidenceTier_EVIDENCE_TIER_E1,
+		ProbeAttempted: true,
+		Tags:           []string{TagUnverified},
+	}}
+	if d := Derive(in); d.Verdict.GetDecision() != pb.Decision_DECISION_PASS {
+		t.Errorf("decision = %v, want pass for an unweighted accepted P0", d.Verdict.GetDecision())
+	}
+}
+
 func TestDeriveCleanRunPasses(t *testing.T) {
 	d := Derive(clean())
 	if d.Verdict.GetDecision() != pb.Decision_DECISION_PASS {
@@ -469,7 +486,10 @@ func resultFrom(d Derived, in DeriveInput) *pb.GrimesResult {
 		LegacyColor:     d.Color,
 		MarginalYield:   &pb.MarginalYield{},
 		Counts:          d.Counts,
-		Verification:    &pb.Verification{Status: pb.VerificationStatus_VERIFICATION_STATUS_NOT_APPLICABLE},
+		Verification: &pb.Verification{
+			Status:     pb.VerificationStatus_VERIFICATION_STATUS_NOT_APPLICABLE,
+			SelectedBy: pb.GateSelection_GATE_SELECTION_UNAVAILABLE,
+		},
 		Ledger: &pb.LedgerRef{
 			Path:                contracts.LedgerPath,
 			DigestSha256:        digest,

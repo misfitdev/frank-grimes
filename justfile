@@ -36,7 +36,7 @@ preview:
     cd docs && python3 -m http.server 8080
 
 # Lint, format-check, validate, and run contract tests
-check: lint fmt-check proto-lint vet test-go validate test-fix-gate test-adjudication test-stop-hook test-contracts test-collector test-orchestrator test-adapter-seam
+check: lint fmt-check proto-lint proto-breaking vet test-go validate test-fix-gate test-adjudication test-stop-hook test-contracts test-collector test-orchestrator test-adapter-seam
 
 # Vet the Go packages
 vet:
@@ -65,6 +65,21 @@ gen:
 # Lint the protobuf contract
 proto-lint:
     buf lint
+
+# Refuse a wire-incompatible change to the contract.
+#
+# The baseline lives outside proto/ because that path is the buf module: an
+# artifact inside it is read as part of the module by any tool that globs the
+# directory. The baseline is the last wire state deliberately accepted. Breaking it is
+# sometimes right, and `just proto-baseline` is how that is said out loud: the
+# regenerated baseline lands in the same commit as the break and the schema
+# major bump, so the acknowledgement is reviewable rather than silent.
+proto-breaking:
+    buf breaking --against .buf/baseline.binpb
+
+# Accept the current contract as the baseline. See proto-breaking.
+proto-baseline:
+    buf build -o .buf/baseline.binpb
 
 # Run the adapter/engine seam tests
 test-adapter-seam:

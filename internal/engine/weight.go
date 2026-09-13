@@ -65,8 +65,15 @@ func decide(in DeriveInput, counts *pb.FindingCounts) pb.Decision {
 	return pb.Decision_DECISION_PASS
 }
 
+// carriesAcceptedP0 reports whether a weighted P0 is being carried rather than
+// fixed. Weighting is checked here as it is in count, residualRisk, and
+// drivingFindings: a finding the other three ignore must not be the one that
+// downgrades the decision.
 func carriesAcceptedP0(cands []Candidate) bool {
 	for _, c := range cands {
+		if !Weighted(c.Tags) {
+			continue
+		}
 		if c.Severity == pb.Severity_SEVERITY_P0 && c.Status == pb.FindingStatus_FINDING_STATUS_ACCEPTED {
 			return true
 		}

@@ -12,7 +12,7 @@ verdict { decision: DECISION_PASS residual_risk: RESIDUAL_RISK_LOW review_confid
 legacy_color: LEGACY_COLOR_GREEN
 marginal_yield { candidates_examined: 6 candidates_disproved: 6 }
 counts { total: 0 }
-verification { status: VERIFICATION_STATUS_NOT_APPLICABLE }
+verification { status: VERIFICATION_STATUS_NOT_APPLICABLE selected_by: GATE_SELECTION_UNAVAILABLE }
 independent_review {
   run_id: "run-003-adj"
   reviewer_id: "grimey-verifier"

@@ -11,12 +11,14 @@ import (
 	"math"
 	"os"
 	"strings"
+	"time"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
 	"github.com/misfitdev/frank-grimes/internal/envelope"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const usage = `grimes-contract - validator and codec for the Frank Grimes contract
@@ -116,6 +118,8 @@ func newMessage(name string) (proto.Message, error) {
 		return &pb.CandidateFinding{}, nil
 	case "TargetInventory", "frank_grimes.v2.TargetInventory":
 		return &pb.TargetInventory{}, nil
+	case "Verification", "frank_grimes.v2.Verification":
+		return &pb.Verification{}, nil
 	default:
 		return nil, fmt.Errorf("unknown message type %q", name)
 	}
@@ -137,6 +141,10 @@ func cmdID(args []string) error {
 	argument := fs.String("argument", "", "supplied argument name")
 	step := fs.Uint("step", 0, "numbered claim or step within the argument")
 	source := fs.String("source", "", "retrieved source URI")
+	publisher := fs.String("publisher", "", "who published the retrieved source")
+	snapshot := fs.String("snapshot-sha256", "", "hex digest of the snapshot that was read")
+	retrievedAt := fs.String("retrieved-at", "", "RFC 3339 time the source was read")
+	sourceSection := fs.String("source-section", "", "section of the retrieved source")
 	evidence := fs.String("evidence", "", "primary evidence text")
 	evidenceFile := fs.String("evidence-file", "", "read evidence from a file")
 	wide := fs.Bool("wide", false, "extend the ID to 16 hex after an observed collision")
@@ -149,7 +157,9 @@ func cmdID(args []string) error {
 	if *step > math.MaxUint32 {
 		return fmt.Errorf("--step must not exceed %d", uint32(math.MaxUint32))
 	}
-	anchor, err := anchorFromFlags(*path, *document, *section, *argument, uint32(*step), *source)
+	anchor, err := anchorFromFlags(*path, *document, *section, *argument, uint32(*step), *source, sourceMeta{
+		publisher: *publisher, snapshot: *snapshot, retrieved: *retrievedAt, section: *sourceSection,
+	})
 	if err != nil {
 		return err
 	}
@@ -176,7 +186,22 @@ func cmdID(args []string) error {
 
 // anchorFromFlags builds the one anchor the flags describe, refusing a mix so
 // that an ID is never taken over a locator the caller did not mean.
-func anchorFromFlags(path, document, section, argument string, step uint32, source string) (*pb.Anchor, error) {
+// sourceMeta is the retrieval identity a citation of an external source needs.
+// Without it a quote cannot be checked against what was actually read, so the
+// contract requires all three of a candidate.
+//
+// required is false for `id`, which prints a fingerprint: identity is the URI
+// and the section, so demanding a digest and a timestamp there would be
+// friction over fields the answer does not depend on.
+type sourceMeta struct {
+	publisher string
+	snapshot  string
+	retrieved string
+	section   string
+	required  bool
+}
+
+func anchorFromFlags(path, document, section, argument string, step uint32, source string, src sourceMeta) (*pb.Anchor, error) {
 	var chosen []string
 	if path != "" {
 		chosen = append(chosen, "--path")
@@ -215,10 +240,34 @@ func anchorFromFlags(path, document, section, argument string, step uint32, sour
 			Argument: argument, Step: step,
 		}}}, nil
 	default:
-		return &pb.Anchor{At: &pb.Anchor_RetrievedSource{RetrievedSource: &pb.RetrievedSource{
-			Uri: source,
-		}}}, nil
+		return sourceAnchor(source, src)
 	}
+}
+
+func sourceAnchor(uri string, src sourceMeta) (*pb.Anchor, error) {
+	missing := src.publisher == "" || src.snapshot == "" || src.retrieved == ""
+	if src.required && missing {
+		return nil, fmt.Errorf("--source needs --publisher, --snapshot-sha256, and --retrieved-at")
+	}
+	retrieved := &pb.RetrievedSource{Uri: uri, Publisher: src.publisher}
+	if src.snapshot != "" {
+		digest, err := hex.DecodeString(src.snapshot)
+		if err != nil || len(digest) != 32 {
+			return nil, fmt.Errorf("--snapshot-sha256 must be 64 hex characters")
+		}
+		retrieved.SnapshotSha256 = digest
+	}
+	if src.retrieved != "" {
+		at, err := time.Parse(time.RFC3339, src.retrieved)
+		if err != nil {
+			return nil, fmt.Errorf("--retrieved-at must be RFC 3339, for example 2026-01-02T15:04:05Z")
+		}
+		retrieved.RetrievedAt = timestamppb.New(at)
+	}
+	if src.section != "" {
+		retrieved.Section = &src.section
+	}
+	return &pb.Anchor{At: &pb.Anchor_RetrievedSource{RetrievedSource: retrieved}}, nil
 }
 
 func cmdValidate(args []string) error {

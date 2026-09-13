@@ -76,7 +76,12 @@ func AnchorKey(a *pb.Anchor) (kind string, parts []string) {
 			strconv.FormatUint(uint64(at.ArgumentStep.GetStep()), 10),
 		}
 	case *pb.Anchor_RetrievedSource:
-		return "src", []string{strings.TrimRight(at.RetrievedSource.GetUri(), "/")}
+		// The section is a named place in the source, the way a document's is,
+		// not an offset into it. Two clauses of one policy are two findings.
+		return "src", []string{
+			strings.TrimRight(at.RetrievedSource.GetUri(), "/"),
+			normalizeLabel(at.RetrievedSource.GetSection()),
+		}
 	default:
 		return "none", nil
 	}

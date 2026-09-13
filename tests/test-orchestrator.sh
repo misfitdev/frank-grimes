@@ -163,6 +163,24 @@ else
 fi
 rm -rf "$WS"
 
+# A descendant that leaves the process group survives the group kill and keeps
+# the pipe open. Every other fake stays in the group, so nothing else covers it.
+#
+# The run still ends: os/exec closes its own pipes once WaitDelay expires, which
+# bounds the read no signal can reach. The bound is the deadline plus that delay,
+# not the deadline alone.
+WS="$(workspace)"
+START=$(date +%s)
+CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-reparent.sh" --provider-timeout=2s)"
+ELAPSED=$(($(date +%s) - START))
+assert_eq "$CODE" "1" "a provider whose descendant escapes the group fails the run"
+if [[ "$ELAPSED" -lt 30 ]]; then
+    pass "an escaped descendant does not hold the run open (${ELAPSED}s)"
+else
+    fail "an escaped descendant held the run for ${ELAPSED}s"
+fi
+rm -rf "$WS"
+
 WS="$(workspace)"
 START=$(date +%s)
 CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-hang.sh" --provider-timeout=2s)"

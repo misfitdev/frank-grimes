@@ -3,9 +3,11 @@ package contracts
 import (
 	"bytes"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"buf.build/go/protovalidate"
@@ -133,9 +135,18 @@ func ParseTextProto(b []byte, m proto.Message) error {
 // WriteAtomic writes through a temporary file in the same directory followed by
 // a rename, so a crash mid-write cannot leave a half-written ledger that the
 // next run would quarantine.
+//
+// The directory is synced after the rename as well as the file before it. A
+// rename is a directory modification, so without that a caller can be told its
+// write succeeded and find no file after power loss.
 func WriteAtomic(path string, data []byte) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	// Directories MkdirAll has to create are new names in their own parents, and
+	// a name is only durable once the parent that holds it is synced. Syncing
+	// the file's directory alone would leave the record reachable through a path
+	// that did not survive.
+	created, err := makeDirs(dir)
+	if err != nil {
 		return err
 	}
 	tmp, err := os.CreateTemp(dir, ".tmp-*")
@@ -156,7 +167,60 @@ func WriteAtomic(path string, data []byte) error {
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmpName, path)
+	if err := os.Rename(tmpName, path); err != nil {
+		return err
+	}
+	if err := syncDirectory(dir); err != nil {
+		return err
+	}
+	// Parents outward, so a directory is synced only after the one it holds.
+	for _, d := range created {
+		if err := syncDirectory(filepath.Dir(d)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// makeDirs creates dir and returns the directories it had to create, innermost
+// first. An existing dir returns nothing to sync.
+func makeDirs(dir string) ([]string, error) {
+	var created []string
+	for d := dir; ; d = filepath.Dir(d) {
+		if _, err := os.Stat(d); err == nil {
+			break
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+		created = append(created, d)
+		if parent := filepath.Dir(d); parent == d {
+			break
+		}
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	return created, nil
+}
+
+// syncDirectory is a variable so a test can observe that it was called. An
+// fsync has no effect anything short of power loss can see, so without this the
+// call could be dropped and every assertion would still pass.
+var syncDirectory = syncDir
+
+func syncDir(dir string) error {
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	// Some filesystems refuse fsync on a directory. The rename already happened,
+	// so a refusal is not a failed write; a real I/O error still is.
+	if err := d.Sync(); err != nil && !errors.Is(err, syscall.EINVAL) &&
+		!errors.Is(err, syscall.ENOTSUP) {
+		d.Close()
+		return err
+	}
+	return d.Close()
 }
 
 // Quarantine moves an unusable file aside rather than deleting it. A corrupt

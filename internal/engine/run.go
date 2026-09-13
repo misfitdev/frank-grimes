@@ -165,6 +165,7 @@ func (e *Engine) resume(ctx context.Context, target *pb.Target) (uint32, error) 
 func (e *Engine) review(ctx context.Context, target *pb.Target, categories []pb.Category, mode pb.Mode, iteration uint32) (*pb.ProviderReport, error) {
 	out, err := e.Provider.Review(ctx, Request{
 		Role:       RolePrimary,
+		RunID:      e.RunID,
 		Target:     target,
 		Mode:       mode,
 		Iteration:  iteration,
@@ -188,7 +189,40 @@ func (e *Engine) review(ctx context.Context, target *pb.Target, categories []pb.
 	if err := contracts.UnmarshalCanonical(raw, report); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrProviderOutput, err)
 	}
+	if why := reportBinding(report, e.RunID, target, mode, iteration); why != "" {
+		return nil, fmt.Errorf("%w: %s", ErrProviderOutput, why)
+	}
 	return report, nil
+}
+
+// reportBinding names why a report is not the answer to this request, or
+// returns "" when it is.
+//
+// The fields are validated as present but bound to nothing, so a report left on
+// disk by an earlier iteration reads as a fresh one. The adapter's documented
+// `cat .grimes/report.envelope` makes that the ordinary case rather than the
+// adversarial one: a provider that fails to rewrite the file hands back the
+// previous answer, whose candidates would be admitted and whose examined count
+// would feed the stopping rule.
+func reportBinding(report *pb.ProviderReport, runID string, target *pb.Target, mode pb.Mode, iteration uint32) string {
+	if report.GetSchemaMajor() != contracts.SchemaMajor {
+		return fmt.Sprintf("report declares contract major %d, expected %d",
+			report.GetSchemaMajor(), contracts.SchemaMajor)
+	}
+	if report.GetRunId() != runID {
+		return fmt.Sprintf("report belongs to run %q, this is run %q", report.GetRunId(), runID)
+	}
+	if !bytes.Equal(report.GetTarget().GetFingerprintSha256(), target.GetFingerprintSha256()) {
+		return "report reviewed a different target than this run"
+	}
+	if report.GetMode() != mode {
+		return fmt.Sprintf("report was produced in %v, this run is %v", report.GetMode(), mode)
+	}
+	if report.GetIteration() != iteration {
+		return fmt.Sprintf("report was taken at iteration %d, this run is at %d",
+			report.GetIteration(), iteration)
+	}
+	return ""
 }
 
 // apply admits each reported candidate into the ledger.

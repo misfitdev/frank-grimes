@@ -13,11 +13,15 @@ const maxTargetLen = 200
 // characters, backticks, and fence syntax removes its ability to close a code
 // block or start a new line; the length bound stops it dominating the prompt.
 // This removes structure, not meaning, so the prompt also labels it as data.
+//
+// U+2028 and U+2029 go with the ASCII controls: many renderers and tokenizers
+// break a line on them, so one left in place starts what reads as a new
+// instruction.
 func SanitizeTarget(s string) string {
 	var b strings.Builder
 	for _, r := range s {
 		switch {
-		case r < 0x20 || r == 0x7f:
+		case r < 0x20 || r == 0x7f || r == '\u2028' || r == '\u2029':
 			continue
 		case r == '`' || r == '$':
 			continue

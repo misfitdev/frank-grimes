@@ -438,6 +438,23 @@ message Finding {
 }
 
 message Ledger {
+  // A finding lives in the target under review. A code ledger holding a
+  // document_part is a finding about something else, and coverage counted
+  // against this target's inventory would never account for it.
+  //
+  // Only Finding.location.anchor is constrained. Evidence.citation.anchor is
+  // deliberately free: a finding in code may cite the spec it contradicts.
+  option (buf.validate.message).cel = {
+    id: "ledger.anchor_kind_matches_target"
+    message: "each finding must be anchored in the kind of target under review"
+    expression:
+      "this.findings.all(k, "
+      "this.target.kind == 1 ? has(this.findings[k].location.anchor.repo_line) : "
+      "this.target.kind == 2 ? has(this.findings[k].location.anchor.document_part) : "
+      "this.target.kind == 3 ? has(this.findings[k].location.anchor.argument_step) : "
+      "has(this.findings[k].location.anchor.retrieved_source))"
+  };
+
   uint32 schema_major = 1 [(buf.validate.field).uint32.const = 2];
   uint32 schema_minor = 2;
   Target target = 3 [(buf.validate.field).required = true];
@@ -539,6 +556,17 @@ enum VerificationStatus {
   VERIFICATION_STATUS_NOT_APPLICABLE = 4;
 }
 
+// Which rule in the skill's gate selection order chose the gate. "The
+// repository's own check passed" and "no gate was available" are different
+// facts about a review, and only this distinguishes them.
+enum GateSelection {
+  GATE_SELECTION_UNSPECIFIED = 0;
+  GATE_SELECTION_USER_SUPPLIED = 1;
+  GATE_SELECTION_REPOSITORY_CHECK = 2;
+  GATE_SELECTION_DOCUMENTED_COMMAND = 3;
+  GATE_SELECTION_UNAVAILABLE = 4;
+}
+
 message Verification {
   option (buf.validate.message).cel = {
     id: "verification.passed_requires_success"
@@ -547,6 +575,13 @@ message Verification {
       "this.status != 1 || "
       "(this.command != '' && this.exit_code == 0 && "
       "size(this.output_sha256) == 32 && has(this.completed_at))"
+  };
+  // A gate that ran was selected by one of the three rules that can name a
+  // command; one that did not run was selected by none of them.
+  option (buf.validate.message).cel = {
+    id: "verification.selection_matches_status"
+    message: "a gate that ran records which rule selected it, and an unavailable one records that it was unavailable"
+    expression: "(this.status == 3 || this.status == 4) == (this.selected_by == 4)"
   };
 
   VerificationStatus status = 1 [(buf.validate.field).enum = {
@@ -558,6 +593,13 @@ message Verification {
   int32 exit_code = 4;
   bytes output_sha256 = 5;
   google.protobuf.Timestamp completed_at = 6;
+  // Not optional: "the repository's own check passed" and "no gate was
+  // available" are different facts, and a record that omits which rule applied
+  // cannot tell them apart.
+  GateSelection selected_by = 7 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
 }
 
 // zero_knowledge is const true: a reviewer that saw the first report is not an

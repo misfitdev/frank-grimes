@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"math"
 	"os"
-	"path/filepath"
+	"strconv"
 	"strings"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
@@ -69,6 +71,10 @@ func cmdReportAdd(args []string) error {
 	argument := fs.String("argument", "", "supplied argument name")
 	step := fs.Uint("step", 0, "numbered claim or step within the argument")
 	source := fs.String("source", "", "retrieved source URI")
+	publisher := fs.String("publisher", "", "who published the retrieved source")
+	snapshot := fs.String("snapshot-sha256", "", "hex digest of the snapshot that was read")
+	retrievedAt := fs.String("retrieved-at", "", "RFC 3339 time the source was read")
+	sourceSection := fs.String("source-section", "", "section of the retrieved source")
 
 	action := fs.String("action", "", "E1: the command or action performed")
 	cwd := fs.String("cwd", ".", "E1: working directory the action ran in")
@@ -94,7 +100,10 @@ func cmdReportAdd(args []string) error {
 	if err != nil {
 		return err
 	}
-	anchor, err := anchorFromFlags(*path, *document, *section, *argument, uint32(*step), *source)
+	anchor, err := anchorFromFlags(*path, *document, *section, *argument, uint32(*step), *source, sourceMeta{
+		publisher: *publisher, snapshot: *snapshot, retrieved: *retrievedAt,
+		section: *sourceSection, required: true,
+	})
 	if err != nil {
 		return err
 	}
@@ -148,7 +157,8 @@ func cmdReportAdd(args []string) error {
 func cmdReportSeal(args []string) error {
 	fs := flag.NewFlagSet("report seal", flag.ExitOnError)
 	file := fs.String("file", DefaultReportPath, "report being built")
-	runID := fs.String("run-id", "", "run identity; defaults to a generated one")
+	runID := fs.String("run-id", "", "run identity; defaults to $GRIMES_RUN_ID, then a generated one")
+	targetFP := fs.String("target-fingerprint", "", "hex target fingerprint; defaults to $GRIMES_TARGET_FINGERPRINT")
 	root := fs.String("target-root", "", "repository root, required for a code target")
 	scope := fs.String("target-scope", "", "what was reviewed")
 	kind := fs.String("kind", "code", "code, document, idea, or external")
@@ -161,11 +171,40 @@ func cmdReportSeal(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	// The engine exports the request it is making when it invokes a provider, so
+	// sealing inside that invocation needs no flags to restate it. A report
+	// answers one request and these are what say which.
+	if *root == "" {
+		*root = os.Getenv("GRIMES_TARGET_ROOT")
+	}
+	if *scope == "" {
+		*scope = os.Getenv("GRIMES_TARGET_SCOPE")
+	}
+	if !wasSetIn(fs, "kind") && os.Getenv("GRIMES_TARGET_KIND") != "" {
+		*kind = os.Getenv("GRIMES_TARGET_KIND")
+	}
+	if !wasSetIn(fs, "iteration") && os.Getenv("GRIMES_ITERATION") != "" {
+		n, err := strconv.ParseUint(os.Getenv("GRIMES_ITERATION"), 10, 32)
+		if err != nil {
+			return fmt.Errorf("GRIMES_ITERATION is not a number: %v", err)
+		}
+		*iteration = uint(n)
+	}
 	if *scope == "" || *summary == "" {
 		return fmt.Errorf("--target-scope and --summary are required")
 	}
 	if *iteration == 0 || *iteration > math.MaxUint32 {
 		return fmt.Errorf("--iteration must be between 1 and %d", uint32(math.MaxUint32))
+	}
+	// The contract carries these as uint32. A larger value would wrap into a
+	// smaller one and the sealed report would record a count nobody supplied.
+	for _, c := range []struct {
+		flag string
+		val  uint
+	}{{"examined", *examined}, {"disproved", *disproved}} {
+		if c.val > math.MaxUint32 {
+			return fmt.Errorf("--%s must not exceed %d", c.flag, uint32(math.MaxUint32))
+		}
 	}
 
 	report, err := loadReport(*file)
@@ -185,12 +224,31 @@ func cmdReportSeal(args []string) error {
 	report.SchemaMajor = contracts.SchemaMajor
 	report.RunId = *runID
 	if report.RunId == "" {
+		report.RunId = os.Getenv("GRIMES_RUN_ID")
+	}
+	if report.RunId == "" {
 		report.RunId = runID2()
+	}
+	// The engine owns the target's identity: it is taken over the target's
+	// content, which this cannot see. Echoing what the engine exported is what
+	// binds the report to the run that asked for it; the root-and-scope digest
+	// below is only for building a report outside a run.
+	fpHex := *targetFP
+	if fpHex == "" {
+		fpHex = os.Getenv("GRIMES_TARGET_FINGERPRINT")
+	}
+	fp := targetFingerprint(*root, *scope)
+	if fpHex != "" {
+		decoded, err := hex.DecodeString(fpHex)
+		if err != nil || len(decoded) != 32 {
+			return fmt.Errorf("--target-fingerprint must be 64 hex characters")
+		}
+		fp = decoded
 	}
 	report.Target = &pb.Target{
 		Root:              *root,
 		Scope:             *scope,
-		FingerprintSha256: targetFingerprint(*root, *scope),
+		FingerprintSha256: fp,
 		Display:           *scope,
 		Kind:              targetKind,
 	}
@@ -205,11 +263,26 @@ func cmdReportSeal(args []string) error {
 	if err != nil {
 		return err
 	}
+
 	if *raw {
-		_, err := os.Stdout.Write(encoded)
+		if _, err := os.Stdout.Write(encoded); err != nil {
+			return err
+		}
+	} else if _, err := fmt.Print(envelope.WrapReport(encoded)); err != nil {
 		return err
 	}
-	fmt.Print(envelope.WrapReport(encoded))
+
+	// Sealing ends this report, but only once it has been delivered. The
+	// candidates in the working file are the only durable copy, and a write that
+	// failed — an engine closing an over-limit pipe, say — would otherwise take
+	// them with it, leaving nothing to inspect or retry.
+	//
+	// Clearing matters because the next seal stamps the current run's identity
+	// onto whatever it finds: candidates left here would pass the binding and be
+	// admitted again, re-reporting findings that pass never made.
+	if err := os.Remove(*file); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("clearing the sealed report: %w", err)
+	}
 	return nil
 }
 
@@ -253,11 +326,9 @@ func saveReport(path string, report *pb.ProviderReport) error {
 	if err != nil {
 		return err
 	}
-	if dir := filepath.Dir(path); dir != "." {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return err
-		}
-	}
+	// Creating the directory here would hide it from WriteAtomic, which syncs
+	// only the directories it creates itself; the new entry in the repository
+	// would then never be made durable.
 	return contracts.WriteAtomic(path, []byte(out))
 }
 
@@ -271,6 +342,12 @@ func evidenceFromFlags(tier, claim string, anchor *pb.Anchor,
 		e.Tier = pb.EvidenceTier_EVIDENCE_TIER_E1
 		if action == "" {
 			return nil, fmt.Errorf("E1 needs --action")
+		}
+		// int32 in the contract: a wider value would wrap and the evidence would
+		// record an outcome the command did not have.
+		if exitCode > math.MaxInt32 || exitCode < math.MinInt32 {
+			return nil, fmt.Errorf("--exit-code must be between %d and %d",
+				int32(math.MinInt32), int32(math.MaxInt32))
 		}
 		cmd := &pb.ExecutedCommand{
 			Action:   action,

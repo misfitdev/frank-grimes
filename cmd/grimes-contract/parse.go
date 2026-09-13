@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -119,4 +120,16 @@ func prototextUnmarshal(b []byte, m proto.Message) error {
 func anchorLabel(a *pb.Anchor) string {
 	kind, parts := contracts.AnchorKey(a)
 	return kind + ":" + strings.Join(parts, "/")
+}
+
+// wasSetIn reports whether a flag was given on the command line, so an
+// environment default does not override an explicit one.
+func wasSetIn(fs *flag.FlagSet, name string) bool {
+	found := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			found = true
+		}
+	})
+	return found
 }

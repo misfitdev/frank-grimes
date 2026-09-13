@@ -89,8 +89,11 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	overrun := int64(len(out)) > limit
 	if overrun {
 		_ = killGroup(cmd)
+		// Closed rather than drained: a descendant that left the process group
+		// survives the kill, and draining its output would wait on a writer
+		// that has no reason to stop.
+		_ = stdout.Close()
 	}
-	_, _ = io.Copy(io.Discard, stdout)
 
 	waitErr := cmd.Wait()
 
@@ -145,6 +148,9 @@ func requestEnv(req engine.Request) []string {
 		"GRIMES_TARGET_ROOT=" + req.Target.GetRoot(),
 		"GRIMES_TARGET_SCOPE=" + req.Target.GetScope(),
 		"GRIMES_TARGET_FINGERPRINT=" + hex(req.Target.GetFingerprintSha256()),
+		// The kind selects what each evidence tier requires of a finding, so a
+		// provider that did not know it would cite a document as if it were code.
+		"GRIMES_TARGET_KIND=" + strings.ToLower(short(req.Target.GetKind().String(), "TARGET_KIND_")),
 	}
 	if req.Role == engine.RoleAdjudicator {
 		return append(env,
@@ -157,6 +163,7 @@ func requestEnv(req engine.Request) []string {
 	}
 	return append(env,
 		"GRIMES_ROLE=primary",
+		"GRIMES_RUN_ID="+req.RunID,
 		"GRIMES_MODE="+short(req.Mode.String(), "MODE_"),
 		"GRIMES_ITERATION="+strconv.FormatUint(uint64(req.Iteration), 10),
 		"GRIMES_CATEGORIES="+categories(req.Categories),
