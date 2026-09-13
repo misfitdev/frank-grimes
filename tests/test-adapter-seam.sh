@@ -122,6 +122,8 @@ echo "--- A run following the adapter's instructions continues the loop ---"
 # asserts the opposite outcome for the opposite input, and on its own it cannot
 # tell a refused forgery from an unrecognised legitimate run.
 SANDBOX="$(mktemp -d)"
+# The collector fingerprints content, so the reviewed script has to be there.
+printf 'rm -rf ./build/*\n' >"$SANDBOX/bad-script.sh"
 mkdir -p "$SANDBOX/hooks"
 cp "$HOOK" "$SANDBOX/hooks/stop.sh"
 chmod +x "$SANDBOX/hooks/stop.sh"

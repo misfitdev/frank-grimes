@@ -18,6 +18,7 @@ type Engine struct {
 	Broker      EvidenceBroker
 	Adjudicator Adjudicator
 	Gate        GateRunner
+	Inventory   InventoryStore
 	Ledger      Ledger
 	Results     ResultStore
 	State       StateStore
@@ -36,9 +37,16 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		return nil, ErrFixModeUnsupported
 	}
 
-	target, categories, err := e.Collector.Collect(ctx, spec)
+	target, inventory, categories, err := e.Collector.Collect(ctx, spec)
 	if err != nil {
 		return nil, fmt.Errorf("collect: %w", err)
+	}
+	// The inventory is recorded before the target is attacked, so the units a
+	// later iteration is accountable for are the ones the first one resolved.
+	if e.Inventory != nil {
+		if err := e.Inventory.Save(ctx, inventory); err != nil {
+			return nil, fmt.Errorf("inventory: %w", err)
+		}
 	}
 
 	iteration, err := e.resume(ctx, target)

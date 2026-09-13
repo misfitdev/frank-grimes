@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"testing"
 	"time"
@@ -150,9 +151,34 @@ func seededLedger(t *testing.T, status pb.FindingStatus) *pb.Ledger {
 	}
 }
 
+// stubCollector resolves a target without touching a filesystem. These tests
+// exercise the run, not collection; tests/test-collector.sh drives the real
+// collector against real artifacts.
+type stubCollector struct{}
+
+func (stubCollector) Collect(ctx context.Context, spec TargetSpec) (*pb.Target, *pb.TargetInventory, []pb.Category, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, nil, err
+	}
+	sum := sha256.Sum256([]byte(spec.Root + "\x00" + spec.Scope))
+	target := &pb.Target{
+		Root: spec.Root, Scope: spec.Scope, FingerprintSha256: sum[:],
+		Display: spec.Scope, Kind: pb.TargetKind_TARGET_KIND_CODE,
+	}
+	categories := spec.Categories
+	if len(categories) == 0 {
+		categories = AllCategories
+	}
+	return target, &pb.TargetInventory{
+		SchemaMajor:             contracts.SchemaMajor,
+		TargetFingerprintSha256: target.GetFingerprintSha256(),
+		Units:                   []*pb.TargetUnit{{Id: spec.Scope, Label: spec.Scope}},
+	}, categories, nil
+}
+
 func testTarget(t *testing.T) *pb.Target {
 	t.Helper()
-	target, _, err := PathCollector{}.Collect(context.Background(), testSpec())
+	target, _, _, err := stubCollector{}.Collect(context.Background(), testSpec())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +236,7 @@ func seedCandidate() *pb.CandidateFinding {
 
 func newEngine(p Provider, l Ledger, s StateStore, a Adjudicator) *Engine {
 	return &Engine{
-		Collector: PathCollector{}, Provider: p, Broker: StrictBroker{},
+		Collector: stubCollector{}, Provider: p, Broker: StrictBroker{},
 		Adjudicator: a, Gate: NotApplicableGate{}, Ledger: l,
 		Results: &memResults{}, State: s,
 		Clock: func() time.Time { return testTime() },
@@ -437,7 +463,7 @@ func unvalidatedReport(t *testing.T, candidates ...*pb.CandidateFinding) []byte 
 }
 
 func TestRunStaleStateFailsClosed(t *testing.T) {
-	other, _, err := PathCollector{}.Collect(context.Background(), TargetSpec{Root: "/repo", Scope: "somewhere-else"})
+	other, _, _, err := stubCollector{}.Collect(context.Background(), TargetSpec{Root: "/repo", Scope: "somewhere-else"})
 	if err != nil {
 		t.Fatal(err)
 	}

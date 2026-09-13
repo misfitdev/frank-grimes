@@ -36,7 +36,7 @@ preview:
     cd docs && python3 -m http.server 8080
 
 # Lint, format-check, validate, and run contract tests
-check: lint fmt-check proto-lint vet test-go validate test-fix-gate test-adjudication test-stop-hook test-contracts test-orchestrator test-adapter-seam
+check: lint fmt-check proto-lint vet test-go validate test-fix-gate test-adjudication test-stop-hook test-contracts test-collector test-orchestrator test-adapter-seam
 
 # Vet the Go packages
 vet:
@@ -71,6 +71,10 @@ test-adapter-seam:
     ./tests/test-adapter-seam.sh
 
 # Run the orchestrator tests
+# Collection resolves any target kind against real artifacts.
+test-collector:
+    ./tests/test-collector.sh
+
 test-orchestrator:
     ./tests/test-orchestrator.sh
 

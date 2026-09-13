@@ -1,0 +1,4 @@
+schema_major: 2
+target_fingerprint_sha256: "01234567890123456789012345678901"
+units { id: "cmd/grimes/main.go" label: "cmd/grimes/main.go" }
+units { id: "internal/engine/run.go" label: "internal/engine/run.go" }
