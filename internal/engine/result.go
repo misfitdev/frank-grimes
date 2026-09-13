@@ -19,6 +19,7 @@ func (e *Engine) assemble(
 	ledger *pb.Ledger,
 	digest []byte,
 	oscillation bool,
+	yield *pb.MarginalYield,
 ) *pb.GrimesResult {
 	return &pb.GrimesResult{
 		SchemaMajor:       contracts.SchemaMajor,
@@ -31,7 +32,7 @@ func (e *Engine) assemble(
 		CompletionState:   pb.CompletionState_COMPLETION_STATE_REVIEW_COMPLETE,
 		Verdict:           d.Verdict,
 		LegacyColor:       d.Color,
-		MarginalYield:     &pb.MarginalYield{},
+		MarginalYield:     yield,
 		Counts:            d.Counts,
 		Findings:          snapshots(ledger),
 		Verification:      verification,

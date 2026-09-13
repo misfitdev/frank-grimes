@@ -1,0 +1,8 @@
+# An independent reviewer that disagrees. Adjudication can only remove
+# confidence, so a block from here stands whatever the primary concluded.
+schema_major: 2
+run_id: "run-001-adj"
+reviewer_id: "grimey-verifier"
+target_fingerprint_sha256: "01234567890123456789012345678901"
+verdict { decision: DECISION_BLOCK residual_risk: RESIDUAL_RISK_CRITICAL review_confidence: REVIEW_CONFIDENCE_HIGH review_completeness: REVIEW_COMPLETENESS_LIMITED }
+completed_at { seconds: 1780000000 }

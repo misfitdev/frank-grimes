@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"fmt"
@@ -54,14 +55,14 @@ func (PathCollector) Collect(ctx context.Context, spec TargetSpec) (*pb.Target, 
 // high until evidence falsification is machine-verifiable.
 type StrictBroker struct{}
 
-func (StrictBroker) Admit(ctx context.Context, f *pb.Finding) (*pb.Finding, error) {
+func (StrictBroker) Admit(ctx context.Context, c *pb.CandidateFinding) (*pb.CandidateFinding, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := contracts.Validate(f); err != nil {
+	if err := contracts.Validate(c); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrProviderOutput, err)
 	}
-	return f, nil
+	return c, nil
 }
 
 // NotApplicableGate is the gate for report mode, which edits nothing.
@@ -95,13 +96,18 @@ func (a ProviderAdjudicator) Adjudicate(ctx context.Context, target *pb.Target, 
 	if err != nil {
 		return nil, err
 	}
-	raw, err := envelope.Extract(string(out.Raw))
+	raw, err := envelope.ExtractReport(string(out.Raw))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrProviderOutput, err)
 	}
-	second := &pb.GrimesResult{}
+	second := &pb.AdjudicationReport{}
 	if err := contracts.UnmarshalCanonical(raw, second); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrProviderOutput, err)
+	}
+	// The adjudicator names the target it judged; a tuple over a different
+	// artifact is not a second opinion on this one.
+	if !bytes.Equal(second.GetTargetFingerprintSha256(), target.GetFingerprintSha256()) {
+		return nil, fmt.Errorf("%w: adjudication names a different target", ErrProviderOutput)
 	}
 	return &pb.IndependentReview{
 		RunId:                   a.RunID,

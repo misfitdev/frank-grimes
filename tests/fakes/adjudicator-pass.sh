@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# An independent reviewer that agrees. Fails loudly if it is handed anything
-# beyond the target identity and the claimed tuple.
+# An independent reviewer that agrees. Fails loudly if handed anything beyond
+# the target identity and the claimed tuple.
 set -euo pipefail
-FIXTURES="$(cd "$(dirname "$0")/../contracts" && pwd)"
+HERE="$(cd "$(dirname "$0")" && pwd)"
 
 for leak in GRIMES_FINDING GRIMES_EVIDENCE GRIMES_LEDGER GRIMES_SEVERITY GRIMES_SUMMARY; do
     if env | grep -q "^${leak}"; then
@@ -15,4 +15,4 @@ if [[ -z "${GRIMES_CLAIMED_DECISION:-}" ]]; then
     exit 1
 fi
 
-grimes-contract encode-result "$FIXTURES/result.adjudicated-green.valid.textproto"
+"$HERE/adjudicate.sh" DECISION_PASS RESIDUAL_RISK_LOW REVIEW_CONFIDENCE_HIGH REVIEW_COMPLETENESS_SUFFICIENT

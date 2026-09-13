@@ -54,12 +54,12 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		return nil, err
 	}
 
-	proposal, err := e.review(ctx, target, categories, mode, iteration)
+	report, err := e.review(ctx, target, categories, mode, iteration)
 	if err != nil {
 		return nil, err
 	}
 
-	oscillation, err := e.apply(ctx, ledger, proposal, iteration)
+	admitted, oscillation, err := e.apply(ctx, ledger, report, iteration)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,8 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		return nil, fmt.Errorf("ledger: %w", err)
 	}
 
-	result := e.assemble(target, mode, iteration, final, review, verification, ledger, digest, oscillation)
+	yield := marginalYield(report, ledger, admitted)
+	result := e.assemble(target, mode, iteration, final, review, verification, ledger, digest, oscillation, yield)
 	if _, err := contracts.EncodeCanonical(result); err != nil {
 		return nil, fmt.Errorf("derived result rejected by the contract: %w", err)
 	}
@@ -150,7 +151,7 @@ func (e *Engine) resume(ctx context.Context, target *pb.Target) (uint32, error) 
 
 // review obtains and decodes provider output. Nothing here is trusted beyond
 // its findings; every authoritative field on the proposal is discarded.
-func (e *Engine) review(ctx context.Context, target *pb.Target, categories []pb.Category, mode pb.Mode, iteration uint32) (*pb.GrimesResult, error) {
+func (e *Engine) review(ctx context.Context, target *pb.Target, categories []pb.Category, mode pb.Mode, iteration uint32) (*pb.ProviderReport, error) {
 	out, err := e.Provider.Review(ctx, Request{
 		Role:       RolePrimary,
 		Target:     target,
@@ -164,55 +165,92 @@ func (e *Engine) review(ctx context.Context, target *pb.Target, categories []pb.
 	}
 
 	raw := out.Raw
-	if envelope.Contains(string(raw)) {
-		raw, err = envelope.Extract(string(raw))
-		if err != nil {
-			return nil, fmt.Errorf("%w: %v", ErrProviderOutput, err)
-		}
-	} else {
-		return nil, fmt.Errorf("%w: no result envelope", ErrProviderOutput)
+	if !envelope.ContainsReport(string(raw)) {
+		return nil, fmt.Errorf("%w: no report envelope", ErrProviderOutput)
 	}
-
-	proposal := &pb.GrimesResult{}
-	if err := contracts.UnmarshalCanonical(raw, proposal); err != nil {
+	raw, err = envelope.ExtractReport(string(raw))
+	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrProviderOutput, err)
 	}
-	return proposal, nil
+
+	report := &pb.ProviderReport{}
+	if err := contracts.UnmarshalCanonical(raw, report); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrProviderOutput, err)
+	}
+	return report, nil
 }
 
-// apply admits each proposed finding and records it against the ledger.
-func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, proposal *pb.GrimesResult, iteration uint32) (bool, error) {
-	// Oscillation comes from what the ledger records happening, never from the
-	// proposal: a provider that could set it would be deciding whether a pass
-	// is reachable.
-	oscillation := false
-	for _, snap := range proposal.GetFindings() {
+// apply admits each reported candidate into the ledger.
+//
+// A candidate carries no identity, so the engine derives it. Two reviews that
+// find the same defect in the same place with the same evidence therefore
+// produce the same finding, and a reappearance is a regression rather than a
+// duplicate.
+func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, report *pb.ProviderReport, iteration uint32) (admitted []string, oscillation bool, err error) {
+	if ledger.Findings == nil {
+		ledger.Findings = map[string]*pb.Finding{}
+	}
+	for _, candidate := range report.GetCandidates() {
 		if err := ctx.Err(); err != nil {
-			return false, err
+			return nil, false, err
 		}
-		existing, ok := ledger.GetFindings()[snap.GetId()]
-		if !ok {
-			// A snapshot names a finding the ledger has never seen. A snapshot
-			// carries no location and no evidence detail, so the engine cannot
-			// build the record the contract requires and refuses rather than
-			// inventing one. Broker.Admit is unreachable until a provider can
-			// send a whole Finding.
-			return false, fmt.Errorf("%w: %s is not in the ledger", ErrProviderOutput, snap.GetId())
-		}
-		if err := verifyIdentity(existing); err != nil {
-			return false, err
-		}
-		osc, err := contracts.Observe(ledger, snap.GetId(), iteration, "grimes")
+		finding, err := e.admit(ctx, candidate, iteration)
 		if err != nil {
-			return false, fmt.Errorf("ledger: %w", err)
+			return nil, false, err
+		}
+		if _, known := ledger.GetFindings()[finding.GetId()]; !known {
+			ledger.Findings[finding.GetId()] = finding
+			admitted = append(admitted, finding.GetId())
+		}
+		osc, err := contracts.Observe(ledger, finding.GetId(), iteration, actorName)
+		if err != nil {
+			return nil, false, fmt.Errorf("ledger: %w", err)
 		}
 		oscillation = oscillation || osc
 	}
-	return oscillation, nil
+	return admitted, oscillation, nil
 }
 
-// verifyIdentity recomputes a finding's ID from its own anchor and evidence. A
-// provider cannot rename a finding to escape its history.
+// admit turns a candidate into a ledger finding, assigning everything the
+// provider is not permitted to state.
+func (e *Engine) admit(ctx context.Context, candidate *pb.CandidateFinding, iteration uint32) (*pb.Finding, error) {
+	vetted, err := e.Broker.Admit(ctx, candidate)
+	if err != nil {
+		return nil, err
+	}
+
+	anchor := vetted.GetLocation().GetAnchor()
+	claim := vetted.GetEvidence().GetClaim()
+	fingerprint := contracts.Fingerprint(vetted.GetCategory(), anchor, claim)
+	evidenceSum, err := contracts.Digest(vetted.GetEvidence())
+	if err != nil {
+		return nil, err
+	}
+	now := e.Clock.stamp()
+
+	return &pb.Finding{
+		Id:                contracts.FindingID(vetted.GetCategory(), fingerprint, false),
+		FingerprintSha256: fingerprint,
+		Category:          vetted.GetCategory(),
+		Location:          vetted.GetLocation(),
+		Risk:              vetted.GetRisk(),
+		Evidence:          vetted.GetEvidence(),
+		EvidenceSha256:    evidenceSum,
+		Status:            pb.FindingStatus_FINDING_STATUS_OPEN,
+		FirstSeen:         now,
+		LastSeen:          now,
+		History: []*pb.FindingEvent{{
+			Iteration:      iteration,
+			To:             pb.FindingStatus_FINDING_STATUS_OPEN,
+			EvidenceSha256: evidenceSum,
+			At:             now,
+			Actor:          actorName,
+		}},
+	}, nil
+}
+
+// verifyIdentity recomputes a finding's ID from its own anchor and evidence.
+// The provider never supplies one, so this guards what the engine itself wrote.
 func verifyIdentity(f *pb.Finding) error {
 	anchor := f.GetLocation().GetAnchor()
 	claim := f.GetEvidence().GetClaim()
@@ -260,6 +298,29 @@ func (e *Engine) persist(ctx context.Context, target *pb.Target, mode pb.Mode, i
 		LedgerDigestSha256: ledgerDigest,
 		LastResultSha256:   resultDigest,
 	})
+}
+
+// marginalYield reports what this iteration added that the ledger did not
+// already hold.
+//
+// The new-finding counts are derived rather than reported: they decide when the
+// loop stops, so a provider stating them would choose how long its own review
+// ran. The examined and disproved counts are the provider's declared self-grind
+// arithmetic and drive nothing.
+func marginalYield(report *pb.ProviderReport, ledger *pb.Ledger, admitted []string) *pb.MarginalYield {
+	y := &pb.MarginalYield{
+		CandidatesExamined:  report.GetCandidatesExamined(),
+		CandidatesDisproved: report.GetCandidatesDisproved(),
+	}
+	for _, id := range admitted {
+		switch ledger.GetFindings()[id].GetRisk().GetSeverity() {
+		case pb.Severity_SEVERITY_P0, pb.Severity_SEVERITY_P1:
+			y.NewP0P1++
+		case pb.Severity_SEVERITY_P2, pb.Severity_SEVERITY_P3:
+			y.NewP2P3++
+		}
+	}
+	return y
 }
 
 func candidatesOf(ledger *pb.Ledger) []Candidate {
