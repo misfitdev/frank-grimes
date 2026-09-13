@@ -46,6 +46,46 @@ func (o LoopOutcome) String() string {
 // Terminal reports whether the loop ends here.
 func (o LoopOutcome) Terminal() bool { return o != OutcomeContinue && o != OutcomeNoRun }
 
+// CompletionState is how this outcome is recorded in a run record.
+func (o LoopOutcome) CompletionState() pb.CompletionState {
+	switch o {
+	case OutcomeIterationLimit:
+		return pb.CompletionState_COMPLETION_STATE_ITERATION_LIMIT
+	case OutcomeConfirmedPass, OutcomeYieldExhausted:
+		return pb.CompletionState_COMPLETION_STATE_REVIEW_COMPLETE
+	case OutcomeContinue:
+		return pb.CompletionState_COMPLETION_STATE_CONTINUE
+	default:
+		return pb.CompletionState_COMPLETION_STATE_BLOCKED
+	}
+}
+
+// Progress is what the stopping rule reads. It holds nothing about which files
+// the two callers loaded, so the record the engine writes and the decision the
+// stop hook reaches are the same conclusion over the same facts.
+type Progress struct {
+	Green         bool
+	Iteration     uint32
+	MaxIterations uint32
+	NewP0P1       uint32
+}
+
+// stopRule applies the stopping rule. It is the only place a review is judged
+// finished.
+func stopRule(p Progress) LoopOutcome {
+	if p.Green {
+		return OutcomeConfirmedPass
+	}
+	if p.Iteration >= p.MaxIterations {
+		return OutcomeIterationLimit
+	}
+	// Re-grinding a target that produced nothing new restates the same findings.
+	if p.Iteration > 1 && p.NewP0P1 == 0 {
+		return OutcomeYieldExhausted
+	}
+	return OutcomeContinue
+}
+
 // LoopDecision is the outcome, why, and the colour it was reached at.
 type LoopDecision struct {
 	Outcome LoopOutcome
@@ -72,29 +112,25 @@ func DecideLoop(state *pb.LoopState, result *pb.GrimesResult, resultDigest []byt
 	}
 
 	color := colorName(result)
-	if result.GetLegacyColor() == pb.LegacyColor_LEGACY_COLOR_GREEN {
-		return LoopDecision{Outcome: OutcomeConfirmedPass, Reason: "independently confirmed pass", Color: color}
+	progress := Progress{
+		Green:         result.GetLegacyColor() == pb.LegacyColor_LEGACY_COLOR_GREEN,
+		Iteration:     state.GetIteration(),
+		MaxIterations: state.GetMaxIterations(),
+		NewP0P1:       result.GetMarginalYield().GetNewP0P1(),
 	}
-	if state.GetIteration() >= state.GetMaxIterations() {
-		return LoopDecision{
-			Outcome: OutcomeIterationLimit,
-			Reason:  fmt.Sprintf("iteration limit of %d reached at %s", state.GetMaxIterations(), color),
-			Color:   color,
-		}
+	outcome := stopRule(progress)
+	var reason string
+	switch outcome {
+	case OutcomeConfirmedPass:
+		reason = "independently confirmed pass"
+	case OutcomeIterationLimit:
+		reason = fmt.Sprintf("iteration limit of %d reached at %s", progress.MaxIterations, color)
+	case OutcomeYieldExhausted:
+		reason = fmt.Sprintf("iteration %d surfaced no new P0/P1", progress.Iteration)
+	default:
+		reason = fmt.Sprintf("%s at iteration %d of %d", color, progress.Iteration, progress.MaxIterations)
 	}
-	// Re-grinding a target that produced nothing new restates the same findings.
-	if state.GetIteration() > 1 && result.GetMarginalYield().GetNewP0P1() == 0 {
-		return LoopDecision{
-			Outcome: OutcomeYieldExhausted,
-			Reason:  fmt.Sprintf("iteration %d surfaced no new P0/P1", state.GetIteration()),
-			Color:   color,
-		}
-	}
-	return LoopDecision{
-		Outcome: OutcomeContinue,
-		Reason:  fmt.Sprintf("%s at iteration %d of %d", color, state.GetIteration(), state.GetMaxIterations()),
-		Color:   color,
-	}
+	return LoopDecision{Outcome: outcome, Reason: reason, Color: color}
 }
 
 func bindingFailure(state *pb.LoopState, result *pb.GrimesResult, resultDigest []byte) string {

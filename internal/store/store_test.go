@@ -273,7 +273,7 @@ func sampleResult() *pb.GrimesResult {
 		ProducerRole:    pb.ProducerRole_PRODUCER_ROLE_ORCHESTRATOR,
 		Target:          target(),
 		Mode:            pb.Mode_MODE_REPORT,
-		Iteration:       1,
+		Iteration:       2,
 		MaxIterations:   5,
 		CompletionState: pb.CompletionState_COMPLETION_STATE_REVIEW_COMPLETE,
 		Verdict: &pb.Verdict{
@@ -283,7 +283,7 @@ func sampleResult() *pb.GrimesResult {
 			ReviewCompleteness: pb.ReviewCompleteness_REVIEW_COMPLETENESS_LIMITED,
 		},
 		LegacyColor:   pb.LegacyColor_LEGACY_COLOR_RED,
-		MarginalYield: &pb.MarginalYield{CandidatesExamined: 4, NewP0P1: 2},
+		MarginalYield: &pb.MarginalYield{CandidatesExamined: 4},
 		Counts:        &pb.FindingCounts{Total: 1, OpenP0: 1},
 		Verification:  &pb.Verification{Status: pb.VerificationStatus_VERIFICATION_STATUS_NOT_APPLICABLE},
 		Ledger:        &pb.LedgerRef{Path: contracts.LedgerPath, DigestSha256: digest},

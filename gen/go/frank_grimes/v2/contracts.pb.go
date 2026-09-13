@@ -3734,7 +3734,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tB\x18\xbaH\x15r\x13\n" +
 	"\x11.grimes/ledger.pbR\x04path\x12,\n" +
 	"\rdigest_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\fdigestSha256\x121\n" +
-	"\x14oscillation_detected\x18\x03 \x01(\bR\x13oscillationDetected\"\xd9\x12\n" +
+	"\x14oscillation_detected\x18\x03 \x01(\bR\x13oscillationDetected\"\xe8\x14\n" +
 	"\fGrimesResult\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
 	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x12\x1e\n" +
@@ -3760,9 +3760,10 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x06ledger\x18\x11 \x01(\v2\x1a.frank_grimes.v2.LedgerRefB\x06\xbaH\x03\xc8\x01\x01R\x06ledger\x12/\n" +
 	"\vunmet_gates\x18\x12 \x03(\tB\x0e\xbaH\v\x92\x01\b\x18\x01\"\x04r\x02\x10\x01R\n" +
 	"unmetGates\x12!\n" +
-	"\asummary\x18\x13 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\asummary:\xe5\t\xbaH\xe1\t\x1ad\n" +
-	"\x18result.orchestrator_only\x12/only the orchestrator may emit the final result\x1a\x17this.producer_role == 3\x1a\xbb\x01\n" +
-	"\x19result.report_is_terminal\x12Mreport mode must terminate as REVIEW_COMPLETE with no applicable verification\x1aOthis.mode != 1 || (this.completion_state == 2 && this.verification.status == 4)\x1a\x9f\x03\n" +
+	"\asummary\x18\x13 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\asummary:\xf4\v\xbaH\xf0\v\x1ad\n" +
+	"\x18result.orchestrator_only\x12/only the orchestrator may emit the final result\x1a\x17this.producer_role == 3\x1a\x88\x01\n" +
+	"!result.report_has_no_verification\x122report mode records verification as not applicable\x1a/this.mode != 1 || this.verification.status == 4\x1a\xbf\x02\n" +
+	"#result.report_completion_is_derived\x12\\the completion state must be the one the colour, iteration, bound, and new P0/P1 count imply\x1a\xb9\x01this.mode != 1 || this.completion_state == (this.legacy_color == 1 ? 2 : this.iteration >= this.max_iterations ? 4 : (this.iteration > 1 && this.marginal_yield.new_p0_p1 == 0u) ? 2 : 1)\x1a\x9f\x03\n" +
 	"(result.green_is_independent_and_verified\x12VGREEN requires an independent matching pass, no oscillation, and required verification\x1a\x9a\x02this.legacy_color != 1 || (has(this.independent_review) && this.independent_review.verdict.decision == 3 && this.independent_review.target_fingerprint_sha256 == this.target.fingerprint_sha256 && !this.ledger.oscillation_detected && (this.mode == 1 || this.verification.status == 1))\x1a\xa9\x02\n" +
 	" result.green_requires_pass_tuple\x12YGREEN requires decision=pass, low residual risk, high confidence, sufficient completeness\x1a\xa9\x01this.legacy_color != 1 || (this.verdict.decision == 3 && this.verdict.residual_risk == 4 && this.verdict.review_confidence == 1 && this.verdict.review_completeness == 1)\x1aw\n" +
 	"\x18result.red_matches_block\x12!RED and decision=block must agree\x1a8(this.legacy_color == 3) == (this.verdict.decision == 1)\x1at\n" +

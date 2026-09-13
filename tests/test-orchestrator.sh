@@ -256,6 +256,56 @@ assert_eq "$CODE" "1" "fix mode is refused rather than ignored"
 rm -rf "$WS"
 
 echo ""
+echo "--- A mid-loop iteration is not recorded as a finished review ---"
+
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" --auto-loop --format=prototext)"
+if echo "$OUT" | grep -qE 'completion_state: +COMPLETION_STATE_CONTINUE'; then
+    pass "iteration 1 of 5 records itself as continuing"
+else
+    fail "iteration 1 of 5 does not record itself as continuing"
+fi
+# The record and the stop hook must reach the same conclusion, or one of them is
+# lying about the same run.
+set +e
+"$GRIMES" loop --dir="$WS" >/dev/null 2>&1
+LOOP_CODE=$?
+set -e
+assert_eq "$LOOP_CODE" "2" "the loop agrees another iteration is owed"
+rm -rf "$WS"
+
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" --auto-loop --max-iterations=1 --format=prototext)"
+if echo "$OUT" | grep -qE 'completion_state: +COMPLETION_STATE_ITERATION_LIMIT'; then
+    pass "a run at its bound records the limit rather than completion"
+else
+    fail "a run at its bound does not record the limit"
+fi
+rm -rf "$WS"
+
+# A second iteration over the same report adds no new P0/P1, which is where the
+# review genuinely ends at RED.
+WS="$(workspace)"
+run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" --auto-loop >/dev/null
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" --auto-loop --format=prototext)"
+if echo "$OUT" | grep -qE 'completion_state: +COMPLETION_STATE_REVIEW_COMPLETE'; then
+    pass "an exhausted iteration records the review as complete"
+else
+    fail "an exhausted iteration does not record the review as complete"
+fi
+if echo "$OUT" | grep -qE 'iteration: +2'; then
+    pass "the second run is recorded as iteration 2"
+else
+    fail "the second run is not recorded as iteration 2"
+fi
+set +e
+"$GRIMES" loop --dir="$WS" >/dev/null 2>&1
+LOOP_CODE=$?
+set -e
+assert_eq "$LOOP_CODE" "0" "the loop agrees the exhausted review ends"
+rm -rf "$WS"
+
+echo ""
 echo "--- State ---"
 
 WS="$(workspace)"

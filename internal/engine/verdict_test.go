@@ -462,7 +462,7 @@ func resultFrom(d Derived, in DeriveInput) *pb.GrimesResult {
 		ProducerRole:    pb.ProducerRole_PRODUCER_ROLE_ORCHESTRATOR,
 		Target:          target,
 		Mode:            pb.Mode_MODE_REPORT,
-		Iteration:       1,
+		Iteration:       2,
 		MaxIterations:   5,
 		CompletionState: pb.CompletionState_COMPLETION_STATE_REVIEW_COMPLETE,
 		Verdict:         d.Verdict,

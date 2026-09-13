@@ -230,8 +230,8 @@ func TestRunEndToEndReportMode(t *testing.T) {
 	if result.GetProducerRole() != pb.ProducerRole_PRODUCER_ROLE_ORCHESTRATOR {
 		t.Errorf("producer role = %v, want orchestrator", result.GetProducerRole())
 	}
-	if result.GetCompletionState() != pb.CompletionState_COMPLETION_STATE_REVIEW_COMPLETE {
-		t.Errorf("completion state = %v, want review complete", result.GetCompletionState())
+	if result.GetCompletionState() != pb.CompletionState_COMPLETION_STATE_CONTINUE {
+		t.Errorf("completion state = %v, want continue at iteration 1 of 5", result.GetCompletionState())
 	}
 	if result.GetVerification().GetStatus() != pb.VerificationStatus_VERIFICATION_STATUS_NOT_APPLICABLE {
 		t.Errorf("verification = %v, want not applicable", result.GetVerification().GetStatus())

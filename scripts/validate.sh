@@ -416,6 +416,28 @@ else
     pass "the legacy colour is derived in one place"
 fi
 
+# The run record's completion state and the stop hook's decision are the same
+# claim about the same iteration. A second place that names a completion state
+# lets the record say a review finished while the loop keeps going. The pattern
+# matches any named constant rather than a set of assignment syntaxes, since a
+# plain assignment or a local variable would otherwise carry one past it.
+DUPLICATES=""
+while IFS= read -r match; do
+    rel="${match%%:*}"
+    rel="${rel#"$PROJECT_ROOT"/}"
+    case "$rel" in
+        internal/engine/loop.go | *_test.go) continue ;;
+    esac
+    DUPLICATES="$DUPLICATES $rel"
+done < <(grep -rn 'pb\.CompletionState_' \
+    "$PROJECT_ROOT/internal" "$PROJECT_ROOT/cmd" --include='*.go' 2>/dev/null || true)
+
+if [[ -n "$DUPLICATES" ]]; then
+    fail "completion state named outside internal/engine/loop.go:$DUPLICATES"
+else
+    pass "the completion state is derived in one place"
+fi
+
 # An adapter carries wiring, never methodology: a colour or decision decided
 # there is a second implementation of Phase 7.
 if grep -rqE 'LEGACY_COLOR_|DECISION_PASS' "$PROJECT_ROOT/adapters" "$PROJECT_ROOT/hooks" 2>/dev/null; then
