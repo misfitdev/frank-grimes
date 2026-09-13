@@ -371,6 +371,24 @@ else
     pass "no component treats the JSON projection as control input"
 fi
 
+# The tier caps constrain a severity paired with its evidence, so they are
+# declared on both Finding and CandidateFinding. Two copies of a rule drift, and
+# the copy nobody updates is the one that lets a bad finding through.
+for rule in p0_requires_e1_or_e2 e3_caps_at_p1; do
+    EXPRS=$(awk -v r="$rule" '
+        $0 ~ "id: \"(finding|candidate)\\." r "\"" { grab = 1; next }
+        grab && /expression:/ { sub(/^ *expression: */, ""); print; grab = 0 }
+    ' "$PROJECT_ROOT/proto/frank_grimes/v2/contracts.proto" | sort -u | wc -l | tr -d ' ')
+    COUNT=$(grep -c "$rule" "$PROJECT_ROOT/proto/frank_grimes/v2/contracts.proto")
+    if [[ "$COUNT" -lt 2 ]]; then
+        fail "$rule is declared $COUNT time(s); Finding and CandidateFinding both need it"
+    elif [[ "$EXPRS" == "1" ]]; then
+        pass "$rule is identical on Finding and CandidateFinding"
+    else
+        fail "$rule has drifted between Finding and CandidateFinding"
+    fi
+done
+
 echo ""
 echo "--- Orchestrator ---"
 

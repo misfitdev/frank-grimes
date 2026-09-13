@@ -281,6 +281,87 @@ message Evidence {
 }
 
 // ---------------------------------------------------------------------------
+// What a provider may say
+// ---------------------------------------------------------------------------
+
+// A finding as a provider may report it.
+//
+// Identity, timestamps, and lifecycle history are absent because they are the
+// ledger's to assign: a provider that could state an ID could rename a finding
+// to escape its own history.
+message CandidateFinding {
+  // The tier caps constrain the pairing of a severity with the evidence offered
+  // for it, so they apply wherever that pairing appears. The expressions are
+  // identical to Finding's by construction; scripts/validate.sh fails the build
+  // if the two copies drift.
+  option (buf.validate.message).cel = {
+    id: "candidate.p0_requires_e1_or_e2"
+    message: "P0 requires E1 or E2 evidence"
+    expression: "this.risk.severity != 1 || this.evidence.tier in [1, 2]"
+  };
+  option (buf.validate.message).cel = {
+    id: "candidate.e3_caps_at_p1"
+    message: "inferred evidence cannot support a severity above P1"
+    expression: "this.evidence.tier != 3 || this.risk.severity != 1"
+  };
+
+  Category category = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  Location location = 2 [(buf.validate.field).required = true];
+  Risk risk = 3 [(buf.validate.field).required = true];
+  Evidence evidence = 4 [(buf.validate.field).required = true];
+  optional string suggested_fix = 5 [(buf.validate.field).string.max_len = 4096];
+}
+
+// What a primary review hands back.
+//
+// There is no verdict here, and no colour, counts, or completion state. The
+// engine derives all of them, and a message able to carry them would be a
+// message a provider could use to decide its own review.
+//
+// Nor is there a marginal-yield count: that decides when the loop stops, so it
+// is derived from what the ledger did and did not already hold.
+message ProviderReport {
+  uint32 schema_major = 1 [(buf.validate.field).uint32.const = 2];
+  uint32 schema_minor = 2;
+  string run_id = 3 [(buf.validate.field).string.min_len = 1];
+  Target target = 4 [(buf.validate.field).required = true];
+  Mode mode = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  uint32 iteration = 6 [(buf.validate.field).uint32.gt = 0];
+  repeated CandidateFinding candidates = 7;
+  repeated Category routed_categories = 8 [(buf.validate.field).repeated = {
+    unique: true
+    items: {
+      enum: {
+        defined_only: true
+        not_in: [0]
+      }
+    }
+  }];
+  uint32 candidates_examined = 9;
+  uint32 candidates_disproved = 10;
+  string summary = 11 [(buf.validate.field).string.min_len = 1];
+}
+
+// What an independent review hands back: a verdict tuple over a named target,
+// and nothing else. An adjudicator that could report findings would be
+// reviewing rather than adjudicating.
+message AdjudicationReport {
+  uint32 schema_major = 1 [(buf.validate.field).uint32.const = 2];
+  uint32 schema_minor = 2;
+  string run_id = 3 [(buf.validate.field).string.min_len = 1];
+  string reviewer_id = 4 [(buf.validate.field).string.min_len = 1];
+  bytes target_fingerprint_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  Verdict verdict = 6 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp completed_at = 7 [(buf.validate.field).required = true];
+}
+
+// ---------------------------------------------------------------------------
 // Findings and the ledger
 // ---------------------------------------------------------------------------
 
