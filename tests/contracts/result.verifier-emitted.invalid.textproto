@@ -5,7 +5,7 @@ run_id: "run-005"
 producer_role: PRODUCER_ROLE_VERIFIER
 target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
 mode: MODE_REPORT
-iteration: 1
+iteration: 2
 max_iterations: 5
 completion_state: COMPLETION_STATE_REVIEW_COMPLETE
 verdict { decision: DECISION_BLOCK residual_risk: RESIDUAL_RISK_CRITICAL review_confidence: REVIEW_CONFIDENCE_HIGH review_completeness: REVIEW_COMPLETENESS_SUFFICIENT }

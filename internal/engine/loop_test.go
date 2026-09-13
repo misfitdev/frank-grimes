@@ -37,7 +37,7 @@ func loopResult(t *testing.T, mutate func(*pb.GrimesResult)) *pb.GrimesResult {
 		Mode:            pb.Mode_MODE_REPORT,
 		Iteration:       1,
 		MaxIterations:   5,
-		CompletionState: pb.CompletionState_COMPLETION_STATE_REVIEW_COMPLETE,
+		CompletionState: pb.CompletionState_COMPLETION_STATE_CONTINUE,
 		Verdict: &pb.Verdict{
 			Decision:           pb.Decision_DECISION_BLOCK,
 			ResidualRisk:       pb.ResidualRisk_RESIDUAL_RISK_CRITICAL,
@@ -55,6 +55,15 @@ func loopResult(t *testing.T, mutate func(*pb.GrimesResult)) *pb.GrimesResult {
 	if mutate != nil {
 		mutate(r)
 	}
+	// A case that moves the iteration, the bound, or the yield gets the
+	// completion state those values earn, so every fabricated record here is one
+	// the contract would accept.
+	r.CompletionState = stopRule(Progress{
+		Green:         r.GetLegacyColor() == pb.LegacyColor_LEGACY_COLOR_GREEN,
+		Iteration:     r.GetIteration(),
+		MaxIterations: r.GetMaxIterations(),
+		NewP0P1:       r.GetMarginalYield().GetNewP0P1(),
+	}).CompletionState()
 	return r
 }
 
@@ -324,4 +333,39 @@ func greenResult(t *testing.T) *pb.GrimesResult {
 			CompletedAt: timestamppb.New(testTime()),
 		}
 	})
+}
+
+// The stopping rule lives in Go and again in CEL as
+// result.review_complete_is_earned. Two statements of one rule drift, so every
+// shape the rule can produce is checked against the contract here rather than
+// trusted to stay aligned.
+func TestCompletionStateAgreesWithTheContract(t *testing.T) {
+	for _, green := range []bool{false, true} {
+		for iteration := uint32(1); iteration <= 4; iteration++ {
+			for max := uint32(1); max <= 4; max++ {
+				for _, yield := range []uint32{0, 3} {
+					if iteration > max {
+						continue
+					}
+					r := loopResult(t, nil)
+					if green {
+						r = greenResult(t)
+					}
+					r.Iteration = iteration
+					r.MaxIterations = max
+					r.MarginalYield.NewP0P1 = yield
+					r.CompletionState = stopRule(Progress{
+						Green:         green,
+						Iteration:     iteration,
+						MaxIterations: max,
+						NewP0P1:       yield,
+					}).CompletionState()
+					if _, err := contracts.EncodeCanonical(r); err != nil {
+						t.Errorf("green=%v iteration=%d/%d yield=%d recorded %v: %v",
+							green, iteration, max, yield, r.GetCompletionState(), err)
+					}
+				}
+			}
+		}
+	}
 }

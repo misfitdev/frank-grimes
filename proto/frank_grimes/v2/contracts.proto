@@ -591,11 +591,21 @@ message GrimesResult {
     expression: "this.producer_role == 3"
   };
   option (buf.validate.message).cel = {
-    id: "result.report_is_terminal"
-    message: "report mode must terminate as REVIEW_COMPLETE with no applicable verification"
+    id: "result.report_has_no_verification"
+    message: "report mode records verification as not applicable"
+    expression: "this.mode != 1 || this.verification.status == 4"
+  };
+  // In report mode the completion state is a total function of the record, and
+  // this is that function: the same stopping rule the engine applies in Go. Fix
+  // mode has no stated rule yet, so it is left out rather than guessed at.
+  option (buf.validate.message).cel = {
+    id: "result.report_completion_is_derived"
+    message: "the completion state must be the one the colour, iteration, bound, and new P0/P1 count imply"
     expression:
-      "this.mode != 1 || "
-      "(this.completion_state == 2 && this.verification.status == 4)"
+      "this.mode != 1 || this.completion_state == ("
+      "this.legacy_color == 1 ? 2 : "
+      "this.iteration >= this.max_iterations ? 4 : "
+      "(this.iteration > 1 && this.marginal_yield.new_p0_p1 == 0u) ? 2 : 1)"
   };
   option (buf.validate.message).cel = {
     id: "result.green_is_independent_and_verified"

@@ -21,6 +21,14 @@ func (e *Engine) assemble(
 	oscillation bool,
 	yield *pb.MarginalYield,
 ) *pb.GrimesResult {
+	// The same stopping rule the stop hook applies, so the record cannot claim a
+	// review ended while the loop is still owed an iteration.
+	outcome := stopRule(Progress{
+		Green:         d.Color == pb.LegacyColor_LEGACY_COLOR_GREEN,
+		Iteration:     iteration,
+		MaxIterations: e.MaxIterations,
+		NewP0P1:       yield.GetNewP0P1(),
+	})
 	return &pb.GrimesResult{
 		SchemaMajor:       contracts.SchemaMajor,
 		RunId:             e.RunID,
@@ -29,7 +37,7 @@ func (e *Engine) assemble(
 		Mode:              mode,
 		Iteration:         iteration,
 		MaxIterations:     e.MaxIterations,
-		CompletionState:   pb.CompletionState_COMPLETION_STATE_REVIEW_COMPLETE,
+		CompletionState:   outcome.CompletionState(),
 		Verdict:           d.Verdict,
 		LegacyColor:       d.Color,
 		MarginalYield:     yield,
