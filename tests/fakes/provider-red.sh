@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Emits the committed RED fixture as a result envelope.
+# Reports one cited P0 as a provider report.
 set -euo pipefail
 FIXTURES="$(cd "$(dirname "$0")/../contracts" && pwd)"
 echo "I looked at the target and found problems."
-grimes-contract encode-result "$FIXTURES/result.report-complete.valid.textproto"
+grimes-contract encode-report "$FIXTURES/report.p0-with-citation.valid.textproto"

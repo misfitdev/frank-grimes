@@ -56,10 +56,10 @@ type Provider interface {
 	Review(ctx context.Context, req Request) (*ProviderOutput, error)
 }
 
-// EvidenceBroker decides whether a proposed finding's evidence entitles it to
+// EvidenceBroker decides whether a reported candidate's evidence entitles it to
 // the tier and severity it claims.
 type EvidenceBroker interface {
-	Admit(ctx context.Context, f *pb.Finding) (*pb.Finding, error)
+	Admit(ctx context.Context, c *pb.CandidateFinding) (*pb.CandidateFinding, error)
 }
 
 // Adjudicator obtains a second verdict reached without sight of the first.

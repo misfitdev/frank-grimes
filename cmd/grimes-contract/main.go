@@ -33,10 +33,10 @@ Usage:
   grimes-contract encode-result [--format=textproto] [file]
       Read a GrimesResult, validate it, emit the canonical envelope.
 
-  grimes-contract encode-report [--format=textproto|binary] [--raw] [file]
+  grimes-contract encode-report [--type=ProviderReport|AdjudicationReport] [--format=...] [--raw] [file]
       Wrap a ProviderReport in the report envelope a provider hands back.
 
-  grimes-contract decode-report [file]
+  grimes-contract decode-report [--type=ProviderReport|AdjudicationReport] [file]
       Decode a report envelope or canonical report bytes.
 
   grimes-contract decode-result [file]
@@ -283,15 +283,22 @@ func cmdEncodeResult(args []string) error {
 func cmdEncodeReport(args []string) error {
 	fs := flag.NewFlagSet("encode-report", flag.ExitOnError)
 	format := fs.String("format", "textproto", "textproto or binary")
+	typeName := fs.String("type", "ProviderReport", "ProviderReport or AdjudicationReport")
 	raw := fs.Bool("raw", false, "write canonical bytes instead of the envelope")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *typeName != "ProviderReport" && *typeName != "AdjudicationReport" {
+		return fmt.Errorf("--type must be ProviderReport or AdjudicationReport")
 	}
 	data, err := readInput(fs.Args())
 	if err != nil {
 		return err
 	}
-	report := &pb.ProviderReport{}
+	report, err := newMessage(*typeName)
+	if err != nil {
+		return err
+	}
 	if *format == "textproto" {
 		if err := contracts.ParseTextProto(data, report); err != nil {
 			return err
@@ -313,6 +320,7 @@ func cmdEncodeReport(args []string) error {
 
 func cmdDecodeReport(args []string) error {
 	fs := flag.NewFlagSet("decode-report", flag.ExitOnError)
+	typeName := fs.String("type", "ProviderReport", "ProviderReport or AdjudicationReport")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -326,7 +334,10 @@ func cmdDecodeReport(args []string) error {
 			return err
 		}
 	}
-	report := &pb.ProviderReport{}
+	report, err := newMessage(*typeName)
+	if err != nil {
+		return err
+	}
 	if err := contracts.UnmarshalCanonical(data, report); err != nil {
 		return err
 	}

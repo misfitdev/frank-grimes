@@ -161,52 +161,51 @@ func testTarget(t *testing.T) *pb.Target {
 
 func testSpec() TargetSpec { return TargetSpec{Root: "/repo", Scope: "bad.sh"} }
 
-// proposal renders provider output naming the seeded finding.
-func proposal(t *testing.T, ids ...string) []byte {
+// report renders provider output carrying the given candidates.
+func report(t *testing.T, candidates ...*pb.CandidateFinding) []byte {
 	t.Helper()
-	snaps := make([]*pb.FindingSnapshot, 0, len(ids))
-	for _, id := range ids {
-		snaps = append(snaps, &pb.FindingSnapshot{
-			Id:     id,
-			Status: pb.FindingStatus_FINDING_STATUS_OPEN,
-			Risk: &pb.Risk{
-				Severity:    pb.Severity_SEVERITY_P0,
-				Likelihood:  pb.Likelihood_LIKELIHOOD_LIKELY,
-				BlastRadius: pb.BlastRadius_BLAST_RADIUS_SYSTEMIC,
-			},
-			EvidenceTier:   pb.EvidenceTier_EVIDENCE_TIER_E2,
-			EvidenceSha256: make([]byte, 32),
-		})
-	}
-	r := &pb.GrimesResult{
-		SchemaMajor:     2,
-		RunId:           "run-provider",
-		ProducerRole:    pb.ProducerRole_PRODUCER_ROLE_ORCHESTRATOR,
-		Target:          testTarget(t),
-		Mode:            pb.Mode_MODE_REPORT,
-		Iteration:       1,
-		MaxIterations:   5,
-		CompletionState: pb.CompletionState_COMPLETION_STATE_REVIEW_COMPLETE,
-		Verdict: &pb.Verdict{
-			Decision:           pb.Decision_DECISION_BLOCK,
-			ResidualRisk:       pb.ResidualRisk_RESIDUAL_RISK_CRITICAL,
-			ReviewConfidence:   pb.ReviewConfidence_REVIEW_CONFIDENCE_HIGH,
-			ReviewCompleteness: pb.ReviewCompleteness_REVIEW_COMPLETENESS_SUFFICIENT,
-		},
-		LegacyColor:   pb.LegacyColor_LEGACY_COLOR_RED,
-		MarginalYield: &pb.MarginalYield{},
-		Counts:        &pb.FindingCounts{Total: uint32(len(ids)), OpenP0: uint32(len(ids))},
-		Findings:      snaps,
-		Verification:  &pb.Verification{Status: pb.VerificationStatus_VERIFICATION_STATUS_NOT_APPLICABLE},
-		Ledger:        &pb.LedgerRef{Path: contracts.LedgerPath, DigestSha256: make([]byte, 32)},
-		UnmetGates:    []string{"decision"},
-		Summary:       "provider proposal",
+	r := &pb.ProviderReport{
+		SchemaMajor:         contracts.SchemaMajor,
+		RunId:               "run-provider",
+		Target:              testTarget(t),
+		Mode:                pb.Mode_MODE_REPORT,
+		Iteration:           1,
+		Candidates:          candidates,
+		RoutedCategories:    []pb.Category{pb.Category_CATEGORY_SEC, pb.Category_CATEGORY_COR},
+		CandidatesExamined:  uint32(len(candidates)) + 3,
+		CandidatesDisproved: 3,
+		Summary:             "provider report",
 	}
 	encoded, err := contracts.EncodeCanonical(r)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return []byte("prose before\n" + envelope.Wrap(encoded))
+	return []byte("prose before\n" + envelope.WrapReport(encoded))
+}
+
+// candidate builds a cited finding at the given severity and path.
+func candidate(path, claim string, sev pb.Severity) *pb.CandidateFinding {
+	return &pb.CandidateFinding{
+		Category: pb.Category_CATEGORY_SEC,
+		Location: &pb.Location{Anchor: contracts.RepoAnchor(path)},
+		Risk: &pb.Risk{
+			Severity:    sev,
+			Likelihood:  pb.Likelihood_LIKELIHOOD_LIKELY,
+			BlastRadius: pb.BlastRadius_BLAST_RADIUS_SYSTEMIC,
+		},
+		Evidence: &pb.Evidence{
+			Tier:  pb.EvidenceTier_EVIDENCE_TIER_E2,
+			Claim: claim,
+			Detail: &pb.Evidence_Citation{Citation: &pb.Citation{
+				Anchor: contracts.RepoAnchor(path), Quote: "rm -rf \"$1\"/*",
+			}},
+		},
+	}
+}
+
+// seedCandidate matches the finding seededLedger holds.
+func seedCandidate() *pb.CandidateFinding {
+	return candidate(seedPath, seedClaim, pb.Severity_SEVERITY_P0)
 }
 
 func newEngine(p Provider, l Ledger, s StateStore, a Adjudicator) *Engine {
@@ -222,7 +221,7 @@ func newEngine(p Provider, l Ledger, s StateStore, a Adjudicator) *Engine {
 func TestRunEndToEndReportMode(t *testing.T) {
 	l := &memLedger{ledger: seededLedger(t, pb.FindingStatus_FINDING_STATUS_OPEN)}
 	s := &memState{}
-	e := newEngine(&fakeProvider{out: proposal(t, p0ID())}, l, s, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
+	e := newEngine(&fakeProvider{out: report(t, seedCandidate())}, l, s, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
 
 	result, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
 	if err != nil {
@@ -257,7 +256,7 @@ func TestRunPersistsResultBeforeState(t *testing.T) {
 	l := &memLedger{ledger: seededLedger(t, pb.FindingStatus_FINDING_STATUS_OPEN)}
 	s := &memState{}
 	results := &memResults{}
-	e := newEngine(&fakeProvider{out: proposal(t, p0ID())}, l, s, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
+	e := newEngine(&fakeProvider{out: report(t, seedCandidate())}, l, s, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
 	e.Results = results
 
 	result, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
@@ -279,82 +278,32 @@ func TestRunPersistsResultBeforeState(t *testing.T) {
 	}
 }
 
-// The provider proposed a full GREEN tuple. The engine must ignore it and
-// derive RED from the open P0 the ledger actually holds.
-func TestRunProviderCannotSelfCertify(t *testing.T) {
-	l := &memLedger{ledger: seededLedger(t, pb.FindingStatus_FINDING_STATUS_OPEN)}
-	green := greenProposal(t)
-	e := newEngine(&fakeProvider{out: green}, l, &memState{}, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
+// A report has no verdict, colour, counts, or summary field, so the engine
+// cannot adopt one. What it can still do is derive the wrong answer, so assert
+// the derivation over what the ledger holds.
+func TestRunDerivesVerdictFromLedgerNotReport(t *testing.T) {
+	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: contracts.SchemaMajor, Target: testTarget(t)}}
+	e := newEngine(&fakeProvider{out: report(t, seedCandidate())}, l, &memState{}, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
 
 	result, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	if result.GetLegacyColor() == pb.LegacyColor_LEGACY_COLOR_GREEN {
-		t.Fatal("engine adopted the provider's GREEN")
-	}
 	if result.GetVerdict().GetDecision() != pb.Decision_DECISION_BLOCK {
-		t.Errorf("decision = %v, want block", result.GetVerdict().GetDecision())
+		t.Errorf("decision = %v, want block for a reported P0", result.GetVerdict().GetDecision())
 	}
-	if result.GetSummary() == "provider proposal" {
-		t.Error("engine adopted the provider's summary")
+	if result.GetLegacyColor() != pb.LegacyColor_LEGACY_COLOR_RED {
+		t.Errorf("color = %v, want red", result.GetLegacyColor())
 	}
 	if result.GetRunId() != "run-001" {
-		t.Errorf("run id = %q, want the engine's own", result.GetRunId())
+		t.Errorf("run id = %q, want the engine's own, not the report's", result.GetRunId())
 	}
-}
-
-func greenProposal(t *testing.T) []byte {
-	t.Helper()
-	r := &pb.GrimesResult{
-		SchemaMajor:     2,
-		RunId:           "run-provider",
-		ProducerRole:    pb.ProducerRole_PRODUCER_ROLE_ORCHESTRATOR,
-		Target:          testTarget(t),
-		Mode:            pb.Mode_MODE_REPORT,
-		Iteration:       1,
-		MaxIterations:   5,
-		CompletionState: pb.CompletionState_COMPLETION_STATE_REVIEW_COMPLETE,
-		Verdict: &pb.Verdict{
-			Decision:           pb.Decision_DECISION_PASS,
-			ResidualRisk:       pb.ResidualRisk_RESIDUAL_RISK_LOW,
-			ReviewConfidence:   pb.ReviewConfidence_REVIEW_CONFIDENCE_HIGH,
-			ReviewCompleteness: pb.ReviewCompleteness_REVIEW_COMPLETENESS_SUFFICIENT,
-		},
-		LegacyColor:   pb.LegacyColor_LEGACY_COLOR_GREEN,
-		MarginalYield: &pb.MarginalYield{},
-		Counts:        &pb.FindingCounts{},
-		Findings: []*pb.FindingSnapshot{{
-			Id:     p0ID(),
-			Status: pb.FindingStatus_FINDING_STATUS_OPEN,
-			Risk: &pb.Risk{
-				Severity:    pb.Severity_SEVERITY_P0,
-				Likelihood:  pb.Likelihood_LIKELIHOOD_LIKELY,
-				BlastRadius: pb.BlastRadius_BLAST_RADIUS_SYSTEMIC,
-			},
-			EvidenceTier:   pb.EvidenceTier_EVIDENCE_TIER_E2,
-			EvidenceSha256: make([]byte, 32),
-		}},
-		Verification: &pb.Verification{Status: pb.VerificationStatus_VERIFICATION_STATUS_NOT_APPLICABLE},
-		IndependentReview: &pb.IndependentReview{
-			RunId: "self", ReviewerId: "self", ZeroKnowledge: true,
-			TargetFingerprintSha256: testTarget(t).GetFingerprintSha256(),
-			Verdict: &pb.Verdict{
-				Decision:           pb.Decision_DECISION_PASS,
-				ResidualRisk:       pb.ResidualRisk_RESIDUAL_RISK_LOW,
-				ReviewConfidence:   pb.ReviewConfidence_REVIEW_CONFIDENCE_HIGH,
-				ReviewCompleteness: pb.ReviewCompleteness_REVIEW_COMPLETENESS_SUFFICIENT,
-			},
-			CompletedAt: timestamppb.New(testTime()),
-		},
-		Ledger:  &pb.LedgerRef{Path: contracts.LedgerPath, DigestSha256: make([]byte, 32)},
-		Summary: "provider proposal",
+	if result.GetSummary() == "provider report" {
+		t.Error("the engine adopted the report's summary")
 	}
-	encoded, err := contracts.EncodeCanonical(r)
-	if err != nil {
-		t.Fatal(err)
+	if result.GetProducerRole() != pb.ProducerRole_PRODUCER_ROLE_ORCHESTRATOR {
+		t.Errorf("producer role = %v, want orchestrator", result.GetProducerRole())
 	}
-	return []byte(envelope.Wrap(encoded))
 }
 
 func TestRunProviderErrorFailsClosed(t *testing.T) {
@@ -394,15 +343,97 @@ func TestRunRejectsBadProviderOutput(t *testing.T) {
 	}
 }
 
-// A provider naming a finding the ledger has never seen cannot conjure one:
-// the engine has no evidence record to back it.
-func TestRunRejectsUnknownFinding(t *testing.T) {
-	l := &memLedger{ledger: seededLedger(t, pb.FindingStatus_FINDING_STATUS_OPEN)}
-	e := newEngine(&fakeProvider{out: proposal(t, "FG-SEC-ffffffffffff")}, l, &memState{}, nil)
+// The case that was impossible before: a first review against an empty ledger.
+func TestRunAdmitsFirstFindings(t *testing.T) {
+	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: contracts.SchemaMajor, Target: testTarget(t)}}
+	e := newEngine(&fakeProvider{out: report(t, seedCandidate())}, l, &memState{}, nil)
+
+	result, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
+	if err != nil {
+		t.Fatalf("a first review was rejected: %v", err)
+	}
+	if len(l.ledger.GetFindings()) != 1 {
+		t.Fatalf("ledger holds %d findings, want 1", len(l.ledger.GetFindings()))
+	}
+	if result.GetCounts().GetOpenP0() != 1 {
+		t.Errorf("open_p0 = %d, want 1", result.GetCounts().GetOpenP0())
+	}
+
+	// Identity, timestamps, and history are the engine's, derived from evidence.
+	for id, f := range l.ledger.GetFindings() {
+		if id != p0ID() {
+			t.Errorf("finding id = %q, want the derived %q", id, p0ID())
+		}
+		if err := verifyIdentity(f); err != nil {
+			t.Errorf("admitted finding fails its own identity check: %v", err)
+		}
+		if f.GetFirstSeen().AsTime() != testTime() {
+			t.Errorf("first_seen = %v, want the engine clock %v", f.GetFirstSeen().AsTime(), testTime())
+		}
+		if len(f.GetHistory()) != 1 || f.GetHistory()[0].GetTo() != pb.FindingStatus_FINDING_STATUS_OPEN {
+			t.Errorf("history = %v, want one opening event", f.GetHistory())
+		}
+		if len(f.GetEvidenceSha256()) != 32 {
+			t.Error("evidence digest was not computed")
+		}
+	}
+}
+
+// The same defect reported twice is one finding, not two.
+func TestRunReportingTwiceDoesNotDuplicate(t *testing.T) {
+	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: contracts.SchemaMajor, Target: testTarget(t)}}
+	e := newEngine(&fakeProvider{out: report(t, seedCandidate(), seedCandidate())}, l, &memState{}, nil)
+
+	if _, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := len(l.ledger.GetFindings()); got != 1 {
+		t.Errorf("ledger holds %d findings, want 1", got)
+	}
+}
+
+// A candidate the contract refuses never reaches the ledger.
+func TestRunRejectsInadmissibleCandidate(t *testing.T) {
+	bad := seedCandidate()
+	// An inferred P0: refused by the tier cap on CandidateFinding.
+	bad.Evidence = &pb.Evidence{
+		Tier:  pb.EvidenceTier_EVIDENCE_TIER_E3,
+		Claim: "probably unvalidated",
+		Detail: &pb.Evidence_Inference{Inference: &pb.Inference{
+			Assumption: "callers pass raw paths", Reasoning: "none seen", Falsifier: "a validating caller",
+		}},
+	}
+	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: contracts.SchemaMajor, Target: testTarget(t)}}
+	e := newEngine(&fakeProvider{out: unvalidatedReport(t, bad)}, l, &memState{}, nil)
+
 	_, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
 	if !errors.Is(err, ErrProviderOutput) {
-		t.Errorf("error = %v, want ErrProviderOutput", err)
+		t.Fatalf("error = %v, want ErrProviderOutput", err)
 	}
+	if l.saves != 0 {
+		t.Error("an inadmissible candidate reached a saved ledger")
+	}
+}
+
+// unvalidatedReport marshals without validating, which is the only way to
+// produce what a hostile or broken provider would actually send. report() goes
+// through EncodeCanonical and so cannot build one.
+func unvalidatedReport(t *testing.T, candidates ...*pb.CandidateFinding) []byte {
+	t.Helper()
+	r := &pb.ProviderReport{
+		SchemaMajor: contracts.SchemaMajor,
+		RunId:       "run-provider",
+		Target:      testTarget(t),
+		Mode:        pb.Mode_MODE_REPORT,
+		Iteration:   1,
+		Candidates:  candidates,
+		Summary:     "provider report",
+	}
+	encoded, err := proto.MarshalOptions{Deterministic: true}.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return []byte(envelope.WrapReport(encoded))
 }
 
 func TestRunStaleStateFailsClosed(t *testing.T) {
@@ -416,7 +447,7 @@ func TestRunStaleStateFailsClosed(t *testing.T) {
 		LedgerDigestSha256: make([]byte, 32), LastResultSha256: make([]byte, 32),
 	}}
 	l := &memLedger{ledger: seededLedger(t, pb.FindingStatus_FINDING_STATUS_OPEN)}
-	e := newEngine(&fakeProvider{out: proposal(t, p0ID())}, l, s, nil)
+	e := newEngine(&fakeProvider{out: report(t, seedCandidate())}, l, s, nil)
 
 	_, err = e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
 	if !errors.Is(err, ErrStaleState) {
@@ -435,7 +466,7 @@ func TestRunIterationLimit(t *testing.T) {
 		LedgerDigestSha256: make([]byte, 32), LastResultSha256: make([]byte, 32),
 	}}
 	l := &memLedger{ledger: seededLedger(t, pb.FindingStatus_FINDING_STATUS_OPEN)}
-	e := newEngine(&fakeProvider{out: proposal(t, p0ID())}, l, s, nil)
+	e := newEngine(&fakeProvider{out: report(t, seedCandidate())}, l, s, nil)
 
 	if _, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT); err == nil {
 		t.Fatal("want an error past the iteration limit")
@@ -447,7 +478,7 @@ func TestRunCancelledContextWritesNothing(t *testing.T) {
 	cancel()
 	l := &memLedger{ledger: seededLedger(t, pb.FindingStatus_FINDING_STATUS_OPEN)}
 	s := &memState{}
-	p := &fakeProvider{out: proposal(t, p0ID())}
+	p := &fakeProvider{out: report(t, seedCandidate())}
 	e := newEngine(p, l, s, nil)
 
 	if _, err := e.Run(ctx, testSpec(), pb.Mode_MODE_REPORT); err == nil {
@@ -471,7 +502,7 @@ func TestRunWithoutAutoLoopLeavesNoState(t *testing.T) {
 		Mode: pb.Mode_MODE_REPORT, Iteration: 1, MaxIterations: 5,
 		LedgerDigestSha256: make([]byte, 32), LastResultSha256: make([]byte, 32),
 	}
-	e := newEngine(&fakeProvider{out: proposal(t, p0ID())}, l, s, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
+	e := newEngine(&fakeProvider{out: report(t, seedCandidate())}, l, s, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
 	e.Results = results
 	e.AutoLoop = false
 
@@ -498,7 +529,7 @@ func TestRunWithoutAutoLoopLeavesNoState(t *testing.T) {
 func TestRunRejectsLedgerForAnotherTarget(t *testing.T) {
 	l := &memLedger{ledger: seededLedger(t, pb.FindingStatus_FINDING_STATUS_OPEN)}
 	s := &memState{}
-	e := newEngine(&fakeProvider{out: proposal(t, p0ID())}, l, s, nil)
+	e := newEngine(&fakeProvider{out: report(t, seedCandidate())}, l, s, nil)
 
 	other := TargetSpec{Root: "/repo", Scope: "somewhere-else"}
 	_, err := e.Run(context.Background(), other, pb.Mode_MODE_REPORT)
@@ -516,7 +547,7 @@ func TestRunRejectsLedgerForAnotherTarget(t *testing.T) {
 // An empty ledger adopts whatever target it is first used for.
 func TestRunAdoptsEmptyLedger(t *testing.T) {
 	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: 2}}
-	e := newEngine(&fakeProvider{out: proposal(t)}, l, &memState{}, nil)
+	e := newEngine(&fakeProvider{out: report(t)}, l, &memState{}, nil)
 
 	if _, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -537,7 +568,7 @@ func TestRunFixModeRejected(t *testing.T) {
 // Without a second opinion the run cannot reach a pass, whatever the ledger says.
 func TestRunWithoutAdjudicatorCapsAtConditional(t *testing.T) {
 	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: 2, Target: testTarget(t)}}
-	e := newEngine(&fakeProvider{out: proposal(t)}, l, &memState{}, nil)
+	e := newEngine(&fakeProvider{out: report(t)}, l, &memState{}, nil)
 
 	result, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
 	if err != nil {
@@ -557,7 +588,7 @@ func TestRunWithoutAdjudicatorCapsAtConditional(t *testing.T) {
 // An adjudicator that fails is unavailable, not agreement.
 func TestRunAdjudicatorFailureIsNotAgreement(t *testing.T) {
 	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: 2, Target: testTarget(t)}}
-	e := newEngine(&fakeProvider{out: proposal(t)}, l, &memState{}, fixedAdjudicator{err: errors.New("unreachable")})
+	e := newEngine(&fakeProvider{out: report(t)}, l, &memState{}, fixedAdjudicator{err: errors.New("unreachable")})
 
 	result, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
 	if err != nil {
@@ -570,7 +601,7 @@ func TestRunAdjudicatorFailureIsNotAgreement(t *testing.T) {
 
 func TestRunIndependentBlockOverridesClean(t *testing.T) {
 	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: 2, Target: testTarget(t)}}
-	e := newEngine(&fakeProvider{out: proposal(t)}, l, &memState{}, fixedAdjudicator{decision: pb.Decision_DECISION_BLOCK})
+	e := newEngine(&fakeProvider{out: report(t)}, l, &memState{}, fixedAdjudicator{decision: pb.Decision_DECISION_BLOCK})
 
 	result, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
 	if err != nil {
@@ -584,46 +615,25 @@ func TestRunIndependentBlockOverridesClean(t *testing.T) {
 	}
 }
 
-// Oscillation decides whether a pass is reachable, so a provider claiming it
-// would be deciding the verdict. It comes from what the ledger records.
-func TestRunIgnoresProviderOscillationClaim(t *testing.T) {
-	l := &memLedger{ledger: &pb.Ledger{SchemaMajor: 2, Target: testTarget(t)}}
-	claimed := proposal(t)
-	e := newEngine(&fakeProvider{out: withOscillationClaim(t, claimed)}, l, &memState{}, nil)
-
+// A report has no oscillation field, so a provider cannot claim one. Oscillation
+// comes from what the ledger records happening.
+func TestRunOscillationComesFromTheLedger(t *testing.T) {
+	clean := &memLedger{ledger: &pb.Ledger{SchemaMajor: contracts.SchemaMajor, Target: testTarget(t)}}
+	e := newEngine(&fakeProvider{out: report(t, seedCandidate())}, clean, &memState{}, nil)
 	result, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if result.GetLedger().GetOscillationDetected() {
-		t.Error("the engine adopted the provider's oscillation claim over a ledger with no regression")
+		t.Error("a first sighting was recorded as oscillation")
 	}
-}
-
-// withOscillationClaim re-wraps provider output with the oscillation flag set.
-func withOscillationClaim(t *testing.T, raw []byte) []byte {
-	t.Helper()
-	payload, err := envelope.Extract(string(raw))
-	if err != nil {
-		t.Fatal(err)
-	}
-	r := &pb.GrimesResult{}
-	if err := contracts.UnmarshalCanonical(payload, r); err != nil {
-		t.Fatal(err)
-	}
-	r.Ledger.OscillationDetected = true
-	encoded, err := contracts.EncodeCanonical(r)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return []byte(envelope.Wrap(encoded))
 }
 
 // A fingerprint already fixed reappearing is a regression, which makes a pass
 // unreachable for the run.
 func TestRunRegressionSetsOscillation(t *testing.T) {
 	l := &memLedger{ledger: seededLedger(t, pb.FindingStatus_FINDING_STATUS_FIXED)}
-	e := newEngine(&fakeProvider{out: proposal(t, p0ID())}, l, &memState{}, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
+	e := newEngine(&fakeProvider{out: report(t, seedCandidate())}, l, &memState{}, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
 
 	result, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
 	if err != nil {
@@ -646,7 +656,7 @@ func TestRunResultIsDeterministic(t *testing.T) {
 
 	encode := func() []byte {
 		l := &memLedger{ledger: seededLedger(t, pb.FindingStatus_FINDING_STATUS_OPEN)}
-		e := newEngine(&fakeProvider{out: proposal(t, p0ID())}, l, &memState{}, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
+		e := newEngine(&fakeProvider{out: report(t, seedCandidate())}, l, &memState{}, fixedAdjudicator{decision: pb.Decision_DECISION_PASS})
 		result, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
 		if err != nil {
 			t.Fatal(err)
@@ -659,5 +669,54 @@ func TestRunResultIsDeterministic(t *testing.T) {
 	}
 	if string(encode()) != string(encode()) {
 		t.Error("two identical runs produced different result bytes")
+	}
+}
+
+// Marginal yield decides when the loop stops, so it is derived from what the
+// ledger did not already hold rather than taken from the report.
+func TestRunDerivesMarginalYield(t *testing.T) {
+	empty := func() *memLedger {
+		return &memLedger{ledger: &pb.Ledger{SchemaMajor: contracts.SchemaMajor, Target: testTarget(t)}}
+	}
+
+	// A new P0 counts.
+	l := empty()
+	e := newEngine(&fakeProvider{out: report(t, seedCandidate())}, l, &memState{}, nil)
+	r, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := r.GetMarginalYield().GetNewP0P1(); got != 1 {
+		t.Errorf("new_p0_p1 = %d, want 1 for a newly admitted P0", got)
+	}
+
+	// A P2 counts separately, and not toward the loop's stopping rule.
+	l = empty()
+	e = newEngine(&fakeProvider{out: report(t, candidate("slow.sh", "quadratic scan", pb.Severity_SEVERITY_P2))}, l, &memState{}, nil)
+	r, err = e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := r.GetMarginalYield().GetNewP0P1(); got != 0 {
+		t.Errorf("new_p0_p1 = %d, want 0 for a P2", got)
+	}
+	if got := r.GetMarginalYield().GetNewP2P3(); got != 1 {
+		t.Errorf("new_p2_p3 = %d, want 1", got)
+	}
+
+	// A finding the ledger already holds is not new, however it is reported.
+	l = &memLedger{ledger: seededLedger(t, pb.FindingStatus_FINDING_STATUS_OPEN)}
+	e = newEngine(&fakeProvider{out: report(t, seedCandidate())}, l, &memState{}, nil)
+	r, err = e.Run(context.Background(), testSpec(), pb.Mode_MODE_REPORT)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if got := r.GetMarginalYield().GetNewP0P1(); got != 0 {
+		t.Errorf("new_p0_p1 = %d, want 0 for a re-reported finding", got)
+	}
+
+	// The provider's self-grind arithmetic passes through untouched.
+	if got := r.GetMarginalYield().GetCandidatesExamined(); got != 4 {
+		t.Errorf("candidates_examined = %d, want the reported 4", got)
 	}
 }
