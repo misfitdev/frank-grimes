@@ -318,6 +318,54 @@ fi
 rm -rf "$WORK"
 
 echo ""
+echo "--- A retrieved source carries its retrieval identity ---"
+
+# Every --source candidate was rejected by validation, because the anchor was
+# built with only the URI while the contract also requires a publisher, a
+# snapshot digest, and a retrieval time.
+WORK="$(mktemp -d)"
+mkdir -p "$WORK/.grimes"
+DIGEST="$(printf 'a%.0s' $(seq 1 64))"
+set +e
+OUT="$(cd "$WORK" && "$BIN" report add --category=SEC --severity=P2 \
+    --blast=local_component --likelihood=unlikely --source="https://example.com/p" \
+    --tier=E2 --claim="c" --quote="q" 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" != "0" ]] && grep -q -- '--publisher' <<<"$OUT"; then
+    pass "a source without its retrieval identity is refused by name"
+else
+    fail "a source without its retrieval identity was accepted (exit $CODE)"
+fi
+
+if (cd "$WORK" && "$BIN" report add --category=SEC --severity=P2 \
+    --blast=local_component --likelihood=unlikely --source="https://example.com/p" \
+    --publisher="Example" --snapshot-sha256="$DIGEST" \
+    --retrieved-at="2026-01-02T15:04:05Z" --source-section="Clause 4" \
+    --tier=E2 --claim="c" --quote="q" >/dev/null 2>&1); then
+    pass "a source with its retrieval identity is admitted"
+else
+    fail "a complete source candidate was still rejected"
+fi
+
+for bad in "--snapshot-sha256=zz --retrieved-at=2026-01-02T15:04:05Z" \
+    "--snapshot-sha256=$DIGEST --retrieved-at=yesterday"; do
+    set +e
+    # shellcheck disable=SC2086  # the pair under test is two flags, not one word
+    OUT="$(cd "$WORK" && "$BIN" report add --category=SEC --severity=P3 \
+        --blast=local_component --likelihood=unlikely --source="https://example.com/q" \
+        --publisher="Example" $bad --tier=E2 --claim="c2" --quote="q" 2>&1)"
+    CODE=$?
+    set -e
+    if [[ "$CODE" != "0" ]]; then
+        pass "a malformed source identity is refused ($bad)"
+    else
+        fail "a malformed source identity was accepted ($bad)"
+    fi
+done
+rm -rf "$WORK"
+
+echo ""
 echo "========================================"
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"

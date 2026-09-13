@@ -207,7 +207,10 @@ grimes-contract report add \
 ```
 
 The anchor is one of `--path`, `--document` with `--section`, `--argument` with
-`--step`, or `--source`. Evidence follows the tier: `--tier=E1` takes `--action`,
+`--step`, or `--source` with `--publisher`, `--snapshot-sha256`, and
+`--retrieved-at` (plus `--source-section` where the source has one). A retrieved
+source without its retrieval identity cannot be checked against what you read,
+so the call is refused. Evidence follows the tier: `--tier=E1` takes `--action`,
 `--cwd`, `--exit-code`, and `--output`; `--tier=E2` takes `--quote`; `--tier=E3`
 takes `--assumption`, `--reasoning`, and `--falsifier`. Add `--suggested-fix` to
 record a fix as text without applying it.
@@ -225,9 +228,12 @@ grimes-contract report seal \
   --examined=<N> --disproved=<K> \
   --summary="<one-sentence BLUF>" > .grimes/report.envelope
 
-grimes run --dir=. --auto-loop \
+grimes run --dir=. \
   --provider-command="cat .grimes/report.envelope" <target>
 ```
+
+Add `--auto-loop` only when the caller asked for it. It is off by default, and
+passing it unasked arms further iterations nobody requested.
 
 `--examined` and `--disproved` are your self-grind arithmetic, where `N = M + K`.
 Report them honestly; they are recorded, not checked.

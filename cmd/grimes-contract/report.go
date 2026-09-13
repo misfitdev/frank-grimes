@@ -69,6 +69,10 @@ func cmdReportAdd(args []string) error {
 	argument := fs.String("argument", "", "supplied argument name")
 	step := fs.Uint("step", 0, "numbered claim or step within the argument")
 	source := fs.String("source", "", "retrieved source URI")
+	publisher := fs.String("publisher", "", "who published the retrieved source")
+	snapshot := fs.String("snapshot-sha256", "", "hex digest of the snapshot that was read")
+	retrievedAt := fs.String("retrieved-at", "", "RFC 3339 time the source was read")
+	sourceSection := fs.String("source-section", "", "section of the retrieved source")
 
 	action := fs.String("action", "", "E1: the command or action performed")
 	cwd := fs.String("cwd", ".", "E1: working directory the action ran in")
@@ -94,7 +98,10 @@ func cmdReportAdd(args []string) error {
 	if err != nil {
 		return err
 	}
-	anchor, err := anchorFromFlags(*path, *document, *section, *argument, uint32(*step), *source)
+	anchor, err := anchorFromFlags(*path, *document, *section, *argument, uint32(*step), *source, sourceMeta{
+		publisher: *publisher, snapshot: *snapshot, retrieved: *retrievedAt,
+		section: *sourceSection, required: true,
+	})
 	if err != nil {
 		return err
 	}

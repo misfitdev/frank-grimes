@@ -135,6 +135,15 @@ else
     fail "grind.md never invokes the engine, so no run record is ever produced"
 fi
 
+# auto-loop is documented as off by default, so the documented command must not
+# hand it to the engine unasked: every ordinary grind would otherwise write loop
+# state and arm iterations the caller did not request.
+if grep -qE '^grimes run .*--auto-loop' "$GRIND"; then
+    fail "grind.md passes --auto-loop unconditionally"
+else
+    pass "grind.md leaves --auto-loop to the caller"
+fi
+
 set +e
 GRIMES_PROJECT_DIR="$SANDBOX" "$SANDBOX/hooks/stop.sh" >/dev/null 2>&1
 EMPTY_CODE=$?
