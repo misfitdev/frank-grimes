@@ -41,7 +41,10 @@ func (NotApplicableGate) Run(ctx context.Context, _ string) (*pb.Verification, e
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return &pb.Verification{Status: pb.VerificationStatus_VERIFICATION_STATUS_NOT_APPLICABLE}, nil
+	return &pb.Verification{
+		Status:     pb.VerificationStatus_VERIFICATION_STATUS_NOT_APPLICABLE,
+		SelectedBy: pb.GateSelection_GATE_SELECTION_UNAVAILABLE,
+	}, nil
 }
 
 // ProviderAdjudicator obtains a second verdict from a separate provider

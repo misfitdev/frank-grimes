@@ -1,0 +1,8 @@
+# A gate that passed cannot also record that no gate was available.
+status: VERIFICATION_STATUS_PASSED
+command: "just check"
+cwd { value: "." }
+exit_code: 0
+output_sha256: "01234567890123456789012345678901"
+completed_at { seconds: 1767225600 }
+selected_by: GATE_SELECTION_UNAVAILABLE

@@ -89,8 +89,11 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	overrun := int64(len(out)) > limit
 	if overrun {
 		_ = killGroup(cmd)
+		// Closed rather than drained: a descendant that left the process group
+		// survives the kill, and draining its output would wait on a writer
+		// that has no reason to stop.
+		_ = stdout.Close()
 	}
-	_, _ = io.Copy(io.Discard, stdout)
 
 	waitErr := cmd.Wait()
 

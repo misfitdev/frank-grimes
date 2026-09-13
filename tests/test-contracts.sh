@@ -152,6 +152,7 @@ for fixture in "$FIXTURES"/*.textproto; do
         report.*) msg="ProviderReport" ;;
         adjudication.*) msg="AdjudicationReport" ;;
         inventory.*) msg="TargetInventory" ;;
+        verification.*) msg="Verification" ;;
         *)
             fail "fixture $name has no recognized type prefix"
             continue

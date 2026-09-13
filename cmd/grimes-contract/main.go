@@ -118,6 +118,8 @@ func newMessage(name string) (proto.Message, error) {
 		return &pb.CandidateFinding{}, nil
 	case "TargetInventory", "frank_grimes.v2.TargetInventory":
 		return &pb.TargetInventory{}, nil
+	case "Verification", "frank_grimes.v2.Verification":
+		return &pb.Verification{}, nil
 	default:
 		return nil, fmt.Errorf("unknown message type %q", name)
 	}

@@ -1,0 +1,3 @@
+# No gate was available, so no selection rule can have named one.
+status: VERIFICATION_STATUS_UNAVAILABLE
+selected_by: GATE_SELECTION_USER_SUPPLIED
