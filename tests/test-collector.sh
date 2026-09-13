@@ -63,6 +63,33 @@ show_inventory() {
     grimes-contract decode-report --type=TargetInventory "$1/.grimes/inventory.pb" 2>/dev/null
 }
 
+# A guard that fails leaves a read blocked on a FIFO, which would hang the suite
+# rather than fail it. GNU timeout is not on every platform, so the bound is kept
+# here: 124 on expiry, matching what timeout would have returned.
+bounded() {
+    local secs="$1"
+    shift
+    local out waited=0 pid code
+    out="$(mktemp)"
+    "$@" >"$out" 2>&1 &
+    pid=$!
+    while kill -0 "$pid" 2>/dev/null && [[ "$waited" -lt "$secs" ]]; do
+        sleep 1
+        waited=$((waited + 1))
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+        kill -9 "$pid" 2>/dev/null
+        wait "$pid" 2>/dev/null
+        code=124
+    else
+        wait "$pid"
+        code=$?
+    fi
+    cat "$out"
+    rm -f "$out"
+    return "$code"
+}
+
 # prototext's spacing is randomized per binary build
 # (google.golang.org/protobuf/internal/detrand), so match on content.
 units_in() {
@@ -302,8 +329,8 @@ rm -rf "$WS" "$OUTSIDE"
 WS="$(mktemp -d)"
 mkfifo "$WS/pipe"
 set +e
-OUT="$(cd "$WS" && "$GRIMES" run --dir=. \
-    --provider-command="$FAKES/provider-red.sh" pipe 2>&1)"
+OUT="$(cd "$WS" && bounded 15 "$GRIMES" run --dir=. \
+    --provider-command="$FAKES/provider-red.sh" pipe)"
 CODE=$?
 set -e
 if [[ "$CODE" == "1" ]] && grep -qi 'not a regular file' <<<"$OUT"; then
@@ -320,8 +347,8 @@ mkfifo "$WS/pipe"
 printf 'x\n' >"$WS/real.txt"
 for kind in document idea; do
     set +e
-    OUT="$(cd "$WS" && timeout 20 "$GRIMES" run --dir=. --kind="$kind" \
-        --provider-command="$FAKES/provider-red.sh" pipe 2>&1)"
+    OUT="$(cd "$WS" && bounded 15 "$GRIMES" run --dir=. --kind="$kind" \
+        --provider-command="$FAKES/provider-red.sh" pipe)"
     CODE=$?
     set -e
     if [[ "$CODE" == "1" ]] && grep -qi 'not a regular file' <<<"$OUT"; then
@@ -331,8 +358,8 @@ for kind in document idea; do
     fi
 done
 set +e
-OUT="$(cd "$WS" && timeout 20 "$GRIMES" run --dir=. --kind=external --snapshot=pipe \
-    --provider-command="$FAKES/provider-red.sh" "https://example.com/p" 2>&1)"
+OUT="$(cd "$WS" && bounded 15 "$GRIMES" run --dir=. --kind=external --snapshot=pipe \
+    --provider-command="$FAKES/provider-red.sh" "https://example.com/p")"
 CODE=$?
 set -e
 if [[ "$CODE" == "1" ]] && grep -qi 'not a regular file' <<<"$OUT"; then
