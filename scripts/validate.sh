@@ -461,6 +461,7 @@ NORMATIVE_MARKERS=(
     'E3 (inferred)'
     'Route exactly'
     'Derive `RED` from'
+    'A check that cannot fail distinguishes nothing'
 )
 
 for marker in "${NORMATIVE_MARKERS[@]}"; do
