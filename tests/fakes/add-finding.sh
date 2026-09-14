@@ -41,7 +41,11 @@ elif [[ "${DISPROOF_NONE:-}" != "" ]]; then
     DISPROOF=()
 fi
 
+# "${DISPROOF[@]}" on an empty array is an unbound variable under set -u in
+# bash 3.2, which is what macOS ships and what the CI runner uses. The +
+# expansion drops the whole word when the array is empty.
 grimes-contract report add \
     --category=SEC --severity="$SEVERITY" --blast="$BLAST" \
     --likelihood="$LIKELIHOOD" "${ANCHOR[@]}" \
-    --tier=E2 --claim="$CLAIM" --quote="$QUOTE" "${DISPROOF[@]}" >/dev/null
+    --tier=E2 --claim="$CLAIM" --quote="$QUOTE" \
+    ${DISPROOF[@]+"${DISPROOF[@]}"} >/dev/null

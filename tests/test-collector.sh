@@ -338,7 +338,11 @@ OUT="$(cd "$WS" && "$GRIMES" run --dir=. --format=prototext \
     --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh src 2>&1)"
 CODE=$?
 set -e
-assert_eq "$CODE" "3" "an untested P0 is conditional rather than blocking or passing"
+if [[ "$CODE" == "3" ]]; then
+    pass "an untested P0 is conditional rather than blocking or passing"
+else
+    fail "untested-P0 run exited $CODE, wanted 3: $OUT"
+fi
 if echo "$OUT" | grep -qE 'residual_risk: +RESIDUAL_RISK_UNKNOWN'; then
     pass "a finding nobody could size leaves the risk unranked"
 else
@@ -357,7 +361,11 @@ OUT="$(cd "$WS" && "$GRIMES" run --dir=. --format=prototext \
     --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh src 2>&1)"
 CODE=$?
 set -e
-assert_eq "$CODE" "3" "an untestable P0 is conditional"
+if [[ "$CODE" == "3" ]]; then
+    pass "an untestable P0 is conditional"
+else
+    fail "untestable-P0 run exited $CODE, wanted 3: $OUT"
+fi
 if echo "$OUT" | grep -qE 'review_confidence: +REVIEW_CONFIDENCE_LOW'; then
     pass "an unavailable falsifier holds confidence at low"
 else
@@ -376,7 +384,11 @@ OUT="$(cd "$WS" && "$GRIMES" run --dir=. --format=prototext \
     --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh src 2>&1)"
 CODE=$?
 set -e
-assert_eq "$CODE" "4" "a contradicted P0 still blocks"
+if [[ "$CODE" == "4" ]]; then
+    pass "a contradicted P0 still blocks"
+else
+    fail "contradicted-P0 run exited $CODE, wanted 4: $OUT"
+fi
 if echo "$OUT" | grep -qE 'review_confidence: +REVIEW_CONFIDENCE_LOW'; then
     pass "a probe that argued against its own finding holds confidence at low"
 else
