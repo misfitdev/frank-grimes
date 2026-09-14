@@ -282,6 +282,15 @@ message Citation {
 // verdict rather than acquitting the finding, which is the treatment the skill
 // already gives an unattemptable falsifier.
 message DisproofAttempt {
+  // Only a probe that ran can have come back against anything. The CLI never
+  // pairs the two, but a provider writes its own report: the flag would reach
+  // the verdict as an evidence conflict raised by an attempt nobody made.
+  option (buf.validate.message).cel = {
+    id: "disproof.contradiction_needs_an_attempt"
+    message: "a disproof that was not performed cannot contradict the claim"
+    expression: "!this.contradicts_claim || has(this.performed)"
+  };
+
   oneof outcome {
     option (buf.validate.oneof).required = true;
     Reproduction performed = 1;

@@ -71,8 +71,8 @@ Anchor:   --path / --document with --section / --argument with --step / --source
 Evidence: E1 --action --cwd --exit-code (--output | --output-sha256)
           E2 --quote
           E3 --assumption --reasoning --falsifier
-Disproof: --disproof-action [--disproof-cwd] --disproof-exit --disproof-output
-            [--disproof-contradicts]
+Disproof: --disproof-action [--disproof-cwd] --disproof-exit \
+            (--disproof-output | --disproof-output-sha256) [--disproof-contradicts]
           or --disproof-unavailable=<why>`
 
 func cmdReportAdd(args []string) error {
@@ -691,6 +691,16 @@ func disproofFromFlags(fs *flag.FlagSet, action, cwd string, exitCode int,
 
 // reproductionOf records a command that was actually run. The prefix names the
 // flag family at fault, since an acquittal supplies two of them.
+// exitFlag names the exit-status flag for a family. Unprefixed it is
+// --exit-code; every prefixed form shortens it, so deriving one from the other
+// by concatenation names a flag nobody defined.
+func exitFlag(prefix string) string {
+	if prefix == "" {
+		return "exit-code"
+	}
+	return prefix + "exit"
+}
+
 func reproductionOf(prefix, action, cwd string, exitCode int, output, outputSum string) (*pb.Reproduction, error) {
 	if action == "" {
 		return nil, fmt.Errorf("--%saction is required", prefix)
@@ -698,7 +708,7 @@ func reproductionOf(prefix, action, cwd string, exitCode int, output, outputSum 
 	// int32 in the contract: a wider value would wrap and the record would
 	// carry an outcome the command did not have.
 	if exitCode > math.MaxInt32 || exitCode < math.MinInt32 {
-		return nil, fmt.Errorf("--%sexit-code must be between %d and %d", prefix,
+		return nil, fmt.Errorf("--%s must be between %d and %d", exitFlag(prefix),
 			int32(math.MinInt32), int32(math.MaxInt32))
 	}
 	cmd := &pb.ExecutedCommand{

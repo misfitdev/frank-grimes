@@ -147,7 +147,7 @@ Freeze the candidate set before reporting. For every candidate, write the specif
 
 - If the disproof observation occurs, delete the candidate from the finding set and count it as killed.
 - If the probe does not disprove the candidate, retain both the candidate's primary evidence and the self-grind result.
-- If the probe cannot be attempted, record the missing prerequisite, mark the candidate `unverified`, and cap it at P2.
+- If the probe cannot be attempted, record the missing prerequisite and mark the candidate `unverified`. Keep the severity it would carry if true: severity is how bad the defect is, not how sure you are of it, and lowering it for an uncertainty reason manufactures the risk weight Phase 7 excludes. Phase 7 drops it from verdict weight and refuses a pass while it stands.
 - If a retained candidate still rests on an unconfirmed assumption, tag it `assumption-dependent`; Phase 7 excludes it from verdict weight.
 
 Deduplicate survivors by root cause and violated invariant; multiple symptoms may be evidence for one finding but are not multiple findings. Report the reconciliation exactly as **“N candidates, M survived, K killed”**, where `N = M + K`. A candidate absent from that arithmetic cannot appear in the report.

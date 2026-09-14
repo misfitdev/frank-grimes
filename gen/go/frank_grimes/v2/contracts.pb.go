@@ -4373,11 +4373,12 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\aexhibit\x12\x05\xbaH\x02\b\x01J\x04\b\x01\x10\x06R\x06actionR\x03cwdR\texit_codeR\x0eoutput_excerptR\routput_sha256\"z\n" +
 	"\bCitation\x12\x1d\n" +
 	"\x05quote\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05quote\x127\n" +
-	"\x06anchor\x18\x04 \x01(\v2\x17.frank_grimes.v2.AnchorB\x06\xbaH\x03\xc8\x01\x01R\x06anchorJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03R\x04pathR\x04line\"\xbc\x01\n" +
+	"\x06anchor\x18\x04 \x01(\v2\x17.frank_grimes.v2.AnchorB\x06\xbaH\x03\xc8\x01\x01R\x06anchorJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03R\x04pathR\x04line\"\xde\x02\n" +
 	"\x0fDisproofAttempt\x12=\n" +
 	"\tperformed\x18\x01 \x01(\v2\x1d.frank_grimes.v2.ReproductionH\x00R\tperformed\x12+\n" +
 	"\vunavailable\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01H\x00R\vunavailable\x12+\n" +
-	"\x11contradicts_claim\x18\x03 \x01(\bR\x10contradictsClaimB\x10\n" +
+	"\x11contradicts_claim\x18\x03 \x01(\bR\x10contradictsClaim:\x9f\x01\xbaH\x9b\x01\x1a\x98\x01\n" +
+	"'disproof.contradiction_needs_an_attempt\x12=a disproof that was not performed cannot contradict the claim\x1a.!this.contradicts_claim || has(this.performed)B\x10\n" +
 	"\aoutcome\x12\x05\xbaH\x02\b\x01\"\x82\x01\n" +
 	"\tInference\x12'\n" +
 	"\n" +
