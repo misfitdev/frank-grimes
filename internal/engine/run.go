@@ -95,7 +95,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		return nil, err
 	}
 
-	cov, err := measure(report, collected.Inventory)
+	cov, err := measure(report, collected.Inventory, collected.Categories)
 	if err != nil {
 		return nil, err
 	}

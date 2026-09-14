@@ -217,23 +217,23 @@ about it.
 
 ### Account for the target
 
-`$GRIMES_TARGET_INVENTORY` holds the units this review is answerable for, and
-`report units` prints their ids exactly — a unit id is arbitrary text, so read
-it from there rather than parsing any rendering of it. Name every unit as either
-examined or skipped, and record what ended each routed category:
+`$GRIMES_TARGET_INVENTORY` holds this run's units and `report units` prints their
+ids exactly. A unit id is arbitrary text, so read it from there rather than
+parsing any rendering of it. The skill says what to account for; these are the
+calls that record it.
 
 ```bash
 grimes-contract report units --print0 |
   grimes-contract report cover --examined-stdin0
 
-grimes-contract report cover --skip="<unit id>:<why>[:material]"
+grimes-contract report cover --skip="<unit id>" --skip-reason="<why>" [--skip-material]
 grimes-contract report stop --category=SEC \
   --condition=<marginal-yield|probes-exhausted|evidence-unavailable> --probes=<n>
 ```
 
 `--examined-stdin0` is the only form safe for an id containing a comma or a
-newline. A unit left unnamed is not silently forgiven: the engine compares this
-against the inventory and caps the verdict.
+newline. `--skip` takes one unit per call, so an id containing any delimiter
+survives.
 
 ### Seal and run
 

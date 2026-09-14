@@ -154,6 +154,8 @@ Deduplicate survivors by root cause and violated invariant; multiple symptoms ma
 
 Keep Phase 1's three-question clarification budget. The 3–5 probes on an attack card are ordered options, not a quota. Within each routed category, attempt the first available probe and record its yield as one or more of: `new P0/P1 candidate`, `stronger evidence for a P0/P1 candidate`, `candidate killed`, or `none`. If no candidate exists, attempt one more available probe before stopping. Otherwise continue in order only while a probe adds a new P0/P1 candidate or materially strengthens or kills one; stop on the first subsequent `none`, or when no further probe is possible with the contract's evidence. Record which condition ended the category. This is a marginal-yield stop, not an acquittal.
 
+Account for every unit of the target. Each unit is either examined or explicitly skipped with a stated reason, and a skip is material when the unit could hold a defect that would change the verdict. A unit left unnamed is a coverage limit, not a pass, and a material skip leaves a critical unknown standing.
+
 Exclude every `assumption-dependent` or `unverified` finding from verdict weight. Keep it in the register or appendix with its tag and required evidence; uncertainty limits completeness instead of manufacturing risk weight. Cap the main Risk Register at 12 survivors, keep all terminal P0/P1 findings ahead of P2/P3 findings, and put every remaining survivor in the appendix.
 
 Derive the verdict tuple from the surviving, verdict-weighted findings and the recorded review limits:

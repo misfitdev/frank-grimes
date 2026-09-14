@@ -19,8 +19,12 @@ if [[ -n "${GRIMES_TARGET_INVENTORY:-}" && -f "$GRIMES_TARGET_INVENTORY" ]]; the
         grimes-contract report cover --examined-stdin0 >/dev/null
 fi
 
-# Every routed category records what ended its grind.
-for CATEGORY in SEC COR REL OPS VER; do
+# Every routed category records what ended its grind. The routed set comes from
+# the engine, not from here: a provider that names its own shorter list is
+# answering a request nobody made.
+CATEGORIES="${GRIMES_CATEGORIES:-SEC,COR,REL,OPS,VER}"
+IFS=, read -r -a ROUTED <<<"$CATEGORIES"
+for CATEGORY in "${ROUTED[@]}"; do
     grimes-contract report stop --category="$CATEGORY" \
         --condition=marginal-yield --probes=2 >/dev/null
 done
@@ -31,5 +35,5 @@ grimes-contract report seal \
     --target-scope="${GRIMES_TARGET_SCOPE:-src}" \
     --kind="${GRIMES_TARGET_KIND:-code}" \
     --iteration="${GRIMES_ITERATION:-1}" \
-    --routed=SEC,COR,REL,OPS,VER \
+    --routed="$CATEGORIES" \
     --examined="$1" --disproved="$2" --summary="$3"

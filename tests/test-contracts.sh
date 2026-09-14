@@ -353,6 +353,39 @@ fi
 rm -rf "$WORK"
 
 echo ""
+echo "--- A unit id survives whatever characters it holds ---"
+
+# An external target's unit id is its URI, so a skip that split its argument on
+# a delimiter would record a fragment. The engine measures coverage against the
+# inventory and refuses a fragment as a unit outside the target, which makes the
+# unit impossible to skip and denies an otherwise complete review.
+WORK="$(mktemp -d)"
+mkdir -p "$WORK/.grimes"
+HOSTILE='https://example.com/policy,v2
+second line'
+SKIPPED="$(cd "$WORK" && "$BIN" report cover --skip="$HOSTILE" \
+    --skip-reason="the publisher withdrew it" --skip-material >/dev/null &&
+    "$BIN" report show --file="$WORK/.grimes/report.textproto")"
+if [[ "$(grep -c 'unit_id' <<<"$SKIPPED")" == "1" ]] &&
+    grep -qF 'https://example.com/policy,v2' <<<"$SKIPPED"; then
+    pass "a unit id holding a colon, a comma, and a newline is skipped whole"
+else
+    fail "the skipped unit id was split: $SKIPPED"
+fi
+
+# The reason is what separates a deliberate skip from an oversight.
+set +e
+OUT=$(cd "$WORK" && "$BIN" report cover --skip="a.sh" 2>&1)
+CODE=$?
+set -e
+if [[ "$CODE" != "0" ]] && grep -q 'skip-reason' <<<"$OUT"; then
+    pass "a skip with no reason is refused by name"
+else
+    fail "an unexplained skip was accepted (exit $CODE)"
+fi
+rm -rf "$WORK"
+
+echo ""
 echo "--- A retrieved source carries its retrieval identity ---"
 
 # Every --source candidate was rejected by validation, because the anchor was

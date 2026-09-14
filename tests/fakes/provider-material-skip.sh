@@ -7,17 +7,32 @@ set -euo pipefail
 cd "$(mktemp -d)"
 echo "I looked at what I could."
 
-HELD="$(grimes-contract report units | head -1)"
-grimes-contract report units | tail -n +2 | while IFS= read -r unit; do
-    grimes-contract report cover --examined="$unit" >/dev/null
-done
-grimes-contract report cover --skip="$HELD:unreadable without credentials:material" >/dev/null
+# A unit id may contain a newline, so the inventory is read NUL-separated. The
+# loop reads from a file rather than a pipe: a pipe would run it in a subshell
+# and HELD would not survive it.
+UNITS="$(mktemp)"
+REST="$(mktemp)"
+grimes-contract report units --print0 >"$UNITS"
+HELD=""
+while IFS= read -r -d '' unit; do
+    if [ -z "$HELD" ]; then
+        HELD="$unit"
+        continue
+    fi
+    printf '%s\0' "$unit" >>"$REST"
+done <"$UNITS"
 
-for CATEGORY in SEC COR REL OPS VER; do
+grimes-contract report cover --examined-stdin0 <"$REST" >/dev/null
+grimes-contract report cover --skip="$HELD" \
+    --skip-reason="unreadable without credentials" --skip-material >/dev/null
+
+CATEGORIES="${GRIMES_CATEGORIES:-SEC,COR,REL,OPS,VER}"
+IFS=, read -r -a ROUTED <<<"$CATEGORIES"
+for CATEGORY in "${ROUTED[@]}"; do
     grimes-contract report stop --category="$CATEGORY" --condition=marginal-yield --probes=2 >/dev/null
 done
 
 grimes-contract report seal --run-id="${GRIMES_RUN_ID:-}" \
     --target-root="${GRIMES_TARGET_ROOT:-}" --target-scope="${GRIMES_TARGET_SCOPE:-src}" \
     --kind="${GRIMES_TARGET_KIND:-code}" --iteration="${GRIMES_ITERATION:-1}" \
-    --routed=SEC,COR,REL,OPS,VER --examined=7 --disproved=7 --summary="One unit could not be read."
+    --routed="$CATEGORIES" --examined=7 --disproved=7 --summary="One unit could not be read."

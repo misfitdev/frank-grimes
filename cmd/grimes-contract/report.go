@@ -55,7 +55,8 @@ const reportUsage = `report subcommands:
                [--kind=code|document|idea|external] [--iteration=<n>] --summary=<text> \
                [--routed=COR,SEC,...] [--examined=<n>] [--disproved=<n>]
   report units [--inventory=<path>]
-  report cover --examined=<id,...> [--skip=<id>:<reason>[:material] ...]
+  report cover [--examined=<id,...>] [--examined-stdin0] \
+               [--skip=<id> --skip-reason=<text> [--skip-material]]
   report stop  --category=<CODE> --condition=<marginal-yield|probes-exhausted|evidence-unavailable> \
                [--probes=<n>]
   report show
@@ -333,17 +334,6 @@ func cmdReportUnits(args []string) error {
 	return nil
 }
 
-// repeatedFlag collects one occurrence per argument, so a reason containing a
-// space survives.
-type repeatedFlag []string
-
-func (r *repeatedFlag) String() string { return strings.Join(*r, " ") }
-
-func (r *repeatedFlag) Set(v string) error {
-	*r = append(*r, v)
-	return nil
-}
-
 // cmdReportCover accounts for the units of the target this review looked at.
 //
 // The denominator is the inventory the engine resolved, which this cannot see:
@@ -354,10 +344,18 @@ func cmdReportCover(args []string) error {
 	file := fs.String("file", DefaultReportPath, "report being built")
 	examined := fs.String("examined", "", "comma-separated unit ids examined")
 	stdin0 := fs.Bool("examined-stdin0", false, "read NUL-separated examined ids from stdin; the only form safe for an id containing a comma or a newline")
-	var skips repeatedFlag
-	fs.Var(&skips, "skip", "<id>:<reason>[:material]; repeatable")
+	skip := fs.String("skip", "", "unit id deliberately not examined; one per call")
+	reason := fs.String("skip-reason", "", "why that unit was not examined")
+	material := fs.Bool("skip-material", false, "the skipped unit could hold a defect that changes the verdict")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *skip == "" && (*reason != "" || *material) {
+		return fmt.Errorf("--skip-reason and --skip-material need --skip")
+	}
+	// An unexplained skip is indistinguishable from an oversight.
+	if *skip != "" && *reason == "" {
+		return fmt.Errorf("--skip needs --skip-reason")
 	}
 
 	report, err := loadReport(*file)
@@ -383,12 +381,12 @@ func cmdReportCover(args []string) error {
 			}
 		}
 	}
-	for _, raw := range skips {
-		skip, err := parseSkip(raw)
-		if err != nil {
-			return err
-		}
-		report.Coverage.Skipped = append(report.Coverage.Skipped, skip)
+	if *skip != "" {
+		report.Coverage.Skipped = append(report.Coverage.Skipped, &pb.SkippedUnit{
+			UnitId:   *skip,
+			Reason:   *reason,
+			Material: *material,
+		})
 	}
 	if err := contracts.Validate(report.GetCoverage()); err != nil {
 		return err
@@ -399,26 +397,6 @@ func cmdReportCover(args []string) error {
 	fmt.Printf("covered %d examined, %d skipped\n",
 		len(report.GetCoverage().GetExamined()), len(report.GetCoverage().GetSkipped()))
 	return nil
-}
-
-// parseSkip reads <id>:<reason>[:material]. The reason is required because an
-// unexplained skip is indistinguishable from an oversight.
-func parseSkip(raw string) (*pb.SkippedUnit, error) {
-	parts := strings.SplitN(raw, ":", 3)
-	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
-		return nil, fmt.Errorf("--skip takes <id>:<reason>[:material], got %q", raw)
-	}
-	skip := &pb.SkippedUnit{UnitId: parts[0], Reason: parts[1]}
-	if len(parts) == 3 {
-		switch parts[2] {
-		case "material":
-			skip.Material = true
-		case "":
-		default:
-			return nil, fmt.Errorf("--skip third field is \"material\" or empty, got %q", parts[2])
-		}
-	}
-	return skip, nil
 }
 
 // cmdReportStop records what ended a routed category's grind.

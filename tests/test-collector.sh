@@ -577,7 +577,13 @@ set +e
 OUT="$(cd "$WS" && "$GRIMES" run --dir=. --format=prototext \
     --provider-command="$FAKES/provider-material-skip.sh" \
     --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh src 2>&1)"
+CODE=$?
 set -e
+if [[ "$CODE" == "0" ]]; then
+    pass "a material skip completes the run"
+else
+    fail "material-skip run exited $CODE, wanted 0: $OUT"
+fi
 if echo "$OUT" | grep -qE 'unmet_gates: +"coverage"'; then
     fail "a skipped unit was counted as unaccounted rather than as a skip"
 else
@@ -598,7 +604,13 @@ set +e
 OUT="$(cd "$WS" && "$GRIMES" run --dir=. --format=prototext \
     --provider-command="$FAKES/provider-blocked-category.sh" \
     --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh src 2>&1)"
+CODE=$?
 set -e
+if [[ "$CODE" == "3" ]]; then
+    pass "a blocked category completes the run as conditional"
+else
+    fail "blocked-category run exited $CODE, wanted 3: $OUT"
+fi
 if echo "$OUT" | grep -qE 'legacy_color: +LEGACY_COLOR_GREEN'; then
     fail "a blocked category still reached GREEN"
 else
@@ -614,7 +626,13 @@ for kind in document idea; do
     OUT="$(cd "$WS" && "$GRIMES" run --dir=. --kind="$kind" --format=prototext \
         --provider-command="$FAKES/provider-green.sh" \
         --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh spec.md 2>&1)"
+    CODE=$?
     set -e
+    if [[ "$CODE" == "0" ]]; then
+        pass "a $kind target with no repository passes"
+    else
+        fail "$kind run exited $CODE, wanted 0: $OUT"
+    fi
     if echo "$OUT" | grep -qE 'unmet_gates: +"coverage"'; then
         fail "a $kind target could not account for its units"
     else

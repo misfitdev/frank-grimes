@@ -4143,7 +4143,8 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\bmaterial\x18\x03 \x01(\bR\bmaterial\"l\n" +
 	"\fUnitCoverage\x12$\n" +
 	"\bexamined\x18\x01 \x03(\tB\b\xbaH\x05\x92\x01\x02\x18\x01R\bexamined\x126\n" +
-	"\askipped\x18\x02 \x03(\v2\x1c.frank_grimes.v2.SkippedUnitR\askipped\"\x8b\b\n" +
+	"\askipped\x18\x02 \x03(\v2\x1c.frank_grimes.v2.SkippedUnitR\askipped\"\xda\n" +
+	"\n" +
 	"\x0eProviderReport\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
 	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x12\x1e\n" +
@@ -4161,8 +4162,10 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	" \x01(\rR\x13candidatesDisproved\x12!\n" +
 	"\asummary\x18\v \x01(\tB\a\xbaH\x04r\x02\x10\x01R\asummary\x129\n" +
 	"\bcoverage\x18\f \x01(\v2\x1d.frank_grimes.v2.UnitCoverageR\bcoverage\x12D\n" +
-	"\x0ecategory_stops\x18\r \x03(\v2\x1d.frank_grimes.v2.CategoryStopR\rcategoryStops:\xcc\x02\xbaH\xc8\x02\x1a\xad\x01\n" +
-	"$report.every_routed_category_stopped\x126every routed category must record what ended its grind\x1aMthis.routed_categories.all(c, this.category_stops.exists(s, s.category == c))\x1a\x95\x01\n" +
+	"\x0ecategory_stops\x18\r \x03(\v2\x1d.frank_grimes.v2.CategoryStopR\rcategoryStops:\x9b\x05\xbaH\x97\x05\x1a\xad\x01\n" +
+	"$report.every_routed_category_stopped\x126every routed category must record what ended its grind\x1aMthis.routed_categories.all(c, this.category_stops.exists(s, s.category == c))\x1a\x9b\x01\n" +
+	"*report.stops_confined_to_routed_categories\x12+a category stop must name a routed category\x1a@this.category_stops.all(s, s.category in this.routed_categories)\x1a\xae\x01\n" +
+	"\x1creport.one_stop_per_category\x12-a category must not record more than one stop\x1a_this.category_stops.all(s, this.category_stops.filter(o, o.category == s.category).size() == 1)\x1a\x95\x01\n" +
 	"!report.coverage_sets_are_disjoint\x12*a unit cannot be both examined and skipped\x1aDthis.coverage.skipped.all(s, !(s.unit_id in this.coverage.examined))\"\xf5\x02\n" +
 	"\x12AdjudicationReport\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +

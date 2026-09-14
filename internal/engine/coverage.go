@@ -30,12 +30,17 @@ type Coverage struct {
 	UnknownRemains bool
 }
 
-// measure compares what the report accounted for against the inventory.
+// measure compares what the report accounted for against the inventory and the
+// categories the engine routed.
 //
-// A unit the inventory does not contain is an error rather than a finding: the
-// provider is describing a target this run did not resolve, and nothing
-// downstream could tell whether it examined the right artifact.
-func measure(report *pb.ProviderReport, inventory *pb.TargetInventory) (Coverage, error) {
+// Both denominators are the engine's. A unit the inventory does not contain is
+// an error rather than a finding: the provider is describing a target this run
+// did not resolve, and nothing downstream could tell whether it examined the
+// right artifact. A category the engine routed but the report does not carry is
+// the same error in the other dimension — taking the routed set from the report
+// would let a provider shorten its own denominator and pass every check on the
+// remainder.
+func measure(report *pb.ProviderReport, inventory *pb.TargetInventory, routed []pb.Category) (Coverage, error) {
 	inScope := map[string]bool{}
 	for _, u := range inventory.GetUnits() {
 		inScope[u.GetId()] = true
@@ -67,23 +72,44 @@ func measure(report *pb.ProviderReport, inventory *pb.TargetInventory) (Coverage
 	}
 	sort.Strings(cov.Unaccounted)
 
+	wasRouted := map[pb.Category]bool{}
+	for _, c := range routed {
+		wasRouted[c] = true
+	}
+	for _, c := range report.GetRoutedCategories() {
+		if !wasRouted[c] {
+			return Coverage{}, fmt.Errorf("%w: reported routing %v, which this run did not route", ErrProviderOutput, c)
+		}
+	}
+
+	// Keyed by category, so a second stop for one category cannot raise the
+	// probe count of a category that was never reached. The contract rejects
+	// the duplicate outright; this stays correct if it ever cannot.
 	stopped := map[pb.Category]*pb.CategoryStop{}
 	for _, s := range report.GetCategoryStops() {
+		if !wasRouted[s.GetCategory()] {
+			return Coverage{}, fmt.Errorf("%w: stopped %v, which this run did not route", ErrProviderOutput, s.GetCategory())
+		}
+		if _, dup := stopped[s.GetCategory()]; dup {
+			return Coverage{}, fmt.Errorf("%w: %v recorded two stops", ErrProviderOutput, s.GetCategory())
+		}
 		stopped[s.GetCategory()] = s
+	}
+
+	cov.CategoriesStopped = len(routed) > 0
+	for _, c := range routed {
+		s, ok := stopped[c]
+		if !ok || s.GetCondition() == pb.StopCondition_STOP_CONDITION_EVIDENCE_UNAVAILABLE {
+			cov.CategoriesStopped = false
+		}
+		if !ok {
+			continue
+		}
 		if s.GetCondition() == pb.StopCondition_STOP_CONDITION_EVIDENCE_UNAVAILABLE {
 			cov.UnknownRemains = true
 		}
 		if s.GetProbesAttempted() > 0 {
 			cov.Probed = true
-		}
-	}
-
-	cov.CategoriesStopped = len(report.GetRoutedCategories()) > 0
-	for _, c := range report.GetRoutedCategories() {
-		s, ok := stopped[c]
-		if !ok || s.GetCondition() == pb.StopCondition_STOP_CONDITION_EVIDENCE_UNAVAILABLE {
-			cov.CategoriesStopped = false
-			break
 		}
 	}
 	return cov, nil

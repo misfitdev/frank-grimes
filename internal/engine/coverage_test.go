@@ -29,7 +29,7 @@ func TestMeasureNamesUnaccountedUnits(t *testing.T) {
 	r := &pb.ProviderReport{
 		Coverage: &pb.UnitCoverage{Examined: []string{"a"}},
 	}
-	cov, err := measure(r, inventoryOf("a", "b", "c"))
+	cov, err := measure(r, inventoryOf("a", "b", "c"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestMeasureRefusesUnitsOutsideTheTarget(t *testing.T) {
 		{"examined", &pb.UnitCoverage{Examined: []string{"elsewhere"}}},
 		{"skipped", &pb.UnitCoverage{Skipped: []*pb.SkippedUnit{{UnitId: "elsewhere", Reason: "r"}}}},
 	} {
-		if _, err := measure(&pb.ProviderReport{Coverage: c.cov}, inventoryOf("a")); err == nil {
+		if _, err := measure(&pb.ProviderReport{Coverage: c.cov}, inventoryOf("a"), nil); err == nil {
 			t.Errorf("%s: a unit outside the target was accepted", c.name)
 		}
 	}
@@ -63,7 +63,7 @@ func TestMeasureRequiresEveryRoutedCategoryToStop(t *testing.T) {
 		CategoryStops:    []*pb.CategoryStop{stop(pb.Category_CATEGORY_SEC, yield, 2)},
 		Coverage:         &pb.UnitCoverage{Examined: []string{"a"}},
 	}
-	cov, err := measure(r, inventoryOf("a"))
+	cov, err := measure(r, inventoryOf("a"), r.GetRoutedCategories())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestMeasureDistinguishesWhyACategoryStopped(t *testing.T) {
 			CategoryStops:    []*pb.CategoryStop{stop(pb.Category_CATEGORY_SEC, c.cond, c.wantProbedWith)},
 			Coverage:         &pb.UnitCoverage{Examined: []string{"a"}},
 		}
-		cov, err := measure(r, inventoryOf("a"))
+		cov, err := measure(r, inventoryOf("a"), routed)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -112,12 +112,79 @@ func TestMeasureProbedComesFromProbesNotFindings(t *testing.T) {
 		Coverage:         &pb.UnitCoverage{Examined: []string{"a"}},
 		Candidates:       []*pb.CandidateFinding{{}, {}},
 	}
-	cov, err := measure(r, inventoryOf("a"))
+	cov, err := measure(r, inventoryOf("a"), r.GetRoutedCategories())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cov.Probed {
 		t.Error("candidates without an attempted probe counted as having probed")
+	}
+}
+
+// The routed set is the engine's, not the report's. A provider that names a
+// shorter list would otherwise satisfy every check on the remainder, and a stop
+// for a category nobody routed would supply the probe count on its behalf.
+func TestMeasureRefusesCategoriesTheRunDidNotRoute(t *testing.T) {
+	routed := []pb.Category{pb.Category_CATEGORY_SEC}
+	for _, c := range []struct {
+		name   string
+		report *pb.ProviderReport
+	}{
+		{"routed", &pb.ProviderReport{
+			RoutedCategories: []pb.Category{pb.Category_CATEGORY_SEC, pb.Category_CATEGORY_COR},
+			CategoryStops: []*pb.CategoryStop{
+				stop(pb.Category_CATEGORY_SEC, yield, 1),
+				stop(pb.Category_CATEGORY_COR, yield, 1),
+			},
+			Coverage: &pb.UnitCoverage{Examined: []string{"a"}},
+		}},
+		{"stopped", &pb.ProviderReport{
+			RoutedCategories: routed,
+			CategoryStops: []*pb.CategoryStop{
+				stop(pb.Category_CATEGORY_SEC, yield, 1),
+				stop(pb.Category_CATEGORY_COR, yield, 1),
+			},
+			Coverage: &pb.UnitCoverage{Examined: []string{"a"}},
+		}},
+	} {
+		if _, err := measure(c.report, inventoryOf("a"), routed); err == nil {
+			t.Errorf("%s: a category this run did not route was accepted", c.name)
+		}
+	}
+}
+
+// A category the engine routed and the report omits is not stopped, however
+// complete the report looks from the inside.
+func TestMeasureCountsCategoriesTheReportOmits(t *testing.T) {
+	r := &pb.ProviderReport{
+		RoutedCategories: []pb.Category{pb.Category_CATEGORY_SEC},
+		CategoryStops:    []*pb.CategoryStop{stop(pb.Category_CATEGORY_SEC, yield, 2)},
+		Coverage:         &pb.UnitCoverage{Examined: []string{"a"}},
+	}
+	routed := []pb.Category{pb.Category_CATEGORY_SEC, pb.Category_CATEGORY_COR}
+	cov, err := measure(r, inventoryOf("a"), routed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cov.CategoriesStopped {
+		t.Error("a routed category the report never mentioned counted as stopped")
+	}
+}
+
+// Two accounts of how one category's grind ended, and nothing can say which
+// happened. The contract rejects the shape; this holds if that rule is removed.
+func TestMeasureRefusesTwoStopsForOneCategory(t *testing.T) {
+	routed := []pb.Category{pb.Category_CATEGORY_SEC}
+	r := &pb.ProviderReport{
+		RoutedCategories: routed,
+		CategoryStops: []*pb.CategoryStop{
+			stop(pb.Category_CATEGORY_SEC, pb.StopCondition_STOP_CONDITION_EVIDENCE_UNAVAILABLE, 0),
+			stop(pb.Category_CATEGORY_SEC, yield, 3),
+		},
+		Coverage: &pb.UnitCoverage{Examined: []string{"a"}},
+	}
+	if _, err := measure(r, inventoryOf("a"), routed); err == nil {
+		t.Error("two stops for one category were accepted")
 	}
 }
 
@@ -128,7 +195,7 @@ func TestMeasureMaterialSkipLeavesUnknown(t *testing.T) {
 				Skipped: []*pb.SkippedUnit{{UnitId: "a", Reason: "generated", Material: material}},
 			},
 		}
-		cov, err := measure(r, inventoryOf("a"))
+		cov, err := measure(r, inventoryOf("a"), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
