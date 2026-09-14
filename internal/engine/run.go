@@ -81,12 +81,21 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		collected.ContentPath = path
 	}
 
-	report, err := e.review(ctx, target, collected.ContentPath, collected.Categories, mode, iteration)
+	inventoryPath := ""
+	if e.Inventory != nil {
+		inventoryPath = e.Inventory.Path()
+	}
+	report, err := e.review(ctx, target, collected.ContentPath, inventoryPath, collected.Categories, mode, iteration)
 	if err != nil {
 		return nil, err
 	}
 
 	surfaced, oscillation, err := e.apply(ctx, ledger, report, iteration)
+	if err != nil {
+		return nil, err
+	}
+
+	cov, err := measure(report, collected.Inventory, collected.Categories)
 	if err != nil {
 		return nil, err
 	}
@@ -100,8 +109,10 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	primary := Derive(DeriveInput{
 		Candidates:              candidates,
 		AdjudicationAvailable:   false,
-		AllCategoriesStopped:    false,
-		CriticalInvariantProbed: len(candidates) > 0,
+		AllCategoriesStopped:    cov.CategoriesStopped,
+		CriticalInvariantProbed: cov.Probed,
+		CriticalUnknownRemains:  cov.UnknownRemains,
+		CoverageIncomplete:      len(cov.Unaccounted) > 0,
 		Oscillation:             oscillation,
 	})
 
@@ -116,8 +127,10 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		IndependentDecision:   review.GetVerdict().GetDecision(),
 		IndependentContextUnknown: review != nil &&
 			review.GetContextOrigin() != pb.ContextOrigin_CONTEXT_ORIGIN_ENGINE_SPAWNED,
-		AllCategoriesStopped:    false,
-		CriticalInvariantProbed: len(candidates) > 0,
+		AllCategoriesStopped:    cov.CategoriesStopped,
+		CriticalInvariantProbed: cov.Probed,
+		CriticalUnknownRemains:  cov.UnknownRemains,
+		CoverageIncomplete:      len(cov.Unaccounted) > 0,
 		Oscillation:             oscillation,
 	})
 
@@ -180,16 +193,17 @@ func (e *Engine) resume(ctx context.Context, target *pb.Target) (uint32, error) 
 
 // review obtains and decodes provider output. Nothing here is trusted beyond
 // its findings; every authoritative field on the proposal is discarded.
-func (e *Engine) review(ctx context.Context, target *pb.Target, contentPath string, categories []pb.Category, mode pb.Mode, iteration uint32) (*pb.ProviderReport, error) {
+func (e *Engine) review(ctx context.Context, target *pb.Target, contentPath, inventoryPath string, categories []pb.Category, mode pb.Mode, iteration uint32) (*pb.ProviderReport, error) {
 	out, err := e.Provider.Review(ctx, Request{
-		Role:        RolePrimary,
-		RunID:       e.RunID,
-		Target:      target,
-		ContentPath: contentPath,
-		Mode:        mode,
-		Iteration:   iteration,
-		Categories:  categories,
-		Research:    e.Research,
+		Role:          RolePrimary,
+		RunID:         e.RunID,
+		Target:        target,
+		ContentPath:   contentPath,
+		InventoryPath: inventoryPath,
+		Mode:          mode,
+		Iteration:     iteration,
+		Categories:    categories,
+		Research:      e.Research,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrProviderFailed, err)

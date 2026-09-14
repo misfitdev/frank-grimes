@@ -181,10 +181,23 @@ echo "--- The documented commands produce a record the engine accepts ---"
 set +e
 # --auto-loop stands in for a caller who asked to iterate; grind.md leaves the
 # flag to the caller, which is asserted separately above.
+# The provider command runs inside the run, so the inventory and the run
+# identity are both readable from the environment by then. This is the whole
+# documented sequence, not a shortcut around it.
+cat >"$SANDBOX/provider.sh" <<'PROVIDER'
+#!/usr/bin/env bash
+set -euo pipefail
+grimes-contract report units --print0 |
+    grimes-contract report cover --examined-stdin0 >/dev/null
+grimes-contract report stop --category=SEC --condition=marginal-yield --probes=2 >/dev/null
+grimes-contract report stop --category=COR --condition=marginal-yield --probes=1 >/dev/null
+grimes-contract report seal --routed=SEC,COR --examined=4 --disproved=3 \
+    --summary="One deletion path survived."
+PROVIDER
+chmod +x "$SANDBOX/provider.sh"
+
 (cd "$SANDBOX" && grimes run --dir=. --auto-loop \
-    --provider-command="grimes-contract report seal --routed=SEC,COR \
-        --examined=4 --disproved=3 --summary=One deletion path survived." \
-    bad-script.sh >/dev/null 2>&1)
+    --provider-command="./provider.sh" bad-script.sh >/dev/null 2>&1)
 RUN_CODE=$?
 set -e
 

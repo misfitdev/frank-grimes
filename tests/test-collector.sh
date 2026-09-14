@@ -501,6 +501,147 @@ fi
 rm -rf "$WS"
 
 echo ""
+echo "--- A review answers for every unit of the target ---"
+
+# The first GREEN the engine can produce. Until coverage was measured against
+# the inventory, completeness could never reach sufficient and this tuple was
+# unreachable by construction, whatever a review found.
+WS="$(mktemp -d)"
+mkdir -p "$WS/src"
+printf 'echo one\n' >"$WS/src/a.sh"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --format=prototext \
+    --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh src 2>&1)"
+CODE=$?
+set -e
+assert_eq "$CODE" "0" "a fully accounted clean review passes"
+if echo "$OUT" | grep -qE 'legacy_color: +LEGACY_COLOR_GREEN'; then
+    pass "a fully accounted clean review reaches GREEN"
+else
+    fail "a fully accounted clean review did not reach GREEN: $(grep -aoE 'unmet_gates: +"[^"]*"' <<<"$OUT" | tr '\n' ' ')"
+fi
+rm -rf "$WS"
+
+# A unit nobody looked at is the difference between a verdict over the target
+# and a verdict over part of it.
+WS="$(mktemp -d)"
+mkdir -p "$WS/src"
+printf 'echo one\n' >"$WS/src/a.sh"
+printf 'echo two\n' >"$WS/src/unexamined.sh"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --format=prototext \
+    --provider-command="$FAKES/provider-partial-coverage.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh src 2>&1)"
+CODE=$?
+set -e
+assert_eq "$CODE" "3" "an unaccounted unit holds the decision at conditional"
+if echo "$OUT" | grep -qE 'unmet_gates: +"coverage"'; then
+    pass "the record names coverage as the unmet gate"
+else
+    fail "the record does not name coverage"
+fi
+if echo "$OUT" | grep -qE 'legacy_color: +LEGACY_COLOR_GREEN'; then
+    fail "a review that skipped a unit still reached GREEN"
+else
+    pass "a review that skipped a unit does not reach GREEN"
+fi
+rm -rf "$WS"
+
+# Coverage naming something outside the target describes a review of a
+# different artifact, which is an error rather than a finding.
+WS="$(mktemp -d)"
+mkdir -p "$WS/src"
+printf 'echo one\n' >"$WS/src/a.sh"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. \
+    --provider-command="$FAKES/provider-invented-coverage.sh" src 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" == "1" ]] && grep -qi 'not in the target' <<<"$OUT"; then
+    pass "coverage of a unit outside the target is refused"
+else
+    fail "invented coverage was accepted (exit $CODE)"
+fi
+rm -rf "$WS"
+
+# A material skip is an admission that part of the target went unreviewed. Two
+# units, so the skip can be held out of the examined set and the two still cover
+# the inventory between them: the run has to succeed for the assertion to mean
+# anything, and a bare "not sufficient" would also be satisfied by a crash.
+WS="$(mktemp -d)"
+mkdir -p "$WS/src"
+printf 'echo one\n' >"$WS/src/a.sh"
+printf 'echo two\n' >"$WS/src/b.sh"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --format=prototext \
+    --provider-command="$FAKES/provider-material-skip.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh src 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" == "0" ]]; then
+    pass "a material skip completes the run"
+else
+    fail "material-skip run exited $CODE, wanted 0: $OUT"
+fi
+if echo "$OUT" | grep -qE 'unmet_gates: +"coverage"'; then
+    fail "a skipped unit was counted as unaccounted rather than as a skip"
+else
+    pass "an explicitly skipped unit is accounted for"
+fi
+if echo "$OUT" | grep -qE 'review_completeness: +REVIEW_COMPLETENESS_LIMITED'; then
+    pass "a material skip holds completeness at limited"
+else
+    fail "a material skip did not hold completeness at limited"
+fi
+rm -rf "$WS"
+
+# A category that stopped for want of evidence did not finish its grind.
+WS="$(mktemp -d)"
+mkdir -p "$WS/src"
+printf 'echo one\n' >"$WS/src/a.sh"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --format=prototext \
+    --provider-command="$FAKES/provider-blocked-category.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh src 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" == "0" ]]; then
+    pass "a blocked category completes the run"
+else
+    fail "blocked-category run exited $CODE, wanted 0: $OUT"
+fi
+if echo "$OUT" | grep -qE 'legacy_color: +LEGACY_COLOR_GREEN'; then
+    fail "a blocked category still reached GREEN"
+else
+    pass "a category blocked for want of evidence does not reach GREEN"
+fi
+rm -rf "$WS"
+
+# Full accounting with no repository present, for the kinds that have none.
+for kind in document idea; do
+    WS="$(mktemp -d)"
+    printf '# One\n\ntext\n' >"$WS/spec.md"
+    set +e
+    OUT="$(cd "$WS" && "$GRIMES" run --dir=. --kind="$kind" --format=prototext \
+        --provider-command="$FAKES/provider-green.sh" \
+        --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh spec.md 2>&1)"
+    CODE=$?
+    set -e
+    if [[ "$CODE" == "0" ]]; then
+        pass "a $kind target with no repository passes"
+    else
+        fail "$kind run exited $CODE, wanted 0: $OUT"
+    fi
+    if echo "$OUT" | grep -qE 'unmet_gates: +"coverage"'; then
+        fail "a $kind target could not account for its units"
+    else
+        pass "a $kind target reaches full accounting with no repository"
+    fi
+    rm -rf "$WS"
+done
+
+echo ""
 echo "--- The inventory belongs to the target it was taken from ---"
 
 WS="$(mktemp -d)"

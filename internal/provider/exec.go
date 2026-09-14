@@ -166,6 +166,10 @@ func requestEnv(req engine.Request) []string {
 	return append(env,
 		"GRIMES_ROLE=primary",
 		"GRIMES_RUN_ID="+req.RunID,
+		// What this review must account for. Coverage is measured against it,
+		// so a provider that could not read it would be graded on a set it was
+		// never shown.
+		"GRIMES_TARGET_INVENTORY="+req.InventoryPath,
 		"GRIMES_MODE="+short(req.Mode.String(), "MODE_"),
 		"GRIMES_ITERATION="+strconv.FormatUint(uint64(req.Iteration), 10),
 		"GRIMES_CATEGORIES="+categories(req.Categories),

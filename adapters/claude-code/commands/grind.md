@@ -215,6 +215,26 @@ record a fix as text without applying it.
 A rejected call prints the contract rule it failed. The skill governs what to do
 about it.
 
+### Account for the target
+
+`$GRIMES_TARGET_INVENTORY` holds this run's units and `report units` prints their
+ids exactly. A unit id is arbitrary text, so read it from there rather than
+parsing any rendering of it. The skill says what to account for; these are the
+calls that record it.
+
+```bash
+grimes-contract report units --print0 |
+  grimes-contract report cover --examined-stdin0
+
+grimes-contract report cover --skip="<unit id>" --skip-reason="<why>" [--skip-material]
+grimes-contract report stop --category=SEC \
+  --condition=<marginal-yield|probes-exhausted|evidence-unavailable> --probes=<n>
+```
+
+`--examined-stdin0` is the only form safe for an id containing a comma or a
+newline. `--skip` takes one unit per call, so an id containing any delimiter
+survives.
+
 ### Seal and run
 
 Sealing happens inside the run, as the provider command: the engine exports the
@@ -228,11 +248,17 @@ which for a pasted argument names no path at all.
 
 ```bash
 grimes run --dir=. \
-  --provider-command="grimes-contract report seal \
-    --routed=<COR,SEC,...> --examined=<N> --disproved=<K> \
-    --summary='<one-sentence BLUF>'" \
+  --provider-command="grimes-contract report seal" \
+  --provider-arg="--routed=<COR,SEC,...>" \
+  --provider-arg="--examined=<N>" \
+  --provider-arg="--disproved=<K>" \
+  --provider-arg="--summary=<one-sentence BLUF>" \
   <target>
 ```
+
+`--provider-command` is split on whitespace, so anything containing a space —
+a summary, most obviously — goes in its own `--provider-arg`, which is not
+split. Quoting inside `--provider-command` does not survive the split.
 
 The target goes last: flags after it are not parsed. Pass `--auto-loop` only when
 the caller asked for it; it is off by default.

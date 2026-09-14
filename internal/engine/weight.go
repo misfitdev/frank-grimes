@@ -58,6 +58,10 @@ func decide(in DeriveInput, counts *pb.FindingCounts) pb.Decision {
 	if !in.AdjudicationAvailable {
 		return pb.Decision_DECISION_CONDITIONAL
 	}
+	// A verdict over part of a target is not a verdict over the target.
+	if in.CoverageIncomplete {
+		return pb.Decision_DECISION_CONDITIONAL
+	}
 	// Accepting a P0 is a decision to carry the risk, not evidence it is gone.
 	if carriesAcceptedP0(in.Candidates) {
 		return pb.Decision_DECISION_CONDITIONAL

@@ -1,0 +1,12 @@
+# An unexplained skip is indistinguishable from an oversight.
+schema_major: 2
+run_id: "run-001"
+target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
+mode: MODE_REPORT
+iteration: 1
+routed_categories: [CATEGORY_SEC]
+category_stops { category: CATEGORY_SEC condition: STOP_CONDITION_MARGINAL_YIELD probes_attempted: 3 }
+coverage { skipped { unit_id: "src/a.sh" } }
+candidates_examined: 1
+candidates_disproved: 1
+summary: "Skipped without saying why."

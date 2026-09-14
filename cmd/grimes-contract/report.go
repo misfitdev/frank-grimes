@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"strconv"
@@ -34,6 +35,12 @@ func cmdReport(args []string) error {
 		return cmdReportAdd(args[1:])
 	case "seal":
 		return cmdReportSeal(args[1:])
+	case "units":
+		return cmdReportUnits(args[1:])
+	case "cover":
+		return cmdReportCover(args[1:])
+	case "stop":
+		return cmdReportStop(args[1:])
 	case "show":
 		return cmdReportShow(args[1:])
 	default:
@@ -47,6 +54,11 @@ const reportUsage = `report subcommands:
   report seal  [--run-id=<id>] --target-root=<path> --target-scope=<scope> \
                [--kind=code|document|idea|external] [--iteration=<n>] --summary=<text> \
                [--routed=COR,SEC,...] [--examined=<n>] [--disproved=<n>]
+  report units [--inventory=<path>]
+  report cover [--examined=<id,...>] [--examined-stdin0] \
+               [--skip=<id> --skip-reason=<text> [--skip-material]]
+  report stop  --category=<CODE> --condition=<marginal-yield|probes-exhausted|evidence-unavailable> \
+               [--probes=<n>]
   report show
 
 Anchor:   --path / --document with --section / --argument with --step / --source
@@ -284,6 +296,162 @@ func cmdReportSeal(args []string) error {
 		return fmt.Errorf("clearing the sealed report: %w", err)
 	}
 	return nil
+}
+
+// cmdReportUnits lists what this review is accountable for, one unit id per
+// line, exactly as the engine recorded them.
+//
+// A unit id is arbitrary text — a path, a heading, a URI — and prototext
+// escapes it. Every provider grepping that rendering back into ids would get
+// the fragile cases wrong in the same way, so the decoding happens once, here.
+// Listing is not claiming: what to examine and what to skip stays the caller's
+// statement.
+func cmdReportUnits(args []string) error {
+	fs := flag.NewFlagSet("report units", flag.ContinueOnError)
+	path := fs.String("inventory", os.Getenv("GRIMES_TARGET_INVENTORY"), "inventory to read; defaults to $GRIMES_TARGET_INVENTORY")
+	zero := fs.Bool("print0", false, "separate ids with NUL, for ids containing newlines")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *path == "" {
+		return fmt.Errorf("report units needs --inventory or $GRIMES_TARGET_INVENTORY")
+	}
+	data, err := os.ReadFile(*path)
+	if err != nil {
+		return err
+	}
+	inventory := &pb.TargetInventory{}
+	if err := contracts.UnmarshalCanonical(data, inventory); err != nil {
+		return err
+	}
+	for _, u := range inventory.GetUnits() {
+		if *zero {
+			fmt.Printf("%s\x00", u.GetId())
+			continue
+		}
+		fmt.Println(u.GetId())
+	}
+	return nil
+}
+
+// cmdReportCover accounts for the units of the target this review looked at.
+//
+// The denominator is the inventory the engine resolved, which this cannot see:
+// the engine compares the two and refuses a unit that is not in the target. All
+// this call can enforce is that the report stays self-consistent.
+func cmdReportCover(args []string) error {
+	fs := flag.NewFlagSet("report cover", flag.ContinueOnError)
+	file := fs.String("file", DefaultReportPath, "report being built")
+	examined := fs.String("examined", "", "comma-separated unit ids examined")
+	stdin0 := fs.Bool("examined-stdin0", false, "read NUL-separated examined ids from stdin; the only form safe for an id containing a comma or a newline")
+	skip := fs.String("skip", "", "unit id deliberately not examined; one per call")
+	reason := fs.String("skip-reason", "", "why that unit was not examined")
+	material := fs.Bool("skip-material", false, "the skipped unit could hold a defect that changes the verdict")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *skip == "" && (*reason != "" || *material) {
+		return fmt.Errorf("--skip-reason and --skip-material need --skip")
+	}
+	// An unexplained skip is indistinguishable from an oversight.
+	if *skip != "" && *reason == "" {
+		return fmt.Errorf("--skip needs --skip-reason")
+	}
+
+	report, err := loadReport(*file)
+	if err != nil {
+		return err
+	}
+	if report.Coverage == nil {
+		report.Coverage = &pb.UnitCoverage{}
+	}
+	for _, id := range strings.Split(*examined, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			report.Coverage.Examined = append(report.Coverage.Examined, id)
+		}
+	}
+	if *stdin0 {
+		raw, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return err
+		}
+		for _, id := range strings.Split(string(raw), "\x00") {
+			if id != "" {
+				report.Coverage.Examined = append(report.Coverage.Examined, id)
+			}
+		}
+	}
+	if *skip != "" {
+		report.Coverage.Skipped = append(report.Coverage.Skipped, &pb.SkippedUnit{
+			UnitId:   *skip,
+			Reason:   *reason,
+			Material: *material,
+		})
+	}
+	if err := contracts.Validate(report.GetCoverage()); err != nil {
+		return err
+	}
+	if err := saveReport(*file, report); err != nil {
+		return err
+	}
+	fmt.Printf("covered %d examined, %d skipped\n",
+		len(report.GetCoverage().GetExamined()), len(report.GetCoverage().GetSkipped()))
+	return nil
+}
+
+// cmdReportStop records what ended a routed category's grind.
+func cmdReportStop(args []string) error {
+	fs := flag.NewFlagSet("report stop", flag.ContinueOnError)
+	file := fs.String("file", DefaultReportPath, "report being built")
+	category := fs.String("category", "", "routed category this stop is for")
+	condition := fs.String("condition", "", "marginal-yield, probes-exhausted, or evidence-unavailable")
+	probes := fs.Uint("probes", 0, "probes attempted in this category")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *probes > math.MaxUint32 {
+		return fmt.Errorf("--probes must not exceed %d", uint32(math.MaxUint32))
+	}
+	cats, err := parseCategories(*category)
+	if err != nil {
+		return err
+	}
+	if len(cats) != 1 {
+		return fmt.Errorf("--category takes exactly one category, got %q", *category)
+	}
+	cat := cats[0]
+	cond, err := parseStopCondition(*condition)
+	if err != nil {
+		return err
+	}
+
+	report, err := loadReport(*file)
+	if err != nil {
+		return err
+	}
+	stop := &pb.CategoryStop{Category: cat, Condition: cond, ProbesAttempted: uint32(*probes)}
+	if err := contracts.Validate(stop); err != nil {
+		return err
+	}
+	report.CategoryStops = append(report.CategoryStops, stop)
+	if err := saveReport(*file, report); err != nil {
+		return err
+	}
+	fmt.Printf("stopped %s as %s after %d probes\n", *category, *condition, *probes)
+	return nil
+}
+
+func parseStopCondition(s string) (pb.StopCondition, error) {
+	switch s {
+	case "marginal-yield":
+		return pb.StopCondition_STOP_CONDITION_MARGINAL_YIELD, nil
+	case "probes-exhausted":
+		return pb.StopCondition_STOP_CONDITION_PROBES_EXHAUSTED, nil
+	case "evidence-unavailable":
+		return pb.StopCondition_STOP_CONDITION_EVIDENCE_UNAVAILABLE, nil
+	default:
+		return 0, fmt.Errorf("unknown stop condition %q", s)
+	}
 }
 
 func cmdReportShow(args []string) error {
