@@ -200,19 +200,126 @@ rm -rf "$WS"
 echo ""
 echo "--- A finding is anchored in the target that was reviewed ---"
 
-# Nothing in the engine yet checks that a finding's anchor resolves inside the
-# target, so a fake that anchors elsewhere would model a provider the engine
-# cannot catch and every test built on it would pass on that shape.
+# The engine refuses a finding whose anchor is not a unit of the target, so a
+# fake that anchors elsewhere would model a provider whose findings can never be
+# admitted, and every test built on it would fail for that reason rather than
+# its own.
 WS="$(mktemp -d)"
 mkdir -p "$WS/src"
 printf 'echo one\n' >"$WS/src/a.sh"
 # A RED run exits non-zero by design, so the verdict is not what is under test.
 (cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-red.sh" src >/dev/null 2>&1) || true
-LEDGER="$(grimes-contract decode-report --type=Ledger "$WS/.grimes/ledger.pb" 2>/dev/null)"
-if grep -qE 'value: +"src"' <<<"$LEDGER"; then
-    pass "a finding is anchored at the reviewed scope"
+LEDGER="$(grimes-contract decode-report --type=Ledger "$WS/.grimes/ledger.pb" 2>/dev/null || true)"
+if grep -qE 'value: +"src/a.sh"' <<<"$LEDGER"; then
+    pass "a finding is anchored at a unit of the target"
 else
     fail "the finding was anchored outside the target: $(grep -aoE 'value: +"[^"]*"' <<<"$LEDGER" | head -2 | tr '\n' ' ')"
+fi
+rm -rf "$WS"
+
+echo ""
+echo "--- Evidence has to point at the target that was reviewed ---"
+
+# The contract sees that a citation carries a quote and an anchor. Only the
+# engine holds the artifact, so only the engine can tell whether either names
+# anything real.
+for case in \
+    "provider-foreign-anchor:not part of:a finding anchored outside the target is refused by name" \
+    "provider-invented-quote:quoted text is not in:a quotation that is nowhere in the target is refused by name" \
+    "provider-foreign-cwd:outside the target:a command that ran outside the target is refused by name"; do
+    FAKE="${case%%:*}"
+    REST="${case#*:}"
+    NEEDLE="${REST%%:*}"
+    WHAT="${REST#*:}"
+    WS="$(mktemp -d)"
+    mkdir -p "$WS/src"
+    printf 'echo one\n' >"$WS/src/a.sh"
+    # A relative name with no ".." that leaves the tree anyway. The contract
+    # cannot see this; resolving it needs the filesystem. The link points at
+    # something that does not exist either, so following it is the only way to
+    # learn where it leads.
+    ln -s "$(mktemp -d)/never-created" "$WS/escape"
+    set +e
+    OUT="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/$FAKE.sh" src 2>&1)"
+    CODE=$?
+    set -e
+    if [[ "$CODE" != "0" ]] && grep -qF "$NEEDLE" <<<"$OUT"; then
+        pass "$WHAT"
+    else
+        fail "$WHAT (exit $CODE): $OUT"
+    fi
+    rm -rf "$WS"
+done
+
+# The provider runs before evidence is checked and can write to the artifact it
+# was asked to review. Re-reading alone would admit the line it planted.
+WS="$(mktemp -d)"
+mkdir -p "$WS/src"
+printf 'echo one\n' >"$WS/src/a.sh"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-edits-target.sh" src 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" != "0" ]] && grep -qF "changed during the review" <<<"$OUT"; then
+    pass "a quote of text the provider planted is refused by name"
+else
+    fail "a provider quoted its own edit (exit $CODE): $OUT"
+fi
+rm -rf "$WS"
+
+# The same, for a target fingerprinted over the whole of its content. One
+# heading, so the planted line lands in the section the finding anchors to and
+# only the fingerprint can refuse it.
+WS="$(mktemp -d)"
+printf '# Overview\nThe service accepts requests.\n' >"$WS/spec.md"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --kind=document \
+    --provider-command="$FAKES/provider-edits-document.sh" spec.md 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" != "0" ]] && grep -qF "changed during the review" <<<"$OUT"; then
+    pass "a document edited mid-review is refused by name"
+else
+    fail "a provider quoted its own edit to a document (exit $CODE): $OUT"
+fi
+rm -rf "$WS"
+
+# A line that really is in the document, but not in the section the finding
+# anchors to. Checking the whole file would admit it, and the citation claims
+# the section rather than the document.
+WS="$(mktemp -d)"
+cat >"$WS/spec.md" <<'DOC'
+# Overview
+The service accepts requests.
+
+## Storage
+Records are written.
+DOC
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --kind=document \
+    --provider-command="$FAKES/provider-cross-section-quote.sh" spec.md 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" != "0" ]] && grep -qF "quoted text is not in" <<<"$OUT"; then
+    pass "a quote from another section of the same document is refused by name"
+else
+    fail "a cross-section quote was admitted (exit $CODE): $OUT"
+fi
+rm -rf "$WS"
+
+# A quote the reviewer really read, differing only in how the line ended. The
+# refusal has to be about the text being absent, not about line endings.
+WS="$(mktemp -d)"
+mkdir -p "$WS/src"
+printf 'echo one\r\n' >"$WS/src/a.sh"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-red.sh" src 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" == "4" ]]; then
+    pass "a quote is admitted across a line-ending difference"
+else
+    fail "a CRLF target refused its own content (exit $CODE): $OUT"
 fi
 rm -rf "$WS"
 

@@ -90,7 +90,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		return nil, err
 	}
 
-	surfaced, oscillation, err := e.apply(ctx, ledger, report, iteration)
+	surfaced, oscillation, err := e.apply(ctx, ledger, report, collected, iteration)
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +270,7 @@ func reportBinding(report *pb.ProviderReport, runID string, target *pb.Target, m
 // counts both, so an iteration that only learns an existing finding is critical
 // is not mistaken for one that learned nothing. Each is named once however many
 // candidates reached it, since the yield counts findings rather than mentions.
-func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, report *pb.ProviderReport, iteration uint32) (surfaced []string, oscillation bool, err error) {
+func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, report *pb.ProviderReport, against *Collected, iteration uint32) (surfaced []string, oscillation bool, err error) {
 	if ledger.Findings == nil {
 		ledger.Findings = map[string]*pb.Finding{}
 	}
@@ -279,7 +279,7 @@ func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, report *pb.Provid
 		if err := ctx.Err(); err != nil {
 			return nil, false, err
 		}
-		finding, err := e.admit(ctx, candidate, iteration)
+		finding, err := e.admit(ctx, candidate, against, iteration)
 		if err != nil {
 			return nil, false, err
 		}
@@ -329,8 +329,8 @@ func escalate(known, reported *pb.Finding, iteration uint32) {
 
 // admit turns a candidate into a ledger finding, assigning everything the
 // provider is not permitted to state.
-func (e *Engine) admit(ctx context.Context, candidate *pb.CandidateFinding, iteration uint32) (*pb.Finding, error) {
-	vetted, err := e.Broker.Admit(ctx, candidate)
+func (e *Engine) admit(ctx context.Context, candidate *pb.CandidateFinding, against *Collected, iteration uint32) (*pb.Finding, error) {
+	vetted, err := e.Broker.Admit(ctx, candidate, against)
 	if err != nil {
 		return nil, err
 	}

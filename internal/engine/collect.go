@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -155,6 +156,7 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*Collected, error) {
 
 	sum := sha256.New()
 	units := make([]*pb.TargetUnit, 0, len(paths))
+	digests := make(map[string][]byte, len(paths))
 	for _, p := range paths {
 		rel, err := filepath.Rel(base, p)
 		if err != nil {
@@ -170,18 +172,21 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*Collected, error) {
 		// or editing it are each a different target.
 		fmt.Fprintf(sum, "%s\x00%s\n", rel, hex.EncodeToString(body[:]))
 		units = append(units, unit(rel, rel))
+		digests[rel] = append([]byte(nil), body[:]...)
 	}
 
 	// The scope itself: a tree when it names a directory, one file when it names
 	// a file. Both are supported targets, and the fingerprint is taken over
 	// path-and-digest pairs either way.
-	return collected(&pb.Target{
+	out := collected(&pb.Target{
 		Root:              spec.Root,
 		Scope:             spec.Scope,
 		FingerprintSha256: sum.Sum(nil),
 		Display:           truncate(spec.Scope),
 		Kind:              pb.TargetKind_TARGET_KIND_CODE,
-	}, units, abs), nil
+	}, units, abs)
+	out.UnitDigests = digests
+	return out, nil
 }
 
 // contained resolves a code scope against its root and refuses one that leaves
@@ -205,11 +210,18 @@ func contained(root, scope string) (abs, base string, err error) {
 		return "", "", err
 	}
 	// A missing target is reported by the caller's stat, so an unresolvable
-	// path is passed through rather than reported as an escape.
-	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
-		abs = resolved
+	// path is passed through rather than reported as an escape. What it is
+	// checked against is the deepest part of it that does exist: "link/missing"
+	// resolves to nothing, and reading only its spelling would miss that link
+	// leaves the tree.
+	resolved, err := resolveExisting(abs)
+	if err != nil {
+		return "", "", err
 	}
-	rel, err := filepath.Rel(base, abs)
+	if full, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = full
+	}
+	rel, err := filepath.Rel(base, resolved)
 	if err != nil {
 		return "", "", err
 	}
@@ -217,6 +229,45 @@ func contained(root, scope string) (abs, base string, err error) {
 		return "", "", fmt.Errorf("code target %q resolves outside the repository root", scope)
 	}
 	return abs, base, nil
+}
+
+// resolveExisting returns the path with its longest existing prefix resolved,
+// so a name that does not exist yet is still judged by where it would sit.
+//
+// EvalSymlinks fails outright on a missing component, and falling back to the
+// spelling of the path would read "link/missing" as inside the tree however far
+// outside link points. A link whose own target does not exist is followed by
+// hand for the same reason: it still says where the path would lead.
+func resolveExisting(path string) (string, error) {
+	// Bounded, because a link that points at itself would otherwise be followed
+	// forever. The limit is the usual kernel one.
+	const maxLinks = 40
+	var missing []string
+	rejoin := func(base string) string {
+		return filepath.Join(append([]string{base}, missing...)...)
+	}
+	for range maxLinks {
+		resolved, err := filepath.EvalSymlinks(path)
+		if err == nil {
+			return rejoin(resolved), nil
+		}
+		if link, err := os.Readlink(path); err == nil {
+			if !filepath.IsAbs(link) {
+				link = filepath.Join(filepath.Dir(path), link)
+			}
+			path = link
+			continue
+		}
+		parent := filepath.Dir(path)
+		// The root resolves or nothing does; without this a malformed path
+		// would climb forever.
+		if parent == path {
+			return rejoin(path), nil
+		}
+		missing = append([]string{filepath.Base(path)}, missing...)
+		path = parent
+	}
+	return "", fmt.Errorf("too many symbolic links resolving %q", path)
 }
 
 // readRegular reads a file-backed target, refusing anything that is not a
@@ -333,12 +384,44 @@ func (c TargetCollector) collectExternal(spec TargetSpec) (*Collected, error) {
 // is not a section, and counting it would inflate the denominator coverage is
 // measured against.
 func sections(text, name string) ([]*pb.TargetUnit, error) {
-	var units []*pb.TargetUnit
-	taken := map[string]int{}
-	var open fence
+	spans, err := sectionSpans(text, name)
+	if err != nil {
+		return nil, err
+	}
+	if len(spans) == 0 {
+		return []*pb.TargetUnit{unit(name, filepath.Base(name))}, nil
+	}
+	units := make([]*pb.TargetUnit, 0, len(spans))
+	for _, s := range spans {
+		units = append(units, s.unit)
+	}
+	return units, nil
+}
+
+// docSection is one heading and the lines it covers, which run to the next
+// heading. Evidence quoted "in" a section has to be checkable against the lines
+// that section actually holds.
+type docSection struct {
+	unit  *pb.TargetUnit
+	start int // index of the heading line
+	end   int // exclusive
+}
+
+// sectionSpans splits a document at its ATX headings.
+//
+// A fenced block is skipped: a shell comment or a preprocessor line inside one
+// is not a section, and counting it would inflate the denominator coverage is
+// measured against.
+func sectionSpans(text, name string) ([]docSection, error) {
+	var (
+		spans []docSection
+		taken = map[string]int{}
+		open  fence
+		n     int
+	)
 	scanner := bufio.NewScanner(strings.NewReader(text))
 	scanner.Buffer(make([]byte, 0, 64*1024), maxDocumentLine)
-	for scanner.Scan() {
+	for ; scanner.Scan(); n++ {
 		line := strings.TrimRight(scanner.Text(), "\r")
 		// A block ends only on the delimiter that opened it, at no less than its
 		// length. Ending it early would expose the commented-out lines of a code
@@ -364,17 +447,64 @@ func sections(text, name string) ([]*pb.TargetUnit, error) {
 		if title == "" {
 			continue
 		}
-		units = append(units, unit(uniqueID(slug(title), title, taken), title))
+		if len(spans) > 0 {
+			spans[len(spans)-1].end = n
+		}
+		spans = append(spans, docSection{
+			unit:  unit(uniqueID(slug(title), title, taken), title),
+			start: n,
+		})
 	}
 	// A line past the buffer stops the scan, and the headings after it would
 	// silently vanish from an inventory that still claims the whole document.
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("document %q: %w", name, err)
 	}
-	if len(units) == 0 {
-		return []*pb.TargetUnit{unit(name, filepath.Base(name))}, nil
+	if len(spans) > 0 {
+		spans[len(spans)-1].end = n
 	}
-	return units, nil
+	return spans, nil
+}
+
+// sectionBody returns the lines the named section covers. A document with no
+// heading is one unit, so the whole of it is the body.
+func sectionBody(text, id string) string {
+	spans, err := sectionSpans(text, "")
+	if err != nil || len(spans) == 0 {
+		return text
+	}
+	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+	for _, s := range spans {
+		if s.unit.GetId() != id {
+			continue
+		}
+		if s.end > len(lines) {
+			s.end = len(lines)
+		}
+		return strings.Join(lines[s.start:s.end], "\n")
+	}
+	return ""
+}
+
+// stepBody returns the paragraph the numbered step covers, matching how
+// paragraphs numbered them.
+func stepBody(text, id string) string {
+	n, err := strconv.Atoi(strings.TrimPrefix(id, "step-"))
+	if err != nil || n < 1 {
+		return ""
+	}
+	seen := 0
+	for _, block := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n\n") {
+		block = strings.TrimSpace(block)
+		if block == "" {
+			continue
+		}
+		seen++
+		if seen == n {
+			return block
+		}
+	}
+	return ""
 }
 
 // opener returns the fence delimiter a line opens or closes with, or "" when

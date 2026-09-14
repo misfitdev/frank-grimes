@@ -66,7 +66,10 @@ workspace() {
     local dir
     dir="$(mktemp -d)"
     mkdir -p "$dir/src" "$dir/other-target"
-    printf 'rm -rf ./build/*\n' >"$dir/src/app.sh"
+    # Two lines, because an escalation has to be able to cite evidence the
+    # milder report did not, and every citation has to be real.
+    # shellcheck disable=SC2016  # the text is the target's content, not an expansion
+    printf 'rm -rf ./build/*\neval "$UNTRUSTED"\n' >"$dir/src/app.sh"
     printf 'echo other\n' >"$dir/other-target/app.sh"
     echo "$dir"
 }
