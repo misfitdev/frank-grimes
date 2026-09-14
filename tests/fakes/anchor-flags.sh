@@ -15,7 +15,7 @@ case "${GRIMES_TARGET_KIND:-code}" in
             --snapshot-sha256="$(printf 'a%.0s' $(seq 1 64))"
             --retrieved-at="2026-01-02T15:04:05Z")
         ;;
-    *) ANCHOR=(--path="${1:-bad-script.sh}") ;;
+    *) ANCHOR=(--path="${1:-${GRIMES_TARGET_SCOPE:-src}}") ;;
 esac
 
 printf '%s\0' "${ANCHOR[@]}"

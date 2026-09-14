@@ -198,6 +198,25 @@ fi
 rm -rf "$WS"
 
 echo ""
+echo "--- A finding is anchored in the target that was reviewed ---"
+
+# Nothing in the engine yet checks that a finding's anchor resolves inside the
+# target, so a fake that anchors elsewhere would model a provider the engine
+# cannot catch and every test built on it would pass on that shape.
+WS="$(mktemp -d)"
+mkdir -p "$WS/src"
+printf 'echo one\n' >"$WS/src/a.sh"
+# A RED run exits non-zero by design, so the verdict is not what is under test.
+(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-red.sh" src >/dev/null 2>&1) || true
+LEDGER="$(grimes-contract decode-report --type=Ledger "$WS/.grimes/ledger.pb" 2>/dev/null)"
+if grep -qE 'value: +"src"' <<<"$LEDGER"; then
+    pass "a finding is anchored at the reviewed scope"
+else
+    fail "the finding was anchored outside the target: $(grep -aoE 'value: +"[^"]*"' <<<"$LEDGER" | head -2 | tr '\n' ' ')"
+fi
+rm -rf "$WS"
+
+echo ""
 echo "--- An external source needs a frozen snapshot ---"
 
 WS="$(mktemp -d)"
