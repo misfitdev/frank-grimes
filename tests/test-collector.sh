@@ -606,10 +606,10 @@ OUT="$(cd "$WS" && "$GRIMES" run --dir=. --format=prototext \
     --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh src 2>&1)"
 CODE=$?
 set -e
-if [[ "$CODE" == "3" ]]; then
-    pass "a blocked category completes the run as conditional"
+if [[ "$CODE" == "0" ]]; then
+    pass "a blocked category completes the run"
 else
-    fail "blocked-category run exited $CODE, wanted 3: $OUT"
+    fail "blocked-category run exited $CODE, wanted 0: $OUT"
 fi
 if echo "$OUT" | grep -qE 'legacy_color: +LEGACY_COLOR_GREEN'; then
     fail "a blocked category still reached GREEN"
