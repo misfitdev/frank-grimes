@@ -24,7 +24,7 @@ done
 ANCHOR=()
 while IFS= read -r -d '' flag; do
     ANCHOR+=("$flag")
-done < <("$FAKES/anchor-flags.sh" "${GRIMES_TARGET_SCOPE:-src}")
+done < <("$FAKES/anchor-flags.sh")
 
 grimes-contract report acquit --category="${ROUTED[0]}" "${ANCHOR[@]}" \
     --claim="the target rejects an unsigned request" \

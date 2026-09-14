@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -333,12 +334,44 @@ func (c TargetCollector) collectExternal(spec TargetSpec) (*Collected, error) {
 // is not a section, and counting it would inflate the denominator coverage is
 // measured against.
 func sections(text, name string) ([]*pb.TargetUnit, error) {
-	var units []*pb.TargetUnit
-	taken := map[string]int{}
-	var open fence
+	spans, err := sectionSpans(text, name)
+	if err != nil {
+		return nil, err
+	}
+	if len(spans) == 0 {
+		return []*pb.TargetUnit{unit(name, filepath.Base(name))}, nil
+	}
+	units := make([]*pb.TargetUnit, 0, len(spans))
+	for _, s := range spans {
+		units = append(units, s.unit)
+	}
+	return units, nil
+}
+
+// docSection is one heading and the lines it covers, which run to the next
+// heading. Evidence quoted "in" a section has to be checkable against the lines
+// that section actually holds.
+type docSection struct {
+	unit  *pb.TargetUnit
+	start int // index of the heading line
+	end   int // exclusive
+}
+
+// sectionSpans splits a document at its ATX headings.
+//
+// A fenced block is skipped: a shell comment or a preprocessor line inside one
+// is not a section, and counting it would inflate the denominator coverage is
+// measured against.
+func sectionSpans(text, name string) ([]docSection, error) {
+	var (
+		spans []docSection
+		taken = map[string]int{}
+		open  fence
+		n     int
+	)
 	scanner := bufio.NewScanner(strings.NewReader(text))
 	scanner.Buffer(make([]byte, 0, 64*1024), maxDocumentLine)
-	for scanner.Scan() {
+	for ; scanner.Scan(); n++ {
 		line := strings.TrimRight(scanner.Text(), "\r")
 		// A block ends only on the delimiter that opened it, at no less than its
 		// length. Ending it early would expose the commented-out lines of a code
@@ -364,17 +397,64 @@ func sections(text, name string) ([]*pb.TargetUnit, error) {
 		if title == "" {
 			continue
 		}
-		units = append(units, unit(uniqueID(slug(title), title, taken), title))
+		if len(spans) > 0 {
+			spans[len(spans)-1].end = n
+		}
+		spans = append(spans, docSection{
+			unit:  unit(uniqueID(slug(title), title, taken), title),
+			start: n,
+		})
 	}
 	// A line past the buffer stops the scan, and the headings after it would
 	// silently vanish from an inventory that still claims the whole document.
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("document %q: %w", name, err)
 	}
-	if len(units) == 0 {
-		return []*pb.TargetUnit{unit(name, filepath.Base(name))}, nil
+	if len(spans) > 0 {
+		spans[len(spans)-1].end = n
 	}
-	return units, nil
+	return spans, nil
+}
+
+// sectionBody returns the lines the named section covers. A document with no
+// heading is one unit, so the whole of it is the body.
+func sectionBody(text, id string) string {
+	spans, err := sectionSpans(text, "")
+	if err != nil || len(spans) == 0 {
+		return text
+	}
+	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+	for _, s := range spans {
+		if s.unit.GetId() != id {
+			continue
+		}
+		if s.end > len(lines) {
+			s.end = len(lines)
+		}
+		return strings.Join(lines[s.start:s.end], "\n")
+	}
+	return ""
+}
+
+// stepBody returns the paragraph the numbered step covers, matching how
+// paragraphs numbered them.
+func stepBody(text, id string) string {
+	n, err := strconv.Atoi(strings.TrimPrefix(id, "step-"))
+	if err != nil || n < 1 {
+		return ""
+	}
+	seen := 0
+	for _, block := range strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n\n") {
+		block = strings.TrimSpace(block)
+		if block == "" {
+			continue
+		}
+		seen++
+		if seen == n {
+			return block
+		}
+	}
+	return ""
 }
 
 // opener returns the fence delimiter a line opens or closes with, or "" when

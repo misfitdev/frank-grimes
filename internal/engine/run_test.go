@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -105,6 +107,30 @@ func testTime() time.Time { return time.Unix(1780000000, 0).UTC() }
 
 const seedPath, seedClaim = "bad.sh", "caller-controlled deletion"
 
+// seedQuote is in the target the stub collector writes, because the broker now
+// checks a citation against the artifact rather than taking its word for it.
+const seedQuote = "rm -rf \"$1\"/*"
+
+// seedUnits are the files seedRoot holds, and the inventory the stub collector
+// reports. The engine reads the target to check evidence against it, so a
+// fabricated path would exercise the failure to read rather than the behaviour
+// under test.
+var seedUnits = []string{seedPath, "slow.sh"}
+
+var seedRoot = sync.OnceValue(func() string {
+	dir, err := os.MkdirTemp("", "grimes-seed")
+	if err != nil {
+		panic(err)
+	}
+	body := "#!/bin/sh\nclean() {\n  " + seedQuote + "\n}\n"
+	for _, name := range seedUnits {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+			panic(err)
+		}
+	}
+	return dir
+})
+
 // p0ID is derived the same way the engine derives it, so the fixture cannot
 // drift away from the fingerprint rule it is meant to exercise.
 func p0ID() string {
@@ -137,7 +163,7 @@ func seededLedger(t *testing.T, status pb.FindingStatus) *pb.Ledger {
 					Tier:  pb.EvidenceTier_EVIDENCE_TIER_E2,
 					Claim: claim,
 					Detail: &pb.Evidence_Citation{Citation: &pb.Citation{
-						Anchor: contracts.RepoAnchor(path), Quote: "rm -rf \"$1\"/*",
+						Anchor: contracts.RepoAnchor(path), Quote: seedQuote,
 					}},
 				},
 				EvidenceSha256: make([]byte, 32),
@@ -176,11 +202,24 @@ func (stubCollector) Collect(ctx context.Context, spec TargetSpec) (*Collected, 
 		Inventory: &pb.TargetInventory{
 			SchemaMajor:             contracts.SchemaMajor,
 			TargetFingerprintSha256: target.GetFingerprintSha256(),
-			Units:                   []*pb.TargetUnit{{Id: spec.Scope, Label: spec.Scope}},
+			Units:                   stubUnits(spec),
 		},
 		Categories:  categories,
 		ContentPath: filepath.Join(spec.Root, spec.Scope),
 	}, nil
+}
+
+// stubUnits reports what seedRoot holds when the spec names it, and the scope
+// itself otherwise, so a target pointed somewhere else still has an inventory.
+func stubUnits(spec TargetSpec) []*pb.TargetUnit {
+	if spec.Root != seedRoot() {
+		return []*pb.TargetUnit{{Id: spec.Scope, Label: spec.Scope}}
+	}
+	out := make([]*pb.TargetUnit, 0, len(seedUnits))
+	for _, name := range seedUnits {
+		out = append(out, &pb.TargetUnit{Id: name, Label: name})
+	}
+	return out
 }
 
 func testTarget(t *testing.T) *pb.Target {
@@ -192,7 +231,7 @@ func testTarget(t *testing.T) *pb.Target {
 	return out.Target
 }
 
-func testSpec() TargetSpec { return TargetSpec{Root: "/repo", Scope: "bad.sh"} }
+func testSpec() TargetSpec { return TargetSpec{Root: seedRoot(), Scope: "."} }
 
 // report renders provider output carrying the given candidates, answering the
 // first iteration.
@@ -218,7 +257,7 @@ func reportAt(t *testing.T, iteration uint32, candidates ...*pb.CandidateFinding
 			{Category: pb.Category_CATEGORY_COR, Condition: pb.StopCondition_STOP_CONDITION_MARGINAL_YIELD, ProbesAttempted: 2},
 		},
 		// stubCollector resolves one unit named after the scope.
-		Coverage:            &pb.UnitCoverage{Examined: []string{"bad.sh"}},
+		Coverage:            &pb.UnitCoverage{Examined: seedUnits},
 		CandidatesExamined:  uint32(len(candidates)) + 3,
 		CandidatesDisproved: 3,
 		Summary:             "provider report",
@@ -244,7 +283,7 @@ func candidate(path, claim string, sev pb.Severity) *pb.CandidateFinding {
 			Tier:  pb.EvidenceTier_EVIDENCE_TIER_E2,
 			Claim: claim,
 			Detail: &pb.Evidence_Citation{Citation: &pb.Citation{
-				Anchor: contracts.RepoAnchor(path), Quote: "rm -rf \"$1\"/*",
+				Anchor: contracts.RepoAnchor(path), Quote: seedQuote,
 			}},
 		},
 	}
@@ -843,7 +882,7 @@ func TestRunRejectsAStaleReport(t *testing.T) {
 // ledger, whatever the report says.
 type refusingBroker struct{ called bool }
 
-func (b *refusingBroker) Admit(context.Context, *pb.CandidateFinding) (*pb.CandidateFinding, error) {
+func (b *refusingBroker) Admit(context.Context, *pb.CandidateFinding, *Collected) (*pb.CandidateFinding, error) {
 	b.called = true
 	return nil, fmt.Errorf("%w: refused by the broker", ErrProviderOutput)
 }

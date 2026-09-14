@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -145,7 +146,12 @@ func (b *boundedBuffer) String() string {
 
 func requestEnv(req engine.Request) []string {
 	env := []string{
-		"GRIMES_TARGET_ROOT=" + req.Target.GetRoot(),
+		// Absolute, like the content path and for the same reason: a provider
+		// runs in its own working directory, so a relative root names whatever
+		// happens to sit beside it. A unit id is relative to this root, so a
+		// provider that cannot resolve the root cannot read the unit it is
+		// about to cite.
+		"GRIMES_TARGET_ROOT=" + absolute(req.Target.GetRoot()),
 		"GRIMES_TARGET_SCOPE=" + req.Target.GetScope(),
 		"GRIMES_TARGET_FINGERPRINT=" + hex(req.Target.GetFingerprintSha256()),
 		// The kind selects what each evidence tier requires of a finding, so a
@@ -183,6 +189,20 @@ func categories(cats []pb.Category) string {
 		names = append(names, contracts.CategoryName(c))
 	}
 	return strings.Join(names, ",")
+}
+
+// absolute resolves a root the provider can use from its own directory. An
+// empty root stays empty: a document or an idea has none, and inventing one
+// would name a repository this review is not about.
+func absolute(root string) string {
+	if root == "" {
+		return ""
+	}
+	abs, err := filepath.Abs(root)
+	if err != nil {
+		return root
+	}
+	return abs
 }
 
 func short(s, prefix string) string {

@@ -89,8 +89,12 @@ type Provider interface {
 
 // EvidenceBroker decides whether a reported candidate's evidence entitles it to
 // the tier and severity it claims.
+//
+// The broker is given the target so it can check the evidence against it. A
+// claim about an artifact nobody resolved is not evidence about this review,
+// and the shape of the record cannot reveal that on its own.
 type EvidenceBroker interface {
-	Admit(ctx context.Context, c *pb.CandidateFinding) (*pb.CandidateFinding, error)
+	Admit(ctx context.Context, c *pb.CandidateFinding, against *Collected) (*pb.CandidateFinding, error)
 }
 
 // Adjudicator obtains a second verdict reached without sight of the first.

@@ -18,18 +18,23 @@ var AllCategories = []pb.Category{
 	pb.Category_CATEGORY_HUM,
 }
 
-// StrictBroker admits a finding only when the contract accepts it whole.
+// StrictBroker admits a finding only when the contract accepts it whole and its
+// evidence resolves against the target under review.
 //
-// It cannot yet establish that a probe was attempted, so confidence stays below
-// high until evidence falsification is machine-verifiable.
+// The contract sees the shape of a record; only the engine holds the artifact.
+// A path that is not in the target, or a quote that is nowhere in the section
+// it cites, has the right shape and establishes nothing.
 type StrictBroker struct{}
 
-func (StrictBroker) Admit(ctx context.Context, c *pb.CandidateFinding) (*pb.CandidateFinding, error) {
+func (StrictBroker) Admit(ctx context.Context, c *pb.CandidateFinding, against *Collected) (*pb.CandidateFinding, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	if err := contracts.Validate(c); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrProviderOutput, err)
+	}
+	if err := resolve(c, against); err != nil {
+		return nil, err
 	}
 	return c, nil
 }

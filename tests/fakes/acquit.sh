@@ -11,7 +11,7 @@ CATEGORY="${1:-SEC}"
 ANCHOR=()
 while IFS= read -r -d '' flag; do
     ANCHOR+=("$flag")
-done < <("$(cd "$(dirname "$0")" && pwd)/anchor-flags.sh" "${GRIMES_TARGET_SCOPE:-src}")
+done < <("$(cd "$(dirname "$0")" && pwd)/anchor-flags.sh")
 
 grimes-contract report acquit --category="$CATEGORY" "${ANCHOR[@]}" \
     --claim="the target rejects an unsigned request" \

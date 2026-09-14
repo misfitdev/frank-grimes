@@ -44,7 +44,5 @@ fi
 
 cd "$(mktemp -d)"
 echo "I read the target I was given."
-# shellcheck disable=SC2016  # the quoted text is evidence, not an expansion
-"$FAKES/add-finding.sh" P0 systemic likely \
-    "caller-controlled deletion path" 'rm -rf "$1"/*'
+"$FAKES/add-finding.sh" P0 systemic likely "caller-controlled deletion path"
 "$FAKES/seal.sh" 6 5 "The content I was handed is the target the engine named."
