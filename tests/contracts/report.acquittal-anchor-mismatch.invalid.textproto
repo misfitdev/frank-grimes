@@ -1,13 +1,13 @@
-# An acquittal whose probe was shown capable of failing: the defect was made
-# present, the same probe was run again, and it failed.
+# A document review cannot be acquitted at a repository path: the record names
+# an artifact this run did not review, and nothing can resolve it later.
 schema_major: 2
 run_id: "run-001"
-target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
+target { scope: "spec.md" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_DOCUMENT }
 mode: MODE_REPORT
 iteration: 1
 routed_categories: [CATEGORY_SEC]
 category_stops { category: CATEGORY_SEC condition: STOP_CONDITION_MARGINAL_YIELD probes_attempted: 3 }
-coverage { examined: "src/a.sh" }
+coverage { examined: "one" }
 acquittals {
   category: CATEGORY_SEC
   claim_anchor { repo_line { path { value: "src/a.sh" } } }
@@ -27,4 +27,4 @@ acquittals {
 }
 candidates_examined: 1
 candidates_disproved: 1
-summary: "One claim survived a probe shown able to break it."
+summary: "Anchored in the wrong kind of artifact."

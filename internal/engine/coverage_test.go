@@ -103,8 +103,6 @@ func TestMeasureDistinguishesWhyACategoryStopped(t *testing.T) {
 	}
 }
 
-// Finding a defect is not evidence that an invariant was tested, which is what
-// the count of candidates used to stand in for.
 // Probed means this review ran something known to be capable of failing. The
 // whole space, because a count of probes the provider typed used to stand in
 // for it and every combination here would have read the same.
@@ -117,8 +115,9 @@ func TestMeasureProbedRequiresAProbeShownCapableOfFailing(t *testing.T) {
 		want       bool
 	}{
 		{"nothing but a probe count", nil, nil, false},
-		{"E1 finding", []*pb.CandidateFinding{e1Candidate()}, nil, true},
-		{"E2 finding", []*pb.CandidateFinding{citedCandidate()}, nil, false},
+		{"E1 finding", []*pb.CandidateFinding{e1Candidate(pb.Category_CATEGORY_SEC)}, nil, true},
+		{"E1 finding in an unrouted category", []*pb.CandidateFinding{e1Candidate(pb.Category_CATEGORY_COR)}, nil, false},
+		{"E2 finding", []*pb.CandidateFinding{citedCandidate(pb.Category_CATEGORY_SEC)}, nil, false},
 		{"controlled acquittal", nil, []*pb.Acquittal{acquittal(pb.Category_CATEGORY_SEC, true)}, true},
 		{"uncontrolled acquittal", nil, []*pb.Acquittal{acquittal(pb.Category_CATEGORY_SEC, false)}, false},
 		// The contract refuses this shape outright, so it cannot arrive through
@@ -148,18 +147,18 @@ func TestMeasureProbedRequiresAProbeShownCapableOfFailing(t *testing.T) {
 	}
 }
 
-func e1Candidate() *pb.CandidateFinding {
-	return &pb.CandidateFinding{Evidence: &pb.Evidence{Tier: pb.EvidenceTier_EVIDENCE_TIER_E1}}
+func e1Candidate(c pb.Category) *pb.CandidateFinding {
+	return &pb.CandidateFinding{Category: c, Evidence: &pb.Evidence{Tier: pb.EvidenceTier_EVIDENCE_TIER_E1}}
 }
 
-func citedCandidate() *pb.CandidateFinding {
-	return &pb.CandidateFinding{Evidence: &pb.Evidence{Tier: pb.EvidenceTier_EVIDENCE_TIER_E2}}
+func citedCandidate(c pb.Category) *pb.CandidateFinding {
+	return &pb.CandidateFinding{Category: c, Evidence: &pb.Evidence{Tier: pb.EvidenceTier_EVIDENCE_TIER_E2}}
 }
 
 func acquittal(c pb.Category, controlled bool) *pb.Acquittal {
 	a := &pb.Acquittal{Category: c, Claim: "it holds", Scope: "the request path"}
 	if controlled {
-		a.Control = &pb.NegativeControl{Mutation: "break it", ProbeFailed: true}
+		a.Control = &pb.NegativeControl{Mutation: "break it", Result: ran(1)}
 	}
 	return a
 }
@@ -168,8 +167,14 @@ func acquittal(c pb.Category, controlled bool) *pb.Acquittal {
 // is blind to the defect it claims to rule out.
 func survivedControl(c pb.Category) *pb.Acquittal {
 	a := acquittal(c, true)
-	a.Control.ProbeFailed = false
+	a.Control.Result = ran(0)
 	return a
+}
+
+func ran(exit int32) *pb.Reproduction {
+	return &pb.Reproduction{Exhibit: &pb.Reproduction_ExecutedCommand{
+		ExecutedCommand: &pb.ExecutedCommand{Action: "run the suite", ExitCode: exit},
+	}}
 }
 
 // The routed set is the engine's, not the report's. A provider that names a

@@ -1,5 +1,5 @@
 # A probe that still passed against the mutated target is blind to the defect it
-# claims to rule out. That is a broken probe, not an acquittal.
+# claims to rule out. Its exit status says so; nothing else is consulted.
 schema_major: 2
 run_id: "run-001"
 target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
@@ -23,7 +23,6 @@ acquittals {
       completed_at { seconds: 1767225846 }
       executed_command { action: "run the suite" cwd { value: "." } exit_code: 0 output_excerpt: "all assertions held" }
     }
-    probe_failed: false
   }
 }
 candidates_examined: 1

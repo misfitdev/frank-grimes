@@ -2531,11 +2531,15 @@ func (x *CategoryStop) GetProbesAttempted() uint32 {
 // What was done to show the probe could have failed, and what happened when it
 // was done. A probe that cannot fail distinguishes nothing, so its passing says
 // nothing about the target.
+//
+// Whether the probe failed is not recorded, because a provider that could state
+// it would be writing down the outcome it wanted. It is read from the result:
+// a command that exited non-zero, or a counterexample the mutated target could
+// not survive.
 type NegativeControl struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Mutation      string                 `protobuf:"bytes,1,opt,name=mutation,proto3" json:"mutation,omitempty"`
 	Result        *Reproduction          `protobuf:"bytes,2,opt,name=result,proto3" json:"result,omitempty"`
-	ProbeFailed   bool                   `protobuf:"varint,3,opt,name=probe_failed,json=probeFailed,proto3" json:"probe_failed,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2582,13 +2586,6 @@ func (x *NegativeControl) GetResult() *Reproduction {
 		return x.Result
 	}
 	return nil
-}
-
-func (x *NegativeControl) GetProbeFailed() bool {
-	if x != nil {
-		return x.ProbeFailed
-	}
-	return false
 }
 
 // A claim this review attacked and could not break.
@@ -4295,11 +4292,11 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\bcategory\x12H\n" +
 	"\tcondition\x18\x02 \x01(\x0e2\x1e.frank_grimes.v2.StopConditionB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\tcondition\x12)\n" +
-	"\x10probes_attempted\x18\x03 \x01(\rR\x0fprobesAttempted\"\x98\x01\n" +
+	"\x10probes_attempted\x18\x03 \x01(\rR\x0fprobesAttempted\"\xdc\x02\n" +
 	"\x0fNegativeControl\x12#\n" +
 	"\bmutation\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\bmutation\x12=\n" +
-	"\x06result\x18\x02 \x01(\v2\x1d.frank_grimes.v2.ReproductionB\x06\xbaH\x03\xc8\x01\x01R\x06result\x12!\n" +
-	"\fprobe_failed\x18\x03 \x01(\bR\vprobeFailed\"\xfe\x03\n" +
+	"\x06result\x18\x02 \x01(\v2\x1d.frank_grimes.v2.ReproductionB\x06\xbaH\x03\xc8\x01\x01R\x06result:\xd0\x01\xbaH\xcc\x01\x1a\xc9\x01\n" +
+	"\x1econtrol.probe_must_have_failed\x12Ta probe that passed against the mutated target has not been shown capable of failing\x1aQ!has(this.result.executed_command) || this.result.executed_command.exit_code != 0J\x04\b\x03\x10\x04R\fprobe_failed\"\xc9\x02\n" +
 	"\tAcquittal\x12A\n" +
 	"\bcategory\x18\x01 \x01(\x0e2\x19.frank_grimes.v2.CategoryB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\bcategory\x12B\n" +
@@ -4307,15 +4304,14 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x05claim\x18\x03 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05claim\x12;\n" +
 	"\x05probe\x18\x04 \x01(\v2\x1d.frank_grimes.v2.ReproductionB\x06\xbaH\x03\xc8\x01\x01R\x05probe\x12:\n" +
 	"\acontrol\x18\x05 \x01(\v2 .frank_grimes.v2.NegativeControlR\acontrol\x12\x1d\n" +
-	"\x05scope\x18\x06 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05scope:\xb2\x01\xbaH\xae\x01\x1a\xab\x01\n" +
-	"\"acquittal.control_must_have_failed\x12Ta probe that passed against the mutated target has not been shown capable of failing\x1a/!has(this.control) || this.control.probe_failed\"l\n" +
+	"\x05scope\x18\x06 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05scope\"l\n" +
 	"\vSkippedUnit\x12 \n" +
 	"\aunit_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x06unitId\x12\x1f\n" +
 	"\x06reason\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x06reason\x12\x1a\n" +
 	"\bmaterial\x18\x03 \x01(\bR\bmaterial\"l\n" +
 	"\fUnitCoverage\x12$\n" +
 	"\bexamined\x18\x01 \x03(\tB\b\xbaH\x05\x92\x01\x02\x18\x01R\bexamined\x126\n" +
-	"\askipped\x18\x02 \x03(\v2\x1c.frank_grimes.v2.SkippedUnitR\askipped\"\x96\v\n" +
+	"\askipped\x18\x02 \x03(\v2\x1c.frank_grimes.v2.SkippedUnitR\askipped\"\xf4\r\n" +
 	"\x0eProviderReport\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
 	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x12\x1e\n" +
@@ -4336,10 +4332,11 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x0ecategory_stops\x18\r \x03(\v2\x1d.frank_grimes.v2.CategoryStopR\rcategoryStops\x12:\n" +
 	"\n" +
 	"acquittals\x18\x0e \x03(\v2\x1a.frank_grimes.v2.AcquittalR\n" +
-	"acquittals:\x9b\x05\xbaH\x97\x05\x1a\xad\x01\n" +
+	"acquittals:\xf9\a\xbaH\xf5\a\x1a\xad\x01\n" +
 	"$report.every_routed_category_stopped\x126every routed category must record what ended its grind\x1aMthis.routed_categories.all(c, this.category_stops.exists(s, s.category == c))\x1a\x9b\x01\n" +
 	"*report.stops_confined_to_routed_categories\x12+a category stop must name a routed category\x1a@this.category_stops.all(s, s.category in this.routed_categories)\x1a\xae\x01\n" +
-	"\x1creport.one_stop_per_category\x12-a category must not record more than one stop\x1a_this.category_stops.all(s, this.category_stops.filter(o, o.category == s.category).size() == 1)\x1a\x95\x01\n" +
+	"\x1creport.one_stop_per_category\x12-a category must not record more than one stop\x1a_this.category_stops.all(s, this.category_stops.filter(o, o.category == s.category).size() == 1)\x1a\xdb\x02\n" +
+	"&report.acquittal_anchor_matches_target\x12Beach acquittal must be anchored in the kind of target under review\x1a\xec\x01this.acquittals.all(a, this.target.kind == 1 ? has(a.claim_anchor.repo_line) : this.target.kind == 2 ? has(a.claim_anchor.document_part) : this.target.kind == 3 ? has(a.claim_anchor.argument_step) : has(a.claim_anchor.retrieved_source))\x1a\x95\x01\n" +
 	"!report.coverage_sets_are_disjoint\x12*a unit cannot be both examined and skipped\x1aDthis.coverage.skipped.all(s, !(s.unit_id in this.coverage.examined))\"\xf5\x02\n" +
 	"\x12AdjudicationReport\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +

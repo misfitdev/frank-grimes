@@ -517,7 +517,7 @@ func cmdReportAcquit(args []string) error {
 		Probe:       probe,
 		Scope:       *scope,
 	}
-	control, err := controlFromFlags(*mutation, *controlAction, *controlCwd, *controlExit, *controlOutput, *controlSum)
+	control, err := controlFromFlags(fs, *mutation, *controlAction, *controlCwd, *controlExit, *controlOutput, *controlSum)
 	if err != nil {
 		return err
 	}
@@ -545,8 +545,18 @@ func cmdReportAcquit(args []string) error {
 // controlFromFlags builds the negative control, or returns nil when none was
 // offered. A partial set is refused: a mutation nobody probed and a probe with
 // nothing mutated are both records of something that did not happen.
-func controlFromFlags(mutation, action, cwd string, exitCode int, output, outputSum string) (*pb.NegativeControl, error) {
-	offered := mutation != "" || action != "" || output != "" || outputSum != ""
+//
+// Offered is decided by which flags were passed rather than by their values,
+// so --control-exit=0 alone is a partial control rather than no control. That
+// case matters most: it is the one a provider reaches for when the control did
+// not actually fail.
+func controlFromFlags(fs *flag.FlagSet, mutation, action, cwd string, exitCode int, output, outputSum string) (*pb.NegativeControl, error) {
+	offered := false
+	fs.Visit(func(f *flag.Flag) {
+		if strings.HasPrefix(f.Name, "control-") {
+			offered = true
+		}
+	})
 	if !offered {
 		return nil, nil
 	}
@@ -557,15 +567,11 @@ func controlFromFlags(mutation, action, cwd string, exitCode int, output, output
 	if err != nil {
 		return nil, err
 	}
-	return &pb.NegativeControl{
-		Mutation: mutation,
-		Result:   result,
-		// Derived, not asserted: a caller that could declare its own control
-		// failed would be back to writing down the outcome it wanted.
-		ProbeFailed: exitCode != 0,
-	}, nil
+	return &pb.NegativeControl{Mutation: mutation, Result: result}, nil
 }
 
+// controlLabel names what the record shows, which is read from the result
+// rather than stated anywhere.
 func controlLabel(c *pb.NegativeControl) string {
 	if c == nil {
 		return "unattempted"

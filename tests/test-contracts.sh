@@ -434,6 +434,16 @@ else
     fail "a control with no mutation was accepted or refused by field (exit $CODE): $OUT"
 fi
 
+set +e
+OUT=$(cd "$WORK" && "$BIN" "${ACQUIT[@]}" --control-exit=0 2>&1)
+CODE=$?
+set -e
+if [[ "$CODE" != "0" ]] && grep -q -- '--control-mutation' <<<"$OUT"; then
+    pass "--control-exit=0 alone is a partial control, not the absence of one"
+else
+    fail "--control-exit=0 alone was read as no control at all (exit $CODE): $OUT"
+fi
+
 OUT=$(cd "$WORK" && "$BIN" "${ACQUIT[@]}" "${CONTROL[@]}" --control-exit=1 2>&1)
 if grep -q 'failed as required' <<<"$OUT"; then
     pass "a control the probe failed against is admitted"
