@@ -141,18 +141,21 @@ def synced_marker(bead_id):
 def find_existing_issue(bead_id):
     """Search for an issue already published for this bead, so a bead whose
     `bd update --external-ref` failed after a prior create doesn't get a
-    second GitHub issue on retry."""
+    second GitHub issue on retry.
+
+    Raises on a search failure rather than returning None, so the caller
+    can't mistake "the search itself failed" for "no issue exists" and
+    create a duplicate.
+    """
     marker = synced_marker(bead_id)
     result = run([
         "gh", "issue", "list", "--repo", REPO, "--state", "all",
         "--search", marker, "--json", "number,body", "--limit", "20",
-    ], check=False)
-    if result.returncode != 0:
-        return None
+    ])
     try:
         candidates = json.loads(result.stdout)
-    except ValueError:
-        return None
+    except ValueError as exc:
+        raise RuntimeError(f"malformed response searching for existing issue: {exc}")
     for candidate in candidates:
         if marker in (candidate.get("body") or ""):
             return str(candidate["number"])
