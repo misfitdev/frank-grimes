@@ -15,6 +15,6 @@ done < <("$FAKES/anchor-flags.sh")
 grimes-contract report add --category=SEC --severity=P0 --blast=systemic \
     --likelihood=likely "${ANCHOR[@]}" --tier=E1 \
     --claim="caller-controlled deletion path" \
-    --action="run the suite" --cwd="escape" --exit-code=1 \
+    --action="run the suite" --cwd="escape/never-created" --exit-code=1 \
     --output="it failed over there" >/dev/null
 "$FAKES/seal.sh" 4 3 "A command run outside the target."

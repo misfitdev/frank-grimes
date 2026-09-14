@@ -156,6 +156,7 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*Collected, error) {
 
 	sum := sha256.New()
 	units := make([]*pb.TargetUnit, 0, len(paths))
+	digests := make(map[string][]byte, len(paths))
 	for _, p := range paths {
 		rel, err := filepath.Rel(base, p)
 		if err != nil {
@@ -171,18 +172,21 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*Collected, error) {
 		// or editing it are each a different target.
 		fmt.Fprintf(sum, "%s\x00%s\n", rel, hex.EncodeToString(body[:]))
 		units = append(units, unit(rel, rel))
+		digests[rel] = append([]byte(nil), body[:]...)
 	}
 
 	// The scope itself: a tree when it names a directory, one file when it names
 	// a file. Both are supported targets, and the fingerprint is taken over
 	// path-and-digest pairs either way.
-	return collected(&pb.Target{
+	out := collected(&pb.Target{
 		Root:              spec.Root,
 		Scope:             spec.Scope,
 		FingerprintSha256: sum.Sum(nil),
 		Display:           truncate(spec.Scope),
 		Kind:              pb.TargetKind_TARGET_KIND_CODE,
-	}, units, abs), nil
+	}, units, abs)
+	out.UnitDigests = digests
+	return out, nil
 }
 
 // contained resolves a code scope against its root and refuses one that leaves
@@ -206,11 +210,18 @@ func contained(root, scope string) (abs, base string, err error) {
 		return "", "", err
 	}
 	// A missing target is reported by the caller's stat, so an unresolvable
-	// path is passed through rather than reported as an escape.
-	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
-		abs = resolved
+	// path is passed through rather than reported as an escape. What it is
+	// checked against is the deepest part of it that does exist: "link/missing"
+	// resolves to nothing, and reading only its spelling would miss that link
+	// leaves the tree.
+	resolved, err := resolveExisting(abs)
+	if err != nil {
+		return "", "", err
 	}
-	rel, err := filepath.Rel(base, abs)
+	if full, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = full
+	}
+	rel, err := filepath.Rel(base, resolved)
 	if err != nil {
 		return "", "", err
 	}
@@ -218,6 +229,30 @@ func contained(root, scope string) (abs, base string, err error) {
 		return "", "", fmt.Errorf("code target %q resolves outside the repository root", scope)
 	}
 	return abs, base, nil
+}
+
+// resolveExisting returns the path with its longest existing prefix resolved,
+// so a name that does not exist yet is still judged by where it would sit.
+//
+// EvalSymlinks fails outright on a missing component, and falling back to the
+// spelling of the path would read "link/missing" as inside the tree however far
+// outside link points.
+func resolveExisting(path string) (string, error) {
+	var missing []string
+	for {
+		resolved, err := filepath.EvalSymlinks(path)
+		if err == nil {
+			return filepath.Join(append([]string{resolved}, missing...)...), nil
+		}
+		parent := filepath.Dir(path)
+		// The root resolves or nothing does; without this a malformed path
+		// would climb forever.
+		if parent == path {
+			return path, nil
+		}
+		missing = append([]string{filepath.Base(path)}, missing...)
+		path = parent
+	}
 }
 
 // readRegular reads a file-backed target, refusing anything that is not a

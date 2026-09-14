@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"strings"
@@ -141,11 +143,17 @@ func quoted(quote string, unit *pb.TargetUnit, against *Collected) error {
 	return nil
 }
 
-// unitBytes returns the bytes the unit covers.
+// unitBytes returns the bytes the unit covered at collection time.
+//
+// Everything here runs after the provider has, and the provider can write to
+// the artifact it was asked to review. Re-reading alone would let it inject the
+// line it then quotes, so what comes back is checked against what collection
+// hashed. A target that changed underneath the review is refused rather than
+// quietly reviewed twice.
 //
 // Spans are re-derived rather than carried in the inventory: the split is a
-// pure function of the content the engine already persisted, and a second copy
-// in the contract could disagree with it.
+// pure function of content the engine already holds, and a second copy in the
+// contract could disagree with it.
 func unitBytes(unit *pb.TargetUnit, against *Collected) (string, error) {
 	if against.Target.GetKind() == pb.TargetKind_TARGET_KIND_CODE {
 		path, err := codePath(unit, against)
@@ -155,6 +163,10 @@ func unitBytes(unit *pb.TargetUnit, against *Collected) (string, error) {
 		body, err := os.ReadFile(path)
 		if err != nil {
 			return "", fmt.Errorf("%w: cannot read %q", ErrProviderOutput, unit.GetId())
+		}
+		want, known := against.UnitDigests[unit.GetId()]
+		if known && !bytes.Equal(sha256sum(body), want) {
+			return "", fmt.Errorf("%w: %q changed during the review", ErrTargetChanged, unit.GetId())
 		}
 		return string(body), nil
 	}
@@ -170,6 +182,11 @@ func unitBytes(unit *pb.TargetUnit, against *Collected) (string, error) {
 	default:
 		return content, nil
 	}
+}
+
+func sha256sum(b []byte) []byte {
+	sum := sha256.Sum256(b)
+	return sum[:]
 }
 
 // codePath resolves a code unit against the repository root.
@@ -196,6 +213,13 @@ func targetContent(against *Collected) (string, error) {
 	body, err := os.ReadFile(against.ContentPath)
 	if err != nil {
 		return "", fmt.Errorf("%w: cannot read the reviewed content", ErrProviderOutput)
+	}
+	// A document, an idea, and an external snapshot are each fingerprinted over
+	// the whole of their content, so the target's own fingerprint is what the
+	// re-read has to match.
+	if !bytes.Equal(sha256sum(body), against.Target.GetFingerprintSha256()) {
+		return "", fmt.Errorf("%w: %q changed during the review",
+			ErrTargetChanged, against.Target.GetScope())
 	}
 	return string(body), nil
 }

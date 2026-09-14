@@ -73,6 +73,12 @@ type Collected struct {
 	// today means an argument read from stdin. The engine persists it and fills
 	// ContentPath in with where it put it.
 	ContentBytes []byte
+	// UnitDigests is what each unit hashed to at collection time, keyed by unit
+	// id. Evidence is checked after the provider has run, and the provider can
+	// write to the artifact it was asked to review: without this, it could
+	// inject the line it then quotes and have the citation admitted against a
+	// fingerprint taken before the edit.
+	UnitDigests map[string][]byte
 }
 
 // Collector resolves a caller's target spec into a fingerprinted target, the

@@ -249,6 +249,39 @@ for case in \
     rm -rf "$WS"
 done
 
+# The provider runs before evidence is checked and can write to the artifact it
+# was asked to review. Re-reading alone would admit the line it planted.
+WS="$(mktemp -d)"
+mkdir -p "$WS/src"
+printf 'echo one\n' >"$WS/src/a.sh"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-edits-target.sh" src 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" != "0" ]] && grep -qF "changed during the review" <<<"$OUT"; then
+    pass "a quote of text the provider planted is refused by name"
+else
+    fail "a provider quoted its own edit (exit $CODE): $OUT"
+fi
+rm -rf "$WS"
+
+# The same, for a target fingerprinted over the whole of its content. One
+# heading, so the planted line lands in the section the finding anchors to and
+# only the fingerprint can refuse it.
+WS="$(mktemp -d)"
+printf '# Overview\nThe service accepts requests.\n' >"$WS/spec.md"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --kind=document \
+    --provider-command="$FAKES/provider-edits-document.sh" spec.md 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" != "0" ]] && grep -qF "changed during the review" <<<"$OUT"; then
+    pass "a document edited mid-review is refused by name"
+else
+    fail "a provider quoted its own edit to a document (exit $CODE): $OUT"
+fi
+rm -rf "$WS"
+
 # A line that really is in the document, but not in the section the finding
 # anchors to. Checking the whole file would admit it, and the citation claims
 # the section rather than the document.
