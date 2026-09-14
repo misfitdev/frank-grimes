@@ -200,15 +200,31 @@ WS="$(workspace)"
 OUT="$(run_grimes "$WS" \
     --provider-command="$FAKES/provider-green.sh" \
     --adjudicator-command="$FAKES/adjudicator-pass.sh" --format=prototext)"
-if echo "$OUT" | grep -qE 'zero_knowledge: +true'; then
-    pass "an adjudicated run records the independent review"
+# Unknown is the honest default: nothing about an opaque command says whether
+# it opened a new session or reused the caller's.
+if echo "$OUT" | grep -qE 'context_origin: +CONTEXT_ORIGIN_UNKNOWN'; then
+    pass "an adjudicated run records the independent review as unknown-origin"
 else
-    fail "an adjudicated run does not record the independent review"
+    fail "an adjudicated run does not record the context origin"
+fi
+# A second opinion that may have seen the first cannot raise confidence to the
+# level a pass requires. Asserted through the gate rather than by grepping the
+# confidence value: the adjudicator states a tuple of its own inside the record,
+# so a bare grep would match its claim rather than the engine's derivation.
+if echo "$OUT" | grep -qE 'unmet_gates: +"review_confidence"'; then
+    pass "an unknown-origin second opinion cannot reach high confidence"
+else
+    fail "an unknown-origin second opinion reached high confidence"
+fi
+if echo "$OUT" | grep -qE 'unmet_gates: +"independent_context"'; then
+    pass "the record names the context as the unmet gate"
+else
+    fail "the record does not name the context gate"
 fi
 if echo "$OUT" | grep -q 'adjudicator received'; then
-    fail "the adjudicator was handed findings or evidence"
+    fail "the adjudicator was handed findings, evidence, or the claimed verdict"
 else
-    pass "the adjudicator receives only the target and the claimed tuple"
+    pass "the adjudicator receives only the target, not the verdict to reach"
 fi
 rm -rf "$WS"
 
@@ -217,6 +233,39 @@ CODE="$(exit_code "$WS" \
     --provider-command="$FAKES/provider-green.sh" \
     --adjudicator-command="$FAKES/adjudicator-block.sh")"
 assert_eq "$CODE" "4" "an independent block produces a blocking exit code"
+rm -rf "$WS"
+
+# The asymmetry: an unknown-origin reviewer may make a verdict worse but never
+# better. Capping its confidence must not also mute its objection.
+WS="$(workspace)"
+CODE="$(exit_code "$WS" \
+    --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-block.sh")"
+assert_eq "$CODE" "4" "an unknown-origin reviewer can still block"
+rm -rf "$WS"
+
+# The operator is the only party who can say a command begins a fresh context.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" \
+    --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" \
+    --adjudicator-fresh --format=prototext)"
+if echo "$OUT" | grep -qE 'context_origin: +CONTEXT_ORIGIN_ENGINE_SPAWNED'; then
+    pass "an operator-asserted fresh context is recorded as engine-spawned"
+else
+    fail "an operator-asserted fresh context was not recorded"
+fi
+if echo "$OUT" | grep -qE 'unmet_gates: +"independent_context"'; then
+    fail "a known-origin context still names the context gate"
+else
+    pass "a known-origin context clears the context gate"
+fi
+rm -rf "$WS"
+
+# The flag asserts something about a command, so it needs one.
+WS="$(workspace)"
+CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-green.sh" --adjudicator-fresh)"
+assert_eq "$CODE" "1" "--adjudicator-fresh without an adjudicator is refused"
 rm -rf "$WS"
 
 echo ""

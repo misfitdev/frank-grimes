@@ -140,6 +140,7 @@ func adjudicatorFor(cfg *config) engine.Adjudicator {
 		return nil
 	}
 	return engine.ProviderAdjudicator{
+		Fresh: cfg.AdjudicatorFresh,
 		Provider: &provider.Exec{
 			Command: cfg.AdjudicatorCommand, Dir: cfg.Dir,
 			MaxOutputBytes: cfg.MaxOutputBytes, Timeout: cfg.ProviderTimeout,

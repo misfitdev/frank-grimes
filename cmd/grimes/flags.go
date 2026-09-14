@@ -84,6 +84,7 @@ type config struct {
 	Dir                string
 	Kind               pb.TargetKind
 	Snapshot           string
+	AdjudicatorFresh   bool
 }
 
 // Root is the repository root a code target is taken from. Only a code target
@@ -110,6 +111,7 @@ func parseRun(args []string) (*config, error) {
 	research := fs.String("research", "offline", "online, offline, or frozen:<path>; advisory until execution boundaries land")
 	providerCmd := fs.String("provider-command", "", "command that performs the review; split on whitespace")
 	adjudicatorCmd := fs.String("adjudicator-command", "", "command that performs the independent review; split on whitespace")
+	adjudicatorFresh := fs.Bool("adjudicator-fresh", false, "assert the adjudicator command begins a new context; without it the review is recorded as unknown-origin and cannot raise confidence")
 	var providerArgs, adjudicatorArgs repeatedArg
 	fs.Var(&providerArgs, "provider-arg", "one argument for the provider command; repeatable, not split")
 	fs.Var(&adjudicatorArgs, "adjudicator-arg", "one argument for the adjudicator command; repeatable, not split")
@@ -131,19 +133,20 @@ func parseRun(args []string) (*config, error) {
 	}
 
 	c := &config{
-		Target:          fs.Arg(0),
-		Scope:           *scope,
-		ScopeSet:        wasSet(fs, "scope"),
-		VerifyCommand:   *verify,
-		Commit:          *commit,
-		MaxIterations:   *maxIter,
-		AutoLoop:        *autoLoop,
-		Research:        *research,
-		ProviderTimeout: *timeout,
-		MaxOutputBytes:  *maxBytes,
-		Format:          *format,
-		Dir:             *dir,
-		Snapshot:        *snapshot,
+		Target:           fs.Arg(0),
+		Scope:            *scope,
+		ScopeSet:         wasSet(fs, "scope"),
+		VerifyCommand:    *verify,
+		Commit:           *commit,
+		MaxIterations:    *maxIter,
+		AutoLoop:         *autoLoop,
+		Research:         *research,
+		ProviderTimeout:  *timeout,
+		MaxOutputBytes:   *maxBytes,
+		Format:           *format,
+		Dir:              *dir,
+		Snapshot:         *snapshot,
+		AdjudicatorFresh: *adjudicatorFresh,
 	}
 
 	var err error
@@ -160,6 +163,9 @@ func parseRun(args []string) (*config, error) {
 	c.AdjudicatorCommand = append(strings.Fields(*adjudicatorCmd), adjudicatorArgs...)
 	if *adjudicatorCmd == "" && len(adjudicatorArgs) > 0 {
 		return nil, fmt.Errorf("--adjudicator-arg needs --adjudicator-command")
+	}
+	if *adjudicatorCmd == "" && *adjudicatorFresh {
+		return nil, fmt.Errorf("--adjudicator-fresh needs --adjudicator-command")
 	}
 
 	return c, c.validate()

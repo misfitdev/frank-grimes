@@ -16,7 +16,7 @@ verification { status: VERIFICATION_STATUS_NOT_APPLICABLE selected_by: GATE_SELE
 independent_review {
   run_id: "run-003-adj"
   reviewer_id: "grimey-verifier"
-  zero_knowledge: true
+  context_origin: CONTEXT_ORIGIN_ENGINE_SPAWNED
   target_fingerprint_sha256: "01234567890123456789012345678901"
   verdict { decision: DECISION_PASS residual_risk: RESIDUAL_RISK_LOW review_confidence: REVIEW_CONFIDENCE_HIGH review_completeness: REVIEW_COMPLETENESS_SUFFICIENT }
   completed_at { seconds: 1780000000 }

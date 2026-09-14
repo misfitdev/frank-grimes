@@ -4,12 +4,13 @@ import pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 
 // Gate names reported when a run falls short of a pass.
 const (
-	GateDecision     = "decision"
-	GateResidualRisk = "residual_risk"
-	GateConfidence   = "review_confidence"
-	GateCompleteness = "review_completeness"
-	GateAdjudication = "adjudication"
-	GateOscillation  = "oscillation"
+	GateDecision           = "decision"
+	GateResidualRisk       = "residual_risk"
+	GateConfidence         = "review_confidence"
+	GateCompleteness       = "review_completeness"
+	GateAdjudication       = "adjudication"
+	GateIndependentContext = "independent_context"
+	GateOscillation        = "oscillation"
 )
 
 // unmetGates names every gate standing between this run and a pass, in a fixed
@@ -30,6 +31,10 @@ func unmetGates(v *pb.Verdict, in DeriveInput) []string {
 	}
 	if !in.AdjudicationAvailable {
 		gates = append(gates, GateAdjudication)
+	}
+	// Named separately from confidence so the record says why it was capped.
+	if in.IndependentContextUnknown {
+		gates = append(gates, GateIndependentContext)
 	}
 	if in.Oscillation {
 		gates = append(gates, GateOscillation)

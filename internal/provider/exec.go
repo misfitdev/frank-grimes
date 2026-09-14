@@ -156,14 +156,12 @@ func requestEnv(req engine.Request) []string {
 		// knowledge is about the first report, not the target.
 		"GRIMES_TARGET_CONTENT=" + req.ContentPath,
 	}
+	// The claimed tuple is deliberately withheld. An independent review that is
+	// shown the conclusion it is meant to reach is anchored by construction;
+	// the engine resolves the two tuples afterwards, which needs nothing shown
+	// to the adjudicator beforehand.
 	if req.Role == engine.RoleAdjudicator {
-		return append(env,
-			"GRIMES_ROLE=adjudicator",
-			"GRIMES_CLAIMED_DECISION="+short(req.Claimed.GetDecision().String(), "DECISION_"),
-			"GRIMES_CLAIMED_RESIDUAL_RISK="+short(req.Claimed.GetResidualRisk().String(), "RESIDUAL_RISK_"),
-			"GRIMES_CLAIMED_CONFIDENCE="+short(req.Claimed.GetReviewConfidence().String(), "REVIEW_CONFIDENCE_"),
-			"GRIMES_CLAIMED_COMPLETENESS="+short(req.Claimed.GetReviewCompleteness().String(), "REVIEW_COMPLETENESS_"),
-		)
+		return append(env, "GRIMES_ROLE=adjudicator")
 	}
 	return append(env,
 		"GRIMES_ROLE=primary",

@@ -89,7 +89,7 @@ func (f fixedAdjudicator) Adjudicate(_ context.Context, target *pb.Target, _ str
 	return &pb.IndependentReview{
 		RunId:                   "run-adj",
 		ReviewerId:              "fake",
-		ZeroKnowledge:           true,
+		ContextOrigin:           pb.ContextOrigin_CONTEXT_ORIGIN_ENGINE_SPAWNED,
 		TargetFingerprintSha256: target.GetFingerprintSha256(),
 		Verdict: &pb.Verdict{
 			Decision:           f.decision,

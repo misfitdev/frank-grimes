@@ -116,6 +116,12 @@ func confidence(in DeriveInput) pb.ReviewConfidence {
 			return pb.ReviewConfidence_REVIEW_CONFIDENCE_LOW
 		}
 	}
+	// A second opinion from a context that may have seen the first is not a
+	// second opinion. It still counts as adjudication, so it can still block;
+	// it cannot raise confidence to the level a pass requires.
+	if in.IndependentContextUnknown {
+		return pb.ReviewConfidence_REVIEW_CONFIDENCE_MEDIUM
+	}
 	for _, c := range driving {
 		if !c.ProbeAttempted {
 			return pb.ReviewConfidence_REVIEW_CONFIDENCE_MEDIUM

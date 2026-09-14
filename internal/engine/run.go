@@ -111,9 +111,11 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	}
 
 	final := Derive(DeriveInput{
-		Candidates:              candidates,
-		AdjudicationAvailable:   review != nil,
-		IndependentDecision:     review.GetVerdict().GetDecision(),
+		Candidates:            candidates,
+		AdjudicationAvailable: review != nil,
+		IndependentDecision:   review.GetVerdict().GetDecision(),
+		IndependentContextUnknown: review != nil &&
+			review.GetContextOrigin() != pb.ContextOrigin_CONTEXT_ORIGIN_ENGINE_SPAWNED,
 		AllCategoriesStopped:    false,
 		CriticalInvariantProbed: len(candidates) > 0,
 		Oscillation:             oscillation,

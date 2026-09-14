@@ -17,7 +17,7 @@ if [[ "$GOT" != "${GRIMES_TARGET_FINGERPRINT:-}" ]]; then
     echo "adjudicator was handed ${GOT}, not the target ${GRIMES_TARGET_FINGERPRINT:-(unset)}" >&2
     exit 1
 fi
-for leak in GRIMES_FINDING GRIMES_EVIDENCE GRIMES_LEDGER GRIMES_SEVERITY GRIMES_SUMMARY; do
+for leak in GRIMES_FINDING GRIMES_EVIDENCE GRIMES_LEDGER GRIMES_SEVERITY GRIMES_SUMMARY GRIMES_CLAIMED; do
     if env | grep -q "^${leak}"; then
         echo "adjudicator received ${leak}; independence is broken" >&2
         exit 1
