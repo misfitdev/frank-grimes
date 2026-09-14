@@ -34,7 +34,7 @@ fi
 
 # Fires the beads->GitHub project sync in the background so a merge/pull is
 # never blocked waiting on the GitHub API.
-if command -v gh >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+if command -v gh >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1 && command -v bd >/dev/null 2>&1; then
   _repo_root=$(git rev-parse --show-toplevel)
   nohup python3 "$_repo_root/scripts/sync-beads-github.py" >>"$_repo_root/.beads/sync-github.log" 2>&1 &
   disown 2>/dev/null || true
