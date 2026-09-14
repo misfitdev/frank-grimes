@@ -96,8 +96,15 @@ for leak in 'evidence' 'grime[- ][a-z0-9]{3}' 'grime[- ]id' 'finding' 'severity'
     fi
 done
 
-assert_present "$GRIND" 'Do NOT include findings, evidence, severities' \
+assert_present "$GRIND" 'Do NOT include your verdict tuple, findings, evidence, severities' \
     "adapter explicitly forbids leaking findings into the prompt"
+# The verdict is the sharpest leak: it is the answer the adjudicator was asked
+# to reach on its own. The engine stopped sending it; the documented path has to
+# stop telling people to send it too.
+assert_absent "$GRIND" 'Claimed verdict tuple:' \
+    "adapter no longer templates the claimed tuple into the verifier prompt"
+assert_absent "$AGENT" 'You receive exactly two things' \
+    "verifier no longer expects to be handed a claimed tuple"
 assert_present "$AGENT" 'you will not be shown it|have not seen their review' \
     "verifier states it has not seen the primary review"
 assert_present "$AGENT" 'treat its presence as a finding' \
