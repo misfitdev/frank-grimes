@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"strconv"
@@ -34,6 +35,8 @@ func cmdReport(args []string) error {
 		return cmdReportAdd(args[1:])
 	case "seal":
 		return cmdReportSeal(args[1:])
+	case "units":
+		return cmdReportUnits(args[1:])
 	case "cover":
 		return cmdReportCover(args[1:])
 	case "stop":
@@ -51,6 +54,7 @@ const reportUsage = `report subcommands:
   report seal  [--run-id=<id>] --target-root=<path> --target-scope=<scope> \
                [--kind=code|document|idea|external] [--iteration=<n>] --summary=<text> \
                [--routed=COR,SEC,...] [--examined=<n>] [--disproved=<n>]
+  report units [--inventory=<path>]
   report cover --examined=<id,...> [--skip=<id>:<reason>[:material] ...]
   report stop  --category=<CODE> --condition=<marginal-yield|probes-exhausted|evidence-unavailable> \
                [--probes=<n>]
@@ -293,6 +297,42 @@ func cmdReportSeal(args []string) error {
 	return nil
 }
 
+// cmdReportUnits lists what this review is accountable for, one unit id per
+// line, exactly as the engine recorded them.
+//
+// A unit id is arbitrary text — a path, a heading, a URI — and prototext
+// escapes it. Every provider grepping that rendering back into ids would get
+// the fragile cases wrong in the same way, so the decoding happens once, here.
+// Listing is not claiming: what to examine and what to skip stays the caller's
+// statement.
+func cmdReportUnits(args []string) error {
+	fs := flag.NewFlagSet("report units", flag.ContinueOnError)
+	path := fs.String("inventory", os.Getenv("GRIMES_TARGET_INVENTORY"), "inventory to read; defaults to $GRIMES_TARGET_INVENTORY")
+	zero := fs.Bool("print0", false, "separate ids with NUL, for ids containing newlines")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *path == "" {
+		return fmt.Errorf("report units needs --inventory or $GRIMES_TARGET_INVENTORY")
+	}
+	data, err := os.ReadFile(*path)
+	if err != nil {
+		return err
+	}
+	inventory := &pb.TargetInventory{}
+	if err := contracts.UnmarshalCanonical(data, inventory); err != nil {
+		return err
+	}
+	for _, u := range inventory.GetUnits() {
+		if *zero {
+			fmt.Printf("%s\x00", u.GetId())
+			continue
+		}
+		fmt.Println(u.GetId())
+	}
+	return nil
+}
+
 // repeatedFlag collects one occurrence per argument, so a reason containing a
 // space survives.
 type repeatedFlag []string
@@ -313,6 +353,7 @@ func cmdReportCover(args []string) error {
 	fs := flag.NewFlagSet("report cover", flag.ContinueOnError)
 	file := fs.String("file", DefaultReportPath, "report being built")
 	examined := fs.String("examined", "", "comma-separated unit ids examined")
+	stdin0 := fs.Bool("examined-stdin0", false, "read NUL-separated examined ids from stdin; the only form safe for an id containing a comma or a newline")
 	var skips repeatedFlag
 	fs.Var(&skips, "skip", "<id>:<reason>[:material]; repeatable")
 	if err := fs.Parse(args); err != nil {
@@ -329,6 +370,17 @@ func cmdReportCover(args []string) error {
 	for _, id := range strings.Split(*examined, ",") {
 		if id = strings.TrimSpace(id); id != "" {
 			report.Coverage.Examined = append(report.Coverage.Examined, id)
+		}
+	}
+	if *stdin0 {
+		raw, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return err
+		}
+		for _, id := range strings.Split(string(raw), "\x00") {
+			if id != "" {
+				report.Coverage.Examined = append(report.Coverage.Examined, id)
+			}
 		}
 	}
 	for _, raw := range skips {

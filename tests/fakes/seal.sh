@@ -12,10 +12,11 @@ set -euo pipefail
 #
 # Callers cd into a scratch directory before building a report, so the path is
 # absolute and exported by the engine rather than found relative to here.
+# NUL-separated: a unit id is arbitrary text and may contain a comma or a
+# newline, which every other separator would split in the wrong place.
 if [[ -n "${GRIMES_TARGET_INVENTORY:-}" && -f "$GRIMES_TARGET_INVENTORY" ]]; then
-    UNITS="$(grimes-contract decode-report --type=TargetInventory "$GRIMES_TARGET_INVENTORY" |
-        grep -oE 'id: +"[^"]*"' | sed 's/.*"\(.*\)"/\1/' | paste -sd, -)"
-    [[ -n "$UNITS" ]] && grimes-contract report cover --examined="$UNITS" >/dev/null
+    grimes-contract report units --print0 |
+        grimes-contract report cover --examined-stdin0 >/dev/null
 fi
 
 # Every routed category records what ended its grind.

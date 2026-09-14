@@ -6,6 +6,11 @@ target { root: "/repo" scope: "bad-script.sh" fingerprint_sha256: "0123456789012
 mode: MODE_REPORT
 iteration: 3
 routed_categories: [CATEGORY_SEC, CATEGORY_COR, CATEGORY_REL, CATEGORY_OPS, CATEGORY_VER]
+category_stops { category: CATEGORY_SEC condition: STOP_CONDITION_MARGINAL_YIELD probes_attempted: 3 }
+category_stops { category: CATEGORY_COR condition: STOP_CONDITION_MARGINAL_YIELD probes_attempted: 2 }
+category_stops { category: CATEGORY_REL condition: STOP_CONDITION_PROBES_EXHAUSTED probes_attempted: 1 }
+category_stops { category: CATEGORY_OPS condition: STOP_CONDITION_MARGINAL_YIELD probes_attempted: 1 }
+category_stops { category: CATEGORY_VER condition: STOP_CONDITION_MARGINAL_YIELD probes_attempted: 1 }
 candidates {
   category: CATEGORY_SEC
   location { anchor { repo_line { path { value: "bad-script.sh" } line: 22 } } }

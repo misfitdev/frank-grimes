@@ -331,6 +331,7 @@ mkdir -p "$WORK/.grimes"
     cd "$WORK" || exit 1
     "$BIN" report add --category=SEC --severity=P2 --blast=local_component \
         --likelihood=unlikely --path=a.sh --tier=E2 --claim="c" --quote="q" >/dev/null
+    "$BIN" report stop --category=SEC --condition=marginal-yield --probes=2 >/dev/null
     "$BIN" report seal --target-root=/repo --target-scope=a.sh --iteration=1 \
         --routed=SEC --examined=1 --disproved=0 --summary="s" >/dev/null
 ) || fail "the seal sequence failed"
@@ -342,7 +343,7 @@ else
 fi
 
 SECOND="$(cd "$WORK" && "$BIN" report seal --target-root=/repo --target-scope=a.sh \
-    --iteration=2 --routed=SEC --examined=0 --disproved=0 --summary="s" |
+    --iteration=2 --examined=0 --disproved=0 --summary="s" |
     "$BIN" decode-report)"
 if grep -q 'candidates' <<<"$SECOND"; then
     fail "a later seal readopted the previous report's candidates"
