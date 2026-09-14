@@ -235,8 +235,10 @@ for case in \
     mkdir -p "$WS/src"
     printf 'echo one\n' >"$WS/src/a.sh"
     # A relative name with no ".." that leaves the tree anyway. The contract
-    # cannot see this; resolving it needs the filesystem.
-    ln -s "$(mktemp -d)" "$WS/escape"
+    # cannot see this; resolving it needs the filesystem. The link points at
+    # something that does not exist either, so following it is the only way to
+    # learn where it leads.
+    ln -s "$(mktemp -d)/never-created" "$WS/escape"
     set +e
     OUT="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/$FAKE.sh" src 2>&1)"
     CODE=$?

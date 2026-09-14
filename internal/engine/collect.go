@@ -236,23 +236,38 @@ func contained(root, scope string) (abs, base string, err error) {
 //
 // EvalSymlinks fails outright on a missing component, and falling back to the
 // spelling of the path would read "link/missing" as inside the tree however far
-// outside link points.
+// outside link points. A link whose own target does not exist is followed by
+// hand for the same reason: it still says where the path would lead.
 func resolveExisting(path string) (string, error) {
+	// Bounded, because a link that points at itself would otherwise be followed
+	// forever. The limit is the usual kernel one.
+	const maxLinks = 40
 	var missing []string
-	for {
+	rejoin := func(base string) string {
+		return filepath.Join(append([]string{base}, missing...)...)
+	}
+	for range maxLinks {
 		resolved, err := filepath.EvalSymlinks(path)
 		if err == nil {
-			return filepath.Join(append([]string{resolved}, missing...)...), nil
+			return rejoin(resolved), nil
+		}
+		if link, err := os.Readlink(path); err == nil {
+			if !filepath.IsAbs(link) {
+				link = filepath.Join(filepath.Dir(path), link)
+			}
+			path = link
+			continue
 		}
 		parent := filepath.Dir(path)
 		// The root resolves or nothing does; without this a malformed path
 		// would climb forever.
 		if parent == path {
-			return path, nil
+			return rejoin(path), nil
 		}
 		missing = append([]string{filepath.Base(path)}, missing...)
 		path = parent
 	}
+	return "", fmt.Errorf("too many symbolic links resolving %q", path)
 }
 
 // readRegular reads a file-backed target, refusing anything that is not a
