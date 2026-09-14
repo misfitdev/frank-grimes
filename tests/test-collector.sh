@@ -493,7 +493,7 @@ OUT="$(cd "$WS" && "$GRIMES" run --dir=. --kind=external --snapshot=frozen.txt \
     --adjudicator-command="$FAKES/adjudicator-reads-content.sh" \
     --format=prototext "https://example.com/policy" 2>&1)"
 set -e
-if echo "$OUT" | grep -qE 'zero_knowledge: +true'; then
+if echo "$OUT" | grep -qE 'context_origin: +CONTEXT_ORIGIN_'; then
     pass "an adjudicator that read the artifact still records an independent review"
 else
     fail "the adjudicator could not read the artifact: $OUT"

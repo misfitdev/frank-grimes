@@ -200,6 +200,13 @@ WS="$(workspace)"
 OUT="$(run_grimes "$WS" \
     --provider-command="$FAKES/provider-green.sh" \
     --adjudicator-command="$FAKES/adjudicator-pass.sh" --format=prototext)"
+# The fake refuses to adjudicate if it was handed findings, evidence, a ledger,
+# a severity, a summary, or the claimed verdict. A refusal reaches the engine as
+# a failed adjudication, which the engine treats as absence rather than as a run
+# failure — so a leak shows up here, as a review that was never recorded. The
+# fake's own message cannot be asserted directly: it goes to stderr and the
+# engine swallows it. internal/provider asserts the environment directly.
+#
 # Unknown is the honest default: nothing about an opaque command says whether
 # it opened a new session or reused the caller's.
 if echo "$OUT" | grep -qE 'context_origin: +CONTEXT_ORIGIN_UNKNOWN'; then
@@ -220,11 +227,6 @@ if echo "$OUT" | grep -qE 'unmet_gates: +"independent_context"'; then
     pass "the record names the context as the unmet gate"
 else
     fail "the record does not name the context gate"
-fi
-if echo "$OUT" | grep -q 'adjudicator received'; then
-    fail "the adjudicator was handed findings, evidence, or the claimed verdict"
-else
-    pass "the adjudicator receives only the target, not the verdict to reach"
 fi
 rm -rf "$WS"
 
