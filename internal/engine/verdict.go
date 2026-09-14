@@ -49,6 +49,11 @@ type DeriveInput struct {
 	// Adjudication
 	AdjudicationAvailable bool
 	IndependentDecision   pb.Decision
+	// IndependentContextUnknown is set when a second opinion arrived from a
+	// context whose origin could not be established. It caps confidence and
+	// leaves the decision alone: such a reviewer may make a verdict worse,
+	// never better.
+	IndependentContextUnknown bool
 
 	// Coverage, owned by the collector. RoutedCategories that did not reach a
 	// marginal-yield stop cap completeness.

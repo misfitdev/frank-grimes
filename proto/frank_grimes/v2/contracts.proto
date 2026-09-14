@@ -602,16 +602,38 @@ message Verification {
   }];
 }
 
-// zero_knowledge is const true: a reviewer that saw the first report is not an
-// independent reviewer, and the schema refuses to record one as if it were.
+// How the context that produced a review came to exist.
+//
+// UNKNOWN is the honest default and the common case: an opaque provider command
+// may have opened a new session or reused the caller's, and nothing the engine
+// can observe distinguishes them. ENGINE_SPAWNED says the engine started the
+// process, was told by the operator that the command begins a fresh context,
+// and left no prior-review state within reach of it.
+enum ContextOrigin {
+  CONTEXT_ORIGIN_UNSPECIFIED = 0;
+  CONTEXT_ORIGIN_ENGINE_SPAWNED = 1;
+  CONTEXT_ORIGIN_UNKNOWN = 2;
+}
+
+// A second opinion, and what is known about the context that formed it.
+//
+// The retired zero_knowledge field was a bool constrained to true, which made
+// an honest "we cannot tell" unrepresentable: every record asserted
+// independence because the schema permitted nothing else.
 message IndependentReview {
+  reserved 3;
+  reserved "zero_knowledge";
+
   string run_id = 1 [(buf.validate.field).string.min_len = 1];
   string reviewer_id = 2 [(buf.validate.field).string.min_len = 1];
-  bool zero_knowledge = 3 [(buf.validate.field).bool.const = true];
   bytes target_fingerprint_sha256 = 4 [(buf.validate.field).bytes.len = 32];
   Verdict verdict = 5 [(buf.validate.field).required = true];
   bytes provider_attestation = 6;
   google.protobuf.Timestamp completed_at = 7 [(buf.validate.field).required = true];
+  ContextOrigin context_origin = 8 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
 }
 
 message MarginalYield {
@@ -674,11 +696,12 @@ message GrimesResult {
   };
   option (buf.validate.message).cel = {
     id: "result.green_is_independent_and_verified"
-    message: "GREEN requires an independent matching pass, no oscillation, and required verification"
+    message: "GREEN requires an independent matching pass from a context the engine spawned, no oscillation, and required verification"
     expression:
       "this.legacy_color != 1 || "
       "(has(this.independent_review) && "
       "this.independent_review.verdict.decision == 3 && "
+      "this.independent_review.context_origin == 1 && "
       "this.independent_review.target_fingerprint_sha256 == this.target.fingerprint_sha256 && "
       "!this.ledger.oscillation_detected && "
       "(this.mode == 1 || this.verification.status == 1))"

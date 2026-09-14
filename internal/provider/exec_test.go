@@ -185,9 +185,10 @@ func TestExecPrimaryRequestEnv(t *testing.T) {
 	}
 }
 
-// The adjudicator receives the target's identity and the claimed tuple. Any
-// finding, evidence, or ledger data reaching it breaks independence.
-func TestExecAdjudicatorReceivesClaimedTupleOnly(t *testing.T) {
+// The adjudicator receives the target's identity and nothing about the review.
+// The claimed verdict is the sharpest leak of the set: a reviewer shown the
+// conclusion it was asked to reach independently is anchored before it starts.
+func TestExecAdjudicatorIsNotToldTheVerdict(t *testing.T) {
 	e := &Exec{Command: script(t, "env\n")}
 	req := primaryReq()
 	req.Role = engine.RoleAdjudicator
@@ -202,18 +203,14 @@ func TestExecAdjudicatorReceivesClaimedTupleOnly(t *testing.T) {
 		t.Fatalf("Review: %v", err)
 	}
 	env := string(out.Raw)
-	for _, want := range []string{
-		"GRIMES_ROLE=adjudicator",
-		"GRIMES_CLAIMED_DECISION=pass",
-		"GRIMES_CLAIMED_RESIDUAL_RISK=low",
-		"GRIMES_CLAIMED_CONFIDENCE=high",
-		"GRIMES_CLAIMED_COMPLETENESS=sufficient",
-	} {
+	// It still has to know which role it is playing, and which target.
+	for _, want := range []string{"GRIMES_ROLE=adjudicator", "GRIMES_TARGET_FINGERPRINT="} {
 		if !strings.Contains(env, want) {
 			t.Errorf("environment missing %q", want)
 		}
 	}
 	for _, leak := range []string{
+		"GRIMES_CLAIMED",
 		"GRIMES_FINDING", "GRIMES_EVIDENCE", "GRIMES_LEDGER",
 		"GRIMES_SEVERITY", "GRIMES_CATEGORIES", "GRIMES_ITERATION",
 	} {

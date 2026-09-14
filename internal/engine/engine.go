@@ -54,6 +54,28 @@ type ProviderAdjudicator struct {
 	ReviewerID string
 	RunID      string
 	Clock      Clock
+	// Fresh is the operator asserting that Provider's command begins a new
+	// context. The engine cannot see inside an opaque command, so this is the
+	// one input it takes on trust — from the person running the review, not
+	// from either model.
+	Fresh bool
+}
+
+// contextOrigin records how this reviewer's context came to exist.
+//
+// ENGINE_SPAWNED needs all three: the operator said the command starts fresh,
+// the engine started the process itself, and the request carried nothing from
+// the review — for an adjudicator that is target identity and the content path,
+// with the claimed verdict deliberately withheld.
+//
+// Not yet covered: the review directory is still reachable from where the
+// provider runs, so a determined command could read the ledger off disk.
+// Confining that is fg-64y.49, and fg-64y.40 for the staged target.
+func (a ProviderAdjudicator) contextOrigin() pb.ContextOrigin {
+	if a.Fresh {
+		return pb.ContextOrigin_CONTEXT_ORIGIN_ENGINE_SPAWNED
+	}
+	return pb.ContextOrigin_CONTEXT_ORIGIN_UNKNOWN
 }
 
 func (a ProviderAdjudicator) Adjudicate(ctx context.Context, target *pb.Target, contentPath string, claimed *pb.Verdict) (*pb.IndependentReview, error) {
@@ -85,7 +107,7 @@ func (a ProviderAdjudicator) Adjudicate(ctx context.Context, target *pb.Target, 
 	return &pb.IndependentReview{
 		RunId:                   a.RunID,
 		ReviewerId:              a.ReviewerID,
-		ZeroKnowledge:           true,
+		ContextOrigin:           a.contextOrigin(),
 		TargetFingerprintSha256: target.GetFingerprintSha256(),
 		Verdict:                 second.GetVerdict(),
 		CompletedAt:             a.Clock.stamp(),

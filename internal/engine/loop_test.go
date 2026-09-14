@@ -328,7 +328,7 @@ func greenResult(t *testing.T) *pb.GrimesResult {
 		r.IndependentReview = &pb.IndependentReview{
 			RunId:                   "run-001-adj",
 			ReviewerId:              "verifier",
-			ZeroKnowledge:           true,
+			ContextOrigin:           pb.ContextOrigin_CONTEXT_ORIGIN_ENGINE_SPAWNED,
 			TargetFingerprintSha256: target.GetFingerprintSha256(),
 			Verdict: &pb.Verdict{
 				Decision:           pb.Decision_DECISION_PASS,

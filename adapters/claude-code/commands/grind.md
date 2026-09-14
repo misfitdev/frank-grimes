@@ -173,14 +173,13 @@ Required before any `pass`, per the skill's "Independent Adjudication" section. 
 ```text
 Target: <repository-relative path or scope>
 Target digest: <git rev-parse HEAD, or a content hash of the reviewed scope>
-Claimed verdict tuple:
-  decision: <block|conditional|pass>
-  residual risk: <critical|high|moderate|low|unknown>
-  review confidence: <high|medium|low>
-  review completeness: <sufficient|limited|inconclusive>
 ```
 
-Do NOT include findings, evidence, severities, grime IDs, proposed fixes, the report, or your reasoning. The verifier's value is that it has not seen them; contaminating the prompt destroys the only thing it provides.
+Do NOT include your verdict tuple, findings, evidence, severities, grime IDs,
+proposed fixes, the report, or your reasoning. The verifier's value is that it
+has not seen them; contaminating the prompt destroys the only thing it provides.
+Your tuple least of all — it is the answer it was asked to reach on its own.
+Resolve the two afterwards, which needs nothing sent beforehand.
 
 Resolve the two verdicts by the skill's table: the stricter decision wins, and an independent pass never upgrades your own `block` or `conditional`. If the verifier cannot run, record `Independent adjudication: not available`, set `review_confidence=low`, and cap at `conditional`/YELLOW.
 

@@ -502,7 +502,7 @@ func resultFrom(d Derived, in DeriveInput) *pb.GrimesResult {
 		r.IndependentReview = &pb.IndependentReview{
 			RunId:                   "run-derive-adj",
 			ReviewerId:              "adjudicator",
-			ZeroKnowledge:           true,
+			ContextOrigin:           pb.ContextOrigin_CONTEXT_ORIGIN_ENGINE_SPAWNED,
 			TargetFingerprintSha256: digest,
 			Verdict: &pb.Verdict{
 				Decision:           in.IndependentDecision,

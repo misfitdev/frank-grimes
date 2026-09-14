@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 # An independent reviewer that agrees. Fails loudly if handed anything beyond
-# the target identity and the claimed tuple.
+# the target identity — including the verdict it is meant to reach on its own.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
-for leak in GRIMES_FINDING GRIMES_EVIDENCE GRIMES_LEDGER GRIMES_SEVERITY GRIMES_SUMMARY; do
+for leak in GRIMES_FINDING GRIMES_EVIDENCE GRIMES_LEDGER GRIMES_SEVERITY GRIMES_SUMMARY GRIMES_CLAIMED; do
     if env | grep -q "^${leak}"; then
         echo "adjudicator received ${leak}; independence is broken" >&2
         exit 1
     fi
 done
-if [[ -z "${GRIMES_CLAIMED_DECISION:-}" ]]; then
-    echo "adjudicator received no claimed decision" >&2
+if [[ "${GRIMES_ROLE:-}" != "adjudicator" ]]; then
+    echo "adjudicator was not addressed as one" >&2
     exit 1
 fi
 
