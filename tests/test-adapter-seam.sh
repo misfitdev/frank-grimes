@@ -172,7 +172,9 @@ echo "--- The documented commands produce a record the engine accepts ---"
         --category=SEC --severity=P0 --blast=systemic --likelihood=likely \
         --path=bad-script.sh \
         --tier=E2 --claim="caller-controlled deletion path" \
-        --quote='rm -rf ./build/*' >/dev/null
+        --quote='rm -rf ./build/*' \
+        --disproof-action="tried to show the path is unreachable" \
+        --disproof-exit=1 --disproof-output="still reachable" >/dev/null
 ) || fail "the documented report commands failed"
 
 # Sealing runs as the provider command, so it inherits the run identity the
