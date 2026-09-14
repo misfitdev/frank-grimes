@@ -409,8 +409,10 @@ else
 fi
 
 # A mutation nobody probed and a probe with nothing mutated are both records of
-# something that did not happen.
-for partial in --control-mutation=x --control-action=y --control-output=z; do
+# something that did not happen. The last case would otherwise reach the
+# contract and be refused by field name rather than by flag.
+PARTIALS=(--control-mutation=x --control-action=y --control-output=z)
+for partial in "${PARTIALS[@]}"; do
     set +e
     OUT=$(cd "$WORK" && "$BIN" "${ACQUIT[@]}" "$partial" 2>&1)
     CODE=$?
@@ -421,6 +423,16 @@ for partial in --control-mutation=x --control-action=y --control-output=z; do
         fail "$partial alone was accepted (exit $CODE): $OUT"
     fi
 done
+
+set +e
+OUT=$(cd "$WORK" && "$BIN" "${ACQUIT[@]}" --control-action=y --control-output=z --control-exit=1 2>&1)
+CODE=$?
+set -e
+if [[ "$CODE" != "0" ]] && grep -q -- '--control-mutation' <<<"$OUT"; then
+    pass "a control with nothing mutated is refused by name"
+else
+    fail "a control with no mutation was accepted or refused by field (exit $CODE): $OUT"
+fi
 
 OUT=$(cd "$WORK" && "$BIN" "${ACQUIT[@]}" "${CONTROL[@]}" --control-exit=1 2>&1)
 if grep -q 'failed as required' <<<"$OUT"; then

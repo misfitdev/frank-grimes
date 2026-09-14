@@ -121,6 +121,11 @@ func TestMeasureProbedRequiresAProbeShownCapableOfFailing(t *testing.T) {
 		{"E2 finding", []*pb.CandidateFinding{citedCandidate()}, nil, false},
 		{"controlled acquittal", nil, []*pb.Acquittal{acquittal(pb.Category_CATEGORY_SEC, true)}, true},
 		{"uncontrolled acquittal", nil, []*pb.Acquittal{acquittal(pb.Category_CATEGORY_SEC, false)}, false},
+		// The contract refuses this shape outright, so it cannot arrive through
+		// a real run. Asserted here so the engine is independently right about
+		// it rather than right by way of a rule somewhere else.
+		{"acquittal whose control passed", nil,
+			[]*pb.Acquittal{survivedControl(pb.Category_CATEGORY_SEC)}, false},
 		{"controlled acquittal in an unrouted category", nil,
 			[]*pb.Acquittal{acquittal(pb.Category_CATEGORY_COR, true)}, false},
 	} {
@@ -156,6 +161,14 @@ func acquittal(c pb.Category, controlled bool) *pb.Acquittal {
 	if controlled {
 		a.Control = &pb.NegativeControl{Mutation: "break it", ProbeFailed: true}
 	}
+	return a
+}
+
+// survivedControl is a probe that passed even against the mutated target, so it
+// is blind to the defect it claims to rule out.
+func survivedControl(c pb.Category) *pb.Acquittal {
+	a := acquittal(c, true)
+	a.Control.ProbeFailed = false
 	return a
 }
 
