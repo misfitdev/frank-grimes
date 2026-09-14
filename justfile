@@ -35,6 +35,10 @@ fmt-check:
 preview:
     cd docs && python3 -m http.server 8080
 
+# Sync beads status into GitHub Project v2 #5 (manual/debug run)
+sync-github:
+    python3 scripts/sync-beads-github.py
+
 # Lint, format-check, validate, and run contract tests
 check: lint fmt-check proto-lint vet test-go validate test-fix-gate test-adjudication test-stop-hook test-contracts test-collector test-orchestrator test-adapter-seam
 

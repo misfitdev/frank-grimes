@@ -31,3 +31,11 @@ if command -v bd >/dev/null 2>&1; then
   if [ $_bd_exit -ne 0 ]; then exit $_bd_exit; fi
 fi
 # --- END BEADS INTEGRATION v1.2.2 ---
+
+# Fires the beads->GitHub project sync in the background so a merge/pull is
+# never blocked waiting on the GitHub API.
+if command -v gh >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+  _repo_root=$(git rev-parse --show-toplevel)
+  nohup python3 "$_repo_root/scripts/sync-beads-github.py" >>"$_repo_root/.beads/sync-github.log" 2>&1 &
+  disown 2>/dev/null || true
+fi
