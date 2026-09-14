@@ -386,6 +386,34 @@ fi
 rm -rf "$WORK"
 
 echo ""
+echo "--- A refusal names a flag the command actually defines ---"
+
+# Every prefixed evidence family shortens the exit flag: --probe-exit, not
+# --probe-exit-code. A message built by concatenation sends the caller looking
+# for a flag nobody defined.
+WORK="$(mktemp -d)"
+mkdir -p "$WORK/.grimes"
+BIG=2147483648
+for case in \
+    "disproof-exit:report add --category=SEC --severity=P2 --blast=local_component --likelihood=likely --path=a.sh --tier=E2 --claim=c --quote=q --disproof-action=x --disproof-output=y" \
+    "probe-exit:report acquit --category=SEC --path=a.sh --claim=c --scope=s --probe-action=x --probe-output=y" \
+    "control-exit:report acquit --category=SEC --path=a.sh --claim=c --scope=s --probe-action=x --probe-exit=0 --probe-output=y --control-mutation=m --control-action=x --control-output=z"; do
+    FLAG="${case%%:*}"
+    ARGS="${case#*:}"
+    set +e
+    # shellcheck disable=SC2086  # the argument list is the case under test
+    OUT=$(cd "$WORK" && "$BIN" $ARGS "--$FLAG=$BIG" 2>&1)
+    CODE=$?
+    set -e
+    if [[ "$CODE" != "0" ]] && grep -qF -- "--$FLAG must be between" <<<"$OUT"; then
+        pass "an out-of-range --$FLAG is refused by its own name"
+    else
+        fail "--$FLAG was refused under another name (exit $CODE): $OUT"
+    fi
+done
+rm -rf "$WORK"
+
+echo ""
 echo "--- An acquittal carries the control that showed its probe can fail ---"
 
 WORK="$(mktemp -d)"
