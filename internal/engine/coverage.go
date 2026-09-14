@@ -21,9 +21,9 @@ type Coverage struct {
 	// CategoriesStopped is true when every routed category recorded a stop and
 	// none of them was blocked for want of evidence.
 	CategoriesStopped bool
-	// Probed is true when some category attempted a probe. Finding a defect is
-	// not evidence that an invariant was tested, which is what the count of
-	// candidates used to stand in for.
+	// Probed is true when this review is known to have run a probe capable of
+	// failing: one that caught a defect, or one shown able to catch one. A count
+	// of probes the provider typed is neither.
 	Probed bool
 	// UnknownRemains is true when a material unit was skipped or a category
 	// stopped because the evidence to continue was unavailable.
@@ -108,9 +108,46 @@ func measure(report *pb.ProviderReport, inventory *pb.TargetInventory, routed []
 		if s.GetCondition() == pb.StopCondition_STOP_CONDITION_EVIDENCE_UNAVAILABLE {
 			cov.UnknownRemains = true
 		}
-		if s.GetProbesAttempted() > 0 {
-			cov.Probed = true
+	}
+	cov.Probed = probed(report, wasRouted)
+	return cov, nil
+}
+
+// probed reports whether this review ran a probe that could have failed.
+//
+// A probe that caught a defect demonstrated its own capability by catching it.
+// A probe that caught nothing demonstrates nothing until a negative control
+// shows it fails when the defect is present, which is the whole of this rule:
+// a check that cannot fail and a check that tried and passed leave the same
+// record otherwise.
+//
+// Both sides are confined to the categories this run routed. A probe run
+// against something nobody asked about says nothing about the review that was
+// asked for.
+func probed(report *pb.ProviderReport, wasRouted map[pb.Category]bool) bool {
+	for _, c := range report.GetCandidates() {
+		if wasRouted[c.GetCategory()] && c.GetEvidence().GetTier() == pb.EvidenceTier_EVIDENCE_TIER_E1 {
+			return true
 		}
 	}
-	return cov, nil
+	for _, a := range report.GetAcquittals() {
+		if wasRouted[a.GetCategory()] && controlFailed(a.GetControl()) {
+			return true
+		}
+	}
+	return false
+}
+
+// controlFailed reads the outcome from the record rather than from a claim
+// about it. An executed command failed when it exited non-zero; a
+// counterexample is itself the failure it would have to report.
+func controlFailed(c *pb.NegativeControl) bool {
+	switch exhibit := c.GetResult().GetExhibit().(type) {
+	case *pb.Reproduction_ExecutedCommand:
+		return exhibit.ExecutedCommand.GetExitCode() != 0
+	case *pb.Reproduction_Counterexample:
+		return true
+	default:
+		return false
+	}
 }

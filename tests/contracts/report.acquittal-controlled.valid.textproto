@@ -1,0 +1,30 @@
+# An acquittal whose probe was shown capable of failing: the defect was made
+# present, the same probe was run again, and it failed.
+schema_major: 2
+run_id: "run-001"
+target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
+mode: MODE_REPORT
+iteration: 1
+routed_categories: [CATEGORY_SEC]
+category_stops { category: CATEGORY_SEC condition: STOP_CONDITION_MARGINAL_YIELD probes_attempted: 3 }
+coverage { examined: "src/a.sh" }
+acquittals {
+  category: CATEGORY_SEC
+  claim_anchor { repo_line { path { value: "src/a.sh" } } }
+  claim: "the target rejects an unsigned request"
+  scope: "the request path, not the token store"
+  probe {
+    completed_at { seconds: 1767225845 }
+    executed_command { action: "run the suite" cwd { value: "." } exit_code: 0 output_excerpt: "all assertions held" }
+  }
+  control {
+    mutation: "drop the signature check"
+    result {
+      completed_at { seconds: 1767225846 }
+      executed_command { action: "run the suite" cwd { value: "." } exit_code: 1 output_excerpt: "the unsigned request was accepted" }
+    }
+  }
+}
+candidates_examined: 1
+candidates_disproved: 1
+summary: "One claim survived a probe shown able to break it."

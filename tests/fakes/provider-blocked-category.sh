@@ -11,6 +11,8 @@ for CATEGORY in "${ROUTED[@]}"; do
     [[ "$CATEGORY" == "SEC" ]] && continue
     grimes-contract report stop --category="$CATEGORY" --condition=marginal-yield --probes=2 >/dev/null
 done
+"$(cd "$(dirname "$0")" && pwd)/acquit.sh" COR
+
 grimes-contract report seal --run-id="${GRIMES_RUN_ID:-}" \
     --target-root="${GRIMES_TARGET_ROOT:-}" --target-scope="${GRIMES_TARGET_SCOPE:-src}" \
     --kind="${GRIMES_TARGET_KIND:-code}" --iteration="${GRIMES_ITERATION:-1}" \

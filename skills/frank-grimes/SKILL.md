@@ -108,7 +108,9 @@ Assume the target fails its claims or critical invariants somewhere in the route
 
 Attack every routed category. Do not stop at the first flaw; hunt the terminal ones first. Within each category, use the priority order in its attack card and the stopping rule in Phase 7.
 
-Before freehand analysis, exhaust the target's own mechanical checks. When the target has a repository, discover its existing local analyzers and tests from its checked-in workflow files and scripts, inspect the command before execution, then run the applicable commands that require no network or unavailable service, and record the exact command, exit code, and bounded output. When the target is a supplied artifact with no runnable check, record the read actions performed over it and the spans they covered. Treat either result as E1 even when it finds nothing. Spend model attention where mechanical tools are weak: cross-file invariants, authorization decisions, ordering, contextual wrongness, failure propagation, and mismatch between claims and behavior.
+Before freehand analysis, exhaust the target's own mechanical checks. When the target has a repository, discover its existing local analyzers and tests from its checked-in workflow files and scripts, inspect the command before execution, then run the applicable commands that require no network or unavailable service, and record the exact command, exit code, and bounded output. When the target is a supplied artifact with no runnable check, record the read actions performed over it and the spans they covered. Spend model attention where mechanical tools are weak: cross-file invariants, authorization decisions, ordering, contextual wrongness, failure propagation, and mismatch between claims and behavior.
+
+A performed check is E1 evidence of the behavior it observed. A check that found nothing is evidence that nothing is there only when a negative control was performed: the defect the check claims to rule out is made present, the check is run again, and it fails. A check that cannot fail distinguishes nothing, and a check whose negative control was not attempted follows the unattemptable-falsifier path rather than acquitting anything. Record the mutation, the rerun, and its result alongside the check.
 
 Every candidate finding must have exactly one primary evidence tier. The tier is the same for every target type; only the record it requires follows from what the target is:
 
@@ -226,11 +228,11 @@ If the analysis cannot fit these constraints, report fewer findings in the regis
 
 ### Survived Scrutiny (Earned Acquittals)
 
-An entry is allowed only when the listed probe was performed during this review and its recorded result failed to falsify the claim. “Looks sound,” a citation without an attempted falsifier, and absence of a finding do not qualify.
+An entry is allowed only when the listed probe was performed during this review, its recorded result failed to falsify the claim, and a negative control showed the probe fails when the defect is present. “Looks sound,” a citation without an attempted falsifier, absence of a finding, and a probe never shown capable of failing do not qualify.
 
-| Claim or Invariant | Specific Probe Performed | Recorded Result | Scope of Acquittal |
-|--------------------|--------------------------|-----------------|---------------------|
-|                    |                          |                 |                     |
+| Claim or Invariant | Specific Probe Performed | Recorded Result | Negative Control and Result | Scope of Acquittal |
+|--------------------|--------------------------|-----------------|-----------------------------|---------------------|
+|                    |                          |                 |                             |                     |
 
 ### Not Examined
 

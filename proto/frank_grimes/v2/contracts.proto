@@ -362,6 +362,48 @@ message CategoryStop {
   uint32 probes_attempted = 3;
 }
 
+// What was done to show the probe could have failed, and what happened when it
+// was done. A probe that cannot fail distinguishes nothing, so its passing says
+// nothing about the target.
+//
+// Whether the probe failed is not recorded, because a provider that could state
+// it would be writing down the outcome it wanted. It is read from the result:
+// a command that exited non-zero, or a counterexample the mutated target could
+// not survive.
+message NegativeControl {
+  // A control whose command succeeded is a probe that did not notice the defect
+  // it was pointed at. That is a broken probe rather than a result to record
+  // with a caveat, so there is no way to write it down.
+  option (buf.validate.message).cel = {
+    id: "control.probe_must_have_failed"
+    message: "a probe that passed against the mutated target has not been shown capable of failing"
+    expression:
+      "!has(this.result.executed_command) || "
+      "this.result.executed_command.exit_code != 0"
+  };
+
+  string mutation = 1 [(buf.validate.field).string.min_len = 1];
+  Reproduction result = 2 [(buf.validate.field).required = true];
+  reserved 3;
+  reserved "probe_failed";
+}
+
+// A claim this review attacked and could not break.
+//
+// An acquittal without a control is still a record of what was done. It earns
+// nothing, the way an unattemptable falsifier earns nothing.
+message Acquittal {
+  Category category = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  Anchor claim_anchor = 2 [(buf.validate.field).required = true];
+  string claim = 3 [(buf.validate.field).string.min_len = 1];
+  Reproduction probe = 4 [(buf.validate.field).required = true];
+  NegativeControl control = 5;
+  string scope = 6 [(buf.validate.field).string.min_len = 1];
+}
+
 // A unit deliberately not examined. The reason is required: an unexplained
 // skip is indistinguishable from an oversight.
 message SkippedUnit {
@@ -415,6 +457,19 @@ message ProviderReport {
       "this.category_stops.all(s, "
       "this.category_stops.filter(o, o.category == s.category).size() == 1)"
   };
+  // An acquittal anchored in some other kind of artifact cannot be resolved
+  // against the target it claims to acquit. Same rule the ledger applies to a
+  // finding's anchor, for the same reason.
+  option (buf.validate.message).cel = {
+    id: "report.acquittal_anchor_matches_target"
+    message: "each acquittal must be anchored in the kind of target under review"
+    expression:
+      "this.acquittals.all(a, "
+      "this.target.kind == 1 ? has(a.claim_anchor.repo_line) : "
+      "this.target.kind == 2 ? has(a.claim_anchor.document_part) : "
+      "this.target.kind == 3 ? has(a.claim_anchor.argument_step) : "
+      "has(a.claim_anchor.retrieved_source))"
+  };
   // A unit cannot be both looked at and deliberately not looked at. The
   // engine checks the union against the inventory; only overlap is visible
   // from inside the report.
@@ -449,6 +504,7 @@ message ProviderReport {
   string summary = 11 [(buf.validate.field).string.min_len = 1];
   UnitCoverage coverage = 12;
   repeated CategoryStop category_stops = 13;
+  repeated Acquittal acquittals = 14;
 }
 
 // What an independent review hands back: a verdict tuple over a named target,

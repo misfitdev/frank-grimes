@@ -235,6 +235,20 @@ grimes-contract report stop --category=SEC \
 newline. `--skip` takes one unit per call, so an id containing any delimiter
 survives.
 
+An acquittal the skill says you earned is recorded with `report acquit`:
+
+```bash
+grimes-contract report acquit --category=SEC --path=<file> \
+  --claim="<claim>" --scope="<scope>" \
+  --probe-action="<command>" --probe-exit=<n> --probe-output="<excerpt>" \
+  --control-mutation="<mutation>" --control-action="<command>" \
+  --control-exit=<n> --control-output="<excerpt>"
+```
+
+The `--control-*` flags go together or not at all, and the command derives the
+control's outcome from `--control-exit` rather than taking it as a flag. The
+skill governs when a control is required and what it has to show.
+
 ### Seal and run
 
 Sealing happens inside the run, as the provider command: the engine exports the
