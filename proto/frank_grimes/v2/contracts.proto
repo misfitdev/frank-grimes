@@ -362,6 +362,40 @@ message CategoryStop {
   uint32 probes_attempted = 3;
 }
 
+// What was done to show the probe could have failed, and what happened when it
+// was done. A probe that cannot fail distinguishes nothing, so its passing says
+// nothing about the target.
+message NegativeControl {
+  string mutation = 1 [(buf.validate.field).string.min_len = 1];
+  Reproduction result = 2 [(buf.validate.field).required = true];
+  bool probe_failed = 3;
+}
+
+// A claim this review attacked and could not break.
+//
+// An acquittal without a control is still a record of what was done. It earns
+// nothing, the way an unattemptable falsifier earns nothing.
+message Acquittal {
+  // A control the probe survived means the probe is blind to the defect it
+  // claims to rule out. That is a broken probe rather than an acquittal to be
+  // recorded with a caveat, so there is no way to write it down as one.
+  option (buf.validate.message).cel = {
+    id: "acquittal.control_must_have_failed"
+    message: "a probe that passed against the mutated target has not been shown capable of failing"
+    expression: "!has(this.control) || this.control.probe_failed"
+  };
+
+  Category category = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  Anchor claim_anchor = 2 [(buf.validate.field).required = true];
+  string claim = 3 [(buf.validate.field).string.min_len = 1];
+  Reproduction probe = 4 [(buf.validate.field).required = true];
+  NegativeControl control = 5;
+  string scope = 6 [(buf.validate.field).string.min_len = 1];
+}
+
 // A unit deliberately not examined. The reason is required: an unexplained
 // skip is indistinguishable from an oversight.
 message SkippedUnit {
@@ -449,6 +483,7 @@ message ProviderReport {
   string summary = 11 [(buf.validate.field).string.min_len = 1];
   UnitCoverage coverage = 12;
   repeated CategoryStop category_stops = 13;
+  repeated Acquittal acquittals = 14;
 }
 
 // What an independent review hands back: a verdict tuple over a named target,

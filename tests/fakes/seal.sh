@@ -29,6 +29,9 @@ for CATEGORY in "${ROUTED[@]}"; do
         --condition=marginal-yield --probes=2 >/dev/null
 done
 
+# One acquittal carrying the control that showed its probe can fail.
+"$(cd "$(dirname "$0")" && pwd)/acquit.sh" "${ROUTED[0]}"
+
 grimes-contract report seal \
     --run-id="${GRIMES_RUN_ID:-}" \
     --target-root="${GRIMES_TARGET_ROOT:-}" \

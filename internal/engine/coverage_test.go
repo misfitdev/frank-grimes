@@ -105,20 +105,58 @@ func TestMeasureDistinguishesWhyACategoryStopped(t *testing.T) {
 
 // Finding a defect is not evidence that an invariant was tested, which is what
 // the count of candidates used to stand in for.
-func TestMeasureProbedComesFromProbesNotFindings(t *testing.T) {
-	r := &pb.ProviderReport{
-		RoutedCategories: []pb.Category{pb.Category_CATEGORY_SEC},
-		CategoryStops:    []*pb.CategoryStop{stop(pb.Category_CATEGORY_SEC, yield, 0)},
-		Coverage:         &pb.UnitCoverage{Examined: []string{"a"}},
-		Candidates:       []*pb.CandidateFinding{{}, {}},
+// Probed means this review ran something known to be capable of failing. The
+// whole space, because a count of probes the provider typed used to stand in
+// for it and every combination here would have read the same.
+func TestMeasureProbedRequiresAProbeShownCapableOfFailing(t *testing.T) {
+	routed := []pb.Category{pb.Category_CATEGORY_SEC}
+	for _, c := range []struct {
+		name       string
+		candidates []*pb.CandidateFinding
+		acquittals []*pb.Acquittal
+		want       bool
+	}{
+		{"nothing but a probe count", nil, nil, false},
+		{"E1 finding", []*pb.CandidateFinding{e1Candidate()}, nil, true},
+		{"E2 finding", []*pb.CandidateFinding{citedCandidate()}, nil, false},
+		{"controlled acquittal", nil, []*pb.Acquittal{acquittal(pb.Category_CATEGORY_SEC, true)}, true},
+		{"uncontrolled acquittal", nil, []*pb.Acquittal{acquittal(pb.Category_CATEGORY_SEC, false)}, false},
+		{"controlled acquittal in an unrouted category", nil,
+			[]*pb.Acquittal{acquittal(pb.Category_CATEGORY_COR, true)}, false},
+	} {
+		r := &pb.ProviderReport{
+			RoutedCategories: routed,
+			// A non-zero count, so a derivation that still read it would
+			// answer true for every case here.
+			CategoryStops: []*pb.CategoryStop{stop(pb.Category_CATEGORY_SEC, yield, 4)},
+			Coverage:      &pb.UnitCoverage{Examined: []string{"a"}},
+			Candidates:    c.candidates,
+			Acquittals:    c.acquittals,
+		}
+		cov, err := measure(r, inventoryOf("a"), routed)
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if cov.Probed != c.want {
+			t.Errorf("%s: probed = %v, want %v", c.name, cov.Probed, c.want)
+		}
 	}
-	cov, err := measure(r, inventoryOf("a"), r.GetRoutedCategories())
-	if err != nil {
-		t.Fatal(err)
+}
+
+func e1Candidate() *pb.CandidateFinding {
+	return &pb.CandidateFinding{Evidence: &pb.Evidence{Tier: pb.EvidenceTier_EVIDENCE_TIER_E1}}
+}
+
+func citedCandidate() *pb.CandidateFinding {
+	return &pb.CandidateFinding{Evidence: &pb.Evidence{Tier: pb.EvidenceTier_EVIDENCE_TIER_E2}}
+}
+
+func acquittal(c pb.Category, controlled bool) *pb.Acquittal {
+	a := &pb.Acquittal{Category: c, Claim: "it holds", Scope: "the request path"}
+	if controlled {
+		a.Control = &pb.NegativeControl{Mutation: "break it", ProbeFailed: true}
 	}
-	if cov.Probed {
-		t.Error("candidates without an attempted probe counted as having probed")
-	}
+	return a
 }
 
 // The routed set is the engine's, not the report's. A provider that names a

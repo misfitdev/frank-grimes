@@ -41,6 +41,8 @@ func cmdReport(args []string) error {
 		return cmdReportCover(args[1:])
 	case "stop":
 		return cmdReportStop(args[1:])
+	case "acquit":
+		return cmdReportAcquit(args[1:])
 	case "show":
 		return cmdReportShow(args[1:])
 	default:
@@ -59,6 +61,10 @@ const reportUsage = `report subcommands:
                [--skip=<id> --skip-reason=<text> [--skip-material]]
   report stop  --category=<CODE> --condition=<marginal-yield|probes-exhausted|evidence-unavailable> \
                [--probes=<n>]
+  report acquit --category=<CODE> <anchor> --claim=<text> --scope=<text> \
+               --probe-action=<cmd> [--probe-cwd=<path>] [--probe-exit=<n>] --probe-output=<text> \
+               [--control-mutation=<text> --control-action=<cmd> [--control-cwd=<path>] \
+                --control-exit=<n> --control-output=<text>]
   report show
 
 Anchor:   --path / --document with --section / --argument with --step / --source
@@ -441,6 +447,132 @@ func cmdReportStop(args []string) error {
 	return nil
 }
 
+// cmdReportAcquit records a claim this review attacked and could not break.
+//
+// The negative control is what separates an acquittal from a probe that was
+// never capable of failing. It is optional here because a control that cannot
+// be run is a real situation; an acquittal without one is simply worth nothing
+// downstream rather than being refused.
+func cmdReportAcquit(args []string) error {
+	fs := flag.NewFlagSet("report acquit", flag.ContinueOnError)
+	file := fs.String("file", DefaultReportPath, "report being built")
+	category := fs.String("category", "", "canonical category code, e.g. SEC")
+	claim := fs.String("claim", "", "the claim or invariant that was attacked")
+	scope := fs.String("scope", "", "what this acquittal does and does not cover")
+
+	path := fs.String("path", "", "repository-relative path")
+	document := fs.String("document", "", "supplied document name")
+	section := fs.String("section", "", "section or clause within the document")
+	argument := fs.String("argument", "", "supplied argument name")
+	step := fs.Uint("step", 0, "numbered claim or step within the argument")
+	source := fs.String("source", "", "retrieved source URI")
+	publisher := fs.String("publisher", "", "who published the retrieved source")
+	snapshot := fs.String("snapshot-sha256", "", "hex digest of the snapshot that was read")
+	retrievedAt := fs.String("retrieved-at", "", "RFC 3339 time the source was read")
+	sourceSection := fs.String("source-section", "", "section of the retrieved source")
+
+	probeAction := fs.String("probe-action", "", "the probe performed against the target as it is")
+	probeCwd := fs.String("probe-cwd", ".", "working directory the probe ran in")
+	probeExit := fs.Int("probe-exit", 0, "exit status of the probe")
+	probeOutput := fs.String("probe-output", "", "result excerpt from the probe")
+	probeSum := fs.String("probe-output-sha256", "", "hex digest of the probe output instead of an excerpt")
+
+	mutation := fs.String("control-mutation", "", "what was changed or injected to make the defect present")
+	controlAction := fs.String("control-action", "", "the probe performed against the mutated target")
+	controlCwd := fs.String("control-cwd", ".", "working directory the control ran in")
+	controlExit := fs.Int("control-exit", 0, "exit status of the probe against the mutated target")
+	controlOutput := fs.String("control-output", "", "result excerpt from the control")
+	controlSum := fs.String("control-output-sha256", "", "hex digest of the control output instead of an excerpt")
+
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *category == "" || *claim == "" || *scope == "" {
+		return fmt.Errorf("--category, --claim, and --scope are required")
+	}
+	if *step > math.MaxUint32 {
+		return fmt.Errorf("--step must not exceed %d", uint32(math.MaxUint32))
+	}
+
+	cat, err := contracts.ParseCategory(strings.ToUpper(*category))
+	if err != nil {
+		return err
+	}
+	anchor, err := anchorFromFlags(*path, *document, *section, *argument, uint32(*step), *source, sourceMeta{
+		publisher: *publisher, snapshot: *snapshot, retrieved: *retrievedAt,
+		section: *sourceSection, required: true,
+	})
+	if err != nil {
+		return err
+	}
+	probe, err := reproductionOf("probe-", *probeAction, *probeCwd, *probeExit, *probeOutput, *probeSum)
+	if err != nil {
+		return err
+	}
+
+	acquittal := &pb.Acquittal{
+		Category:    cat,
+		ClaimAnchor: anchor,
+		Claim:       *claim,
+		Probe:       probe,
+		Scope:       *scope,
+	}
+	control, err := controlFromFlags(*mutation, *controlAction, *controlCwd, *controlExit, *controlOutput, *controlSum)
+	if err != nil {
+		return err
+	}
+	acquittal.Control = control
+
+	// Validated alone so the message names this acquittal rather than failing
+	// the whole report at seal time with no indication which one was at fault.
+	if err := contracts.Validate(acquittal); err != nil {
+		return err
+	}
+
+	report, err := loadReport(*file)
+	if err != nil {
+		return err
+	}
+	report.Acquittals = append(report.Acquittals, acquittal)
+	if err := saveReport(*file, report); err != nil {
+		return err
+	}
+	fmt.Printf("acquitted %s claim at %s (control %s)\n",
+		contracts.CategoryName(cat), anchorLabel(anchor), controlLabel(control))
+	return nil
+}
+
+// controlFromFlags builds the negative control, or returns nil when none was
+// offered. A partial set is refused: a mutation nobody probed and a probe with
+// nothing mutated are both records of something that did not happen.
+func controlFromFlags(mutation, action, cwd string, exitCode int, output, outputSum string) (*pb.NegativeControl, error) {
+	offered := mutation != "" || action != "" || output != "" || outputSum != ""
+	if !offered {
+		return nil, nil
+	}
+	if mutation == "" || action == "" {
+		return nil, fmt.Errorf("a negative control needs --control-mutation and --control-action")
+	}
+	result, err := reproductionOf("control-", action, cwd, exitCode, output, outputSum)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.NegativeControl{
+		Mutation: mutation,
+		Result:   result,
+		// Derived, not asserted: a caller that could declare its own control
+		// failed would be back to writing down the outcome it wanted.
+		ProbeFailed: exitCode != 0,
+	}, nil
+}
+
+func controlLabel(c *pb.NegativeControl) string {
+	if c == nil {
+		return "unattempted"
+	}
+	return "failed as required"
+}
+
 func parseStopCondition(s string) (pb.StopCondition, error) {
 	switch s {
 	case "marginal-yield":
@@ -500,6 +632,41 @@ func saveReport(path string, report *pb.ProviderReport) error {
 	return contracts.WriteAtomic(path, []byte(out))
 }
 
+// reproductionOf records a command that was actually run. The prefix names the
+// flag family at fault, since an acquittal supplies two of them.
+func reproductionOf(prefix, action, cwd string, exitCode int, output, outputSum string) (*pb.Reproduction, error) {
+	if action == "" {
+		return nil, fmt.Errorf("--%saction is required", prefix)
+	}
+	// int32 in the contract: a wider value would wrap and the record would
+	// carry an outcome the command did not have.
+	if exitCode > math.MaxInt32 || exitCode < math.MinInt32 {
+		return nil, fmt.Errorf("--%sexit-code must be between %d and %d", prefix,
+			int32(math.MinInt32), int32(math.MaxInt32))
+	}
+	cmd := &pb.ExecutedCommand{
+		Action:   action,
+		Cwd:      &pb.RepoPath{Value: cwd},
+		ExitCode: int32(exitCode),
+	}
+	switch {
+	case output != "":
+		cmd.Output = &pb.ExecutedCommand_OutputExcerpt{OutputExcerpt: output}
+	case outputSum != "":
+		sum, err := hexBytes(outputSum)
+		if err != nil {
+			return nil, err
+		}
+		cmd.Output = &pb.ExecutedCommand_OutputSha256{OutputSha256: sum}
+	default:
+		return nil, fmt.Errorf("--%soutput or --%soutput-sha256 is required", prefix, prefix)
+	}
+	return &pb.Reproduction{
+		CompletedAt: timestamppb.New(contracts.Now().UTC()),
+		Exhibit:     &pb.Reproduction_ExecutedCommand{ExecutedCommand: cmd},
+	}, nil
+}
+
 func evidenceFromFlags(tier, claim string, anchor *pb.Anchor,
 	action, cwd string, exitCode int, output, outputSum string,
 	quote, assumption, reasoning, falsifier string,
@@ -508,36 +675,11 @@ func evidenceFromFlags(tier, claim string, anchor *pb.Anchor,
 	switch strings.ToUpper(tier) {
 	case "E1":
 		e.Tier = pb.EvidenceTier_EVIDENCE_TIER_E1
-		if action == "" {
-			return nil, fmt.Errorf("E1 needs --action")
+		repro, err := reproductionOf("", action, cwd, exitCode, output, outputSum)
+		if err != nil {
+			return nil, err
 		}
-		// int32 in the contract: a wider value would wrap and the evidence would
-		// record an outcome the command did not have.
-		if exitCode > math.MaxInt32 || exitCode < math.MinInt32 {
-			return nil, fmt.Errorf("--exit-code must be between %d and %d",
-				int32(math.MinInt32), int32(math.MaxInt32))
-		}
-		cmd := &pb.ExecutedCommand{
-			Action:   action,
-			Cwd:      &pb.RepoPath{Value: cwd},
-			ExitCode: int32(exitCode),
-		}
-		switch {
-		case output != "":
-			cmd.Output = &pb.ExecutedCommand_OutputExcerpt{OutputExcerpt: output}
-		case outputSum != "":
-			sum, err := hexBytes(outputSum)
-			if err != nil {
-				return nil, err
-			}
-			cmd.Output = &pb.ExecutedCommand_OutputSha256{OutputSha256: sum}
-		default:
-			return nil, fmt.Errorf("E1 needs --output or --output-sha256")
-		}
-		e.Detail = &pb.Evidence_Reproduction{Reproduction: &pb.Reproduction{
-			CompletedAt: timestamppb.New(contracts.Now().UTC()),
-			Exhibit:     &pb.Reproduction_ExecutedCommand{ExecutedCommand: cmd},
-		}}
+		e.Detail = &pb.Evidence_Reproduction{Reproduction: repro}
 	case "E2":
 		e.Tier = pb.EvidenceTier_EVIDENCE_TIER_E2
 		if quote == "" {

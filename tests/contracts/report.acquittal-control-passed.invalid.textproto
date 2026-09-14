@@ -1,0 +1,31 @@
+# A probe that still passed against the mutated target is blind to the defect it
+# claims to rule out. That is a broken probe, not an acquittal.
+schema_major: 2
+run_id: "run-001"
+target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
+mode: MODE_REPORT
+iteration: 1
+routed_categories: [CATEGORY_SEC]
+category_stops { category: CATEGORY_SEC condition: STOP_CONDITION_MARGINAL_YIELD probes_attempted: 3 }
+coverage { examined: "src/a.sh" }
+acquittals {
+  category: CATEGORY_SEC
+  claim_anchor { repo_line { path { value: "src/a.sh" } } }
+  claim: "the target rejects an unsigned request"
+  scope: "the request path"
+  probe {
+    completed_at { seconds: 1767225845 }
+    executed_command { action: "run the suite" cwd { value: "." } exit_code: 0 output_excerpt: "all assertions held" }
+  }
+  control {
+    mutation: "drop the signature check"
+    result {
+      completed_at { seconds: 1767225846 }
+      executed_command { action: "run the suite" cwd { value: "." } exit_code: 0 output_excerpt: "all assertions held" }
+    }
+    probe_failed: false
+  }
+}
+candidates_examined: 1
+candidates_disproved: 1
+summary: "The probe never noticed."

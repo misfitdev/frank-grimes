@@ -386,6 +386,59 @@ fi
 rm -rf "$WORK"
 
 echo ""
+echo "--- An acquittal carries the control that showed its probe can fail ---"
+
+WORK="$(mktemp -d)"
+mkdir -p "$WORK/.grimes"
+ACQUIT=(report acquit --category=SEC --path=a.sh
+    --claim="the target rejects an unsigned request" --scope="the request path"
+    --probe-action="run the suite" --probe-exit=0 --probe-output="all held")
+CONTROL=(--control-mutation="drop the signature check" --control-action="run the suite"
+    --control-output="the unsigned request was accepted")
+
+# Whether the control failed is read from its exit status. A caller that could
+# declare it would be writing down the outcome it wanted.
+set +e
+OUT=$(cd "$WORK" && "$BIN" "${ACQUIT[@]}" "${CONTROL[@]}" --control-exit=0 2>&1)
+CODE=$?
+set -e
+if [[ "$CODE" != "0" ]] && grep -qi 'capable of failing' <<<"$OUT"; then
+    pass "a control the probe survived is refused by name"
+else
+    fail "a probe that passed against the mutated target was accepted (exit $CODE): $OUT"
+fi
+
+# A mutation nobody probed and a probe with nothing mutated are both records of
+# something that did not happen.
+for partial in --control-mutation=x --control-action=y --control-output=z; do
+    set +e
+    OUT=$(cd "$WORK" && "$BIN" "${ACQUIT[@]}" "$partial" 2>&1)
+    CODE=$?
+    set -e
+    if [[ "$CODE" != "0" ]] && grep -q -- '--control-' <<<"$OUT"; then
+        pass "a partial negative control is refused by name ($partial)"
+    else
+        fail "$partial alone was accepted (exit $CODE): $OUT"
+    fi
+done
+
+OUT=$(cd "$WORK" && "$BIN" "${ACQUIT[@]}" "${CONTROL[@]}" --control-exit=1 2>&1)
+if grep -q 'failed as required' <<<"$OUT"; then
+    pass "a control the probe failed against is admitted"
+else
+    fail "a controlled acquittal was refused: $OUT"
+fi
+
+# An acquittal with no control is a record of what was done. It earns nothing
+# downstream, which is the engine's business rather than this command's.
+if (cd "$WORK" && "$BIN" "${ACQUIT[@]}" >/dev/null 2>&1); then
+    pass "an acquittal with no control is recorded"
+else
+    fail "an acquittal without a control was refused"
+fi
+rm -rf "$WORK"
+
+echo ""
 echo "--- A retrieved source carries its retrieval identity ---"
 
 # Every --source candidate was rejected by validation, because the anchor was

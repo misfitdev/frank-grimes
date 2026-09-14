@@ -523,6 +523,31 @@ else
 fi
 rm -rf "$WS"
 
+# The same review with the control removed. This is the shape that let PR #28
+# ship: a check that passed while the defect it named was present, recorded as
+# evidence the target was sound. Nothing else about the run changes.
+WS="$(mktemp -d)"
+mkdir -p "$WS/src"
+printf 'echo one\n' >"$WS/src/a.sh"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --format=prototext \
+    --provider-command="$FAKES/provider-uncontrolled.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh src 2>&1)"
+CODE=$?
+set -e
+assert_eq "$CODE" "0" "an uncontrolled review completes"
+if echo "$OUT" | grep -qE 'legacy_color: +LEGACY_COLOR_GREEN'; then
+    fail "a probe never shown capable of failing still reached GREEN"
+else
+    pass "a probe never shown capable of failing does not reach GREEN"
+fi
+if echo "$OUT" | grep -qE 'review_completeness: +REVIEW_COMPLETENESS_INCONCLUSIVE'; then
+    pass "an uncontrolled probe leaves completeness inconclusive"
+else
+    fail "completeness was not inconclusive: $(grep -aoE 'review_completeness: +[A-Z_]*' <<<"$OUT")"
+fi
+rm -rf "$WS"
+
 # A unit nobody looked at is the difference between a verdict over the target
 # and a verdict over part of it.
 WS="$(mktemp -d)"
