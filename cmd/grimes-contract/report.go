@@ -664,17 +664,26 @@ func saveReport(path string, report *pb.ProviderReport) error {
 func disproofFromFlags(fs *flag.FlagSet, action, cwd string, exitCode int,
 	output, outputSum, why string, contradicts bool,
 ) (*pb.DisproofAttempt, error) {
-	offered := false
+	var offered, performed []string
 	fs.Visit(func(f *flag.Flag) {
-		if strings.HasPrefix(f.Name, "disproof-") {
-			offered = true
+		if !strings.HasPrefix(f.Name, "disproof-") {
+			return
+		}
+		offered = append(offered, "--"+f.Name)
+		if f.Name != "disproof-unavailable" {
+			performed = append(performed, "--"+f.Name)
 		}
 	})
-	if !offered {
+	if len(offered) == 0 {
 		return nil, nil
 	}
-	if why != "" && action != "" {
-		return nil, fmt.Errorf("--disproof-unavailable and --disproof-action are exclusive")
+	// Presence, not value: --disproof-cwd carries a default, so a caller who
+	// passed it would otherwise be indistinguishable from one who did not.
+	// Dropping these silently would record an attempt nobody made as one
+	// nobody could make, and the difference is the whole point of the record.
+	if why != "" && len(performed) > 0 {
+		return nil, fmt.Errorf("--disproof-unavailable describes an attempt that did not happen, so it cannot be given with %s",
+			strings.Join(performed, ", "))
 	}
 	if why != "" {
 		return &pb.DisproofAttempt{Outcome: &pb.DisproofAttempt_Unavailable{Unavailable: why}}, nil

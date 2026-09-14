@@ -386,6 +386,38 @@ fi
 rm -rf "$WORK"
 
 echo ""
+echo "--- An unavailable disproof cannot carry the attempt it did not make ---"
+
+WORK="$(mktemp -d)"
+mkdir -p "$WORK/.grimes"
+ADD=(report add --category=SEC --severity=P2 --blast=local_component
+    --likelihood=likely --path=a.sh --tier=E2 --claim=c --quote=q
+    --disproof-unavailable="the service is not reachable")
+
+# Every performed-side flag, including the ones carrying a default and the
+# contradiction flag the contract would reject on its own.
+for extra in --disproof-action=x --disproof-cwd=. --disproof-exit=1 \
+    --disproof-output=y --disproof-output-sha256=aa --disproof-contradicts; do
+    set +e
+    OUT=$(cd "$WORK" && "$BIN" "${ADD[@]}" "$extra" 2>&1)
+    CODE=$?
+    set -e
+    if [[ "$CODE" != "0" ]] && grep -qF -- "--disproof-unavailable" <<<"$OUT"; then
+        pass "an unavailable disproof refuses $extra rather than dropping it"
+    else
+        fail "$extra was accepted alongside --disproof-unavailable (exit $CODE): $OUT"
+    fi
+done
+
+# The bare form still works, or the refusal above would be refusing everything.
+if (cd "$WORK" && "$BIN" "${ADD[@]}" >/dev/null 2>&1); then
+    pass "an unavailable disproof on its own is recorded"
+else
+    fail "an unavailable disproof was refused on its own"
+fi
+rm -rf "$WORK"
+
+echo ""
 echo "--- A refusal names a flag the command actually defines ---"
 
 # Every prefixed evidence family shortens the exit flag: --probe-exit, not
