@@ -338,6 +338,46 @@ message CandidateFinding {
   optional string suggested_fix = 5 [(buf.validate.field).string.max_len = 4096];
 }
 
+// What ended a category's grind.
+//
+// Recorded per routed category, because "every probe came back none" and "no
+// probe was possible" are different facts about a review and only one of them
+// is a stop the reviewer earned.
+enum StopCondition {
+  STOP_CONDITION_UNSPECIFIED = 0;
+  STOP_CONDITION_MARGINAL_YIELD = 1;
+  STOP_CONDITION_PROBES_EXHAUSTED = 2;
+  STOP_CONDITION_EVIDENCE_UNAVAILABLE = 3;
+}
+
+message CategoryStop {
+  Category category = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  StopCondition condition = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  uint32 probes_attempted = 3;
+}
+
+// A unit deliberately not examined. The reason is required: an unexplained
+// skip is indistinguishable from an oversight.
+message SkippedUnit {
+  string unit_id = 1 [(buf.validate.field).string.min_len = 1];
+  string reason = 2 [(buf.validate.field).string.min_len = 1];
+  bool material = 3;
+}
+
+// Which units of the target were looked at, and which deliberately were not.
+// The denominator lives in TargetInventory, which the engine owns; this is the
+// provider accounting for itself against it.
+message UnitCoverage {
+  repeated string examined = 1 [(buf.validate.field).repeated.unique = true];
+  repeated SkippedUnit skipped = 2;
+}
+
 // What a primary review hands back.
 //
 // There is no verdict here, and no colour, counts, or completion state. The
@@ -347,6 +387,25 @@ message CandidateFinding {
 // Nor is there a marginal-yield count: that decides when the loop stops, so it
 // is derived from what the ledger did and did not already hold.
 message ProviderReport {
+  // A category routed but never stopped is a grind that was abandoned rather
+  // than finished, and the record has to be able to tell the difference.
+  option (buf.validate.message).cel = {
+    id: "report.every_routed_category_stopped"
+    message: "every routed category must record what ended its grind"
+    expression:
+      "this.routed_categories.all(c, "
+      "this.category_stops.exists(s, s.category == c))"
+  };
+  // A unit cannot be both looked at and deliberately not looked at. The
+  // engine checks the union against the inventory; only overlap is visible
+  // from inside the report.
+  option (buf.validate.message).cel = {
+    id: "report.coverage_sets_are_disjoint"
+    message: "a unit cannot be both examined and skipped"
+    expression:
+      "this.coverage.skipped.all(s, "
+      "!(s.unit_id in this.coverage.examined))"
+  };
   uint32 schema_major = 1 [(buf.validate.field).uint32.const = 2];
   uint32 schema_minor = 2;
   string run_id = 3 [(buf.validate.field).string.min_len = 1];
@@ -369,6 +428,8 @@ message ProviderReport {
   uint32 candidates_examined = 9;
   uint32 candidates_disproved = 10;
   string summary = 11 [(buf.validate.field).string.min_len = 1];
+  UnitCoverage coverage = 12;
+  repeated CategoryStop category_stops = 13;
 }
 
 // What an independent review hands back: a verdict tuple over a named target,

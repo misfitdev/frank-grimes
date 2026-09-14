@@ -55,11 +55,15 @@ type DeriveInput struct {
 	// never better.
 	IndependentContextUnknown bool
 
-	// Coverage, owned by the collector. RoutedCategories that did not reach a
-	// marginal-yield stop cap completeness.
+	// Coverage, measured against the inventory the engine resolved. Routed
+	// categories that did not reach a stop cap completeness.
 	AllCategoriesStopped    bool
 	CriticalInvariantProbed bool
 	CriticalUnknownRemains  bool
+	// CoverageIncomplete is set when a unit of the target was neither examined
+	// nor explicitly skipped. A review that did not look at part of what it was
+	// given cannot pass on the part it did look at.
+	CoverageIncomplete bool
 
 	// TargetKind records what was reviewed. It selects nothing in the verdict
 	// rules; it is carried so the result can say what it judged.

@@ -11,6 +11,7 @@ const (
 	GateAdjudication       = "adjudication"
 	GateIndependentContext = "independent_context"
 	GateOscillation        = "oscillation"
+	GateCoverage           = "coverage"
 )
 
 // unmetGates names every gate standing between this run and a pass, in a fixed
@@ -35,6 +36,9 @@ func unmetGates(v *pb.Verdict, in DeriveInput) []string {
 	// Named separately from confidence so the record says why it was capped.
 	if in.IndependentContextUnknown {
 		gates = append(gates, GateIndependentContext)
+	}
+	if in.CoverageIncomplete {
+		gates = append(gates, GateCoverage)
 	}
 	if in.Oscillation {
 		gates = append(gates, GateOscillation)

@@ -39,11 +39,16 @@ type Request struct {
 	// adjudicator that cannot see the artifact cannot form an opinion of its
 	// own, and zero knowledge is about the first report, not the target.
 	ContentPath string
-	Mode        pb.Mode
-	Iteration   uint32
-	Categories  []pb.Category
-	Research    string
-	Claimed     *pb.Verdict
+	// InventoryPath is the set of units the primary review must account for.
+	// A provider asked to report coverage has to be able to read the
+	// denominator it is being measured against. The adjudicator reports no
+	// coverage and does not receive it.
+	InventoryPath string
+	Mode          pb.Mode
+	Iteration     uint32
+	Categories    []pb.Category
+	Research      string
+	Claimed       *pb.Verdict
 }
 
 // ProviderOutput is raw transport output. Raw is untrusted bytes; the engine
@@ -116,6 +121,8 @@ type ResultStore interface {
 // accountable to the same units the first one was.
 type InventoryStore interface {
 	Save(ctx context.Context, i *pb.TargetInventory) error
+	// Path is where a provider can read what it is accountable for.
+	Path() string
 }
 
 // ContentStore persists collected bytes that have no path of their own, so a

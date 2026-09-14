@@ -206,13 +206,19 @@ func report(t *testing.T, candidates ...*pb.CandidateFinding) []byte {
 func reportAt(t *testing.T, iteration uint32, candidates ...*pb.CandidateFinding) []byte {
 	t.Helper()
 	r := &pb.ProviderReport{
-		SchemaMajor:         contracts.SchemaMajor,
-		RunId:               "run-001",
-		Target:              testTarget(t),
-		Mode:                pb.Mode_MODE_REPORT,
-		Iteration:           iteration,
-		Candidates:          candidates,
-		RoutedCategories:    []pb.Category{pb.Category_CATEGORY_SEC, pb.Category_CATEGORY_COR},
+		SchemaMajor:      contracts.SchemaMajor,
+		RunId:            "run-001",
+		Target:           testTarget(t),
+		Mode:             pb.Mode_MODE_REPORT,
+		Iteration:        iteration,
+		Candidates:       candidates,
+		RoutedCategories: []pb.Category{pb.Category_CATEGORY_SEC, pb.Category_CATEGORY_COR},
+		CategoryStops: []*pb.CategoryStop{
+			{Category: pb.Category_CATEGORY_SEC, Condition: pb.StopCondition_STOP_CONDITION_MARGINAL_YIELD, ProbesAttempted: 3},
+			{Category: pb.Category_CATEGORY_COR, Condition: pb.StopCondition_STOP_CONDITION_MARGINAL_YIELD, ProbesAttempted: 2},
+		},
+		// stubCollector resolves one unit named after the scope.
+		Coverage:            &pb.UnitCoverage{Examined: []string{"bad.sh"}},
 		CandidatesExamined:  uint32(len(candidates)) + 3,
 		CandidatesDisproved: 3,
 		Summary:             "provider report",
