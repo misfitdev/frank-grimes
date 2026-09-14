@@ -106,14 +106,18 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	}
 
 	candidates := candidatesOf(ledger)
+	blocked := rankingBlocked(ledger)
+	falsifierUnavailable := criticalFalsifierUnavailable(ledger)
 	primary := Derive(DeriveInput{
-		Candidates:              candidates,
-		AdjudicationAvailable:   false,
-		AllCategoriesStopped:    cov.CategoriesStopped,
-		CriticalInvariantProbed: cov.Probed,
-		CriticalUnknownRemains:  cov.UnknownRemains,
-		CoverageIncomplete:      len(cov.Unaccounted) > 0,
-		Oscillation:             oscillation,
+		Candidates:                   candidates,
+		AdjudicationAvailable:        false,
+		RankingBlocked:               blocked,
+		CriticalFalsifierUnavailable: falsifierUnavailable,
+		AllCategoriesStopped:         cov.CategoriesStopped,
+		CriticalInvariantProbed:      cov.Probed,
+		CriticalUnknownRemains:       cov.UnknownRemains,
+		CoverageIncomplete:           len(cov.Unaccounted) > 0,
+		Oscillation:                  oscillation,
 	})
 
 	review, err := e.adjudicate(ctx, target, collected.ContentPath, primary.Verdict)
@@ -122,9 +126,11 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	}
 
 	final := Derive(DeriveInput{
-		Candidates:            candidates,
-		AdjudicationAvailable: review != nil,
-		IndependentDecision:   review.GetVerdict().GetDecision(),
+		Candidates:                   candidates,
+		AdjudicationAvailable:        review != nil,
+		RankingBlocked:               blocked,
+		CriticalFalsifierUnavailable: falsifierUnavailable,
+		IndependentDecision:          review.GetVerdict().GetDecision(),
 		IndependentContextUnknown: review != nil &&
 			review.GetContextOrigin() != pb.ContextOrigin_CONTEXT_ORIGIN_ENGINE_SPAWNED,
 		AllCategoriesStopped:    cov.CategoriesStopped,
@@ -442,11 +448,7 @@ func marginalYield(report *pb.ProviderReport, ledger *pb.Ledger, surfaced []stri
 func candidatesOf(ledger *pb.Ledger) []Candidate {
 	out := make([]Candidate, 0, len(ledger.GetFindings()))
 	for _, f := range ledger.GetFindings() {
-		out = append(out, Candidate{
-			Severity: f.GetRisk().GetSeverity(),
-			Status:   f.GetStatus(),
-			Tier:     f.GetEvidence().GetTier(),
-		})
+		out = append(out, weigh(f))
 	}
 	return out
 }

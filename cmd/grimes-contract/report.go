@@ -70,7 +70,10 @@ const reportUsage = `report subcommands:
 Anchor:   --path / --document with --section / --argument with --step / --source
 Evidence: E1 --action --cwd --exit-code (--output | --output-sha256)
           E2 --quote
-          E3 --assumption --reasoning --falsifier`
+          E3 --assumption --reasoning --falsifier
+Disproof: --disproof-action [--disproof-cwd] --disproof-exit --disproof-output
+            [--disproof-contradicts]
+          or --disproof-unavailable=<why>`
 
 func cmdReportAdd(args []string) error {
 	fs := flag.NewFlagSet("report add", flag.ExitOnError)
@@ -103,6 +106,14 @@ func cmdReportAdd(args []string) error {
 	assumption := fs.String("assumption", "", "E3: the explicit assumption")
 	reasoning := fs.String("reasoning", "", "E3: observed facts used by the inference")
 	falsifier := fs.String("falsifier", "", "E3: an observation that would falsify it")
+
+	disproofAction := fs.String("disproof-action", "", "the probe performed against this finding")
+	disproofCwd := fs.String("disproof-cwd", ".", "working directory the disproof ran in")
+	disproofExit := fs.Int("disproof-exit", 0, "exit status of the disproof")
+	disproofOutput := fs.String("disproof-output", "", "result excerpt from the disproof")
+	disproofSum := fs.String("disproof-output-sha256", "", "hex digest of the disproof output instead of an excerpt")
+	disproofUnavailable := fs.String("disproof-unavailable", "", "why the disproof could not be attempted")
+	contradicts := fs.Bool("disproof-contradicts", false, "the probe came back against the finding")
 
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -143,6 +154,13 @@ func cmdReportAdd(args []string) error {
 	if err != nil {
 		return err
 	}
+
+	disproof, err := disproofFromFlags(fs, *disproofAction, *disproofCwd, *disproofExit,
+		*disproofOutput, *disproofSum, *disproofUnavailable, *contradicts)
+	if err != nil {
+		return err
+	}
+	evidence.Disproof = disproof
 
 	candidate := &pb.CandidateFinding{
 		Category: cat,
@@ -636,6 +654,39 @@ func saveReport(path string, report *pb.ProviderReport) error {
 	// only the directories it creates itself; the new entry in the repository
 	// would then never be made durable.
 	return contracts.WriteAtomic(path, []byte(out))
+}
+
+// disproofFromFlags builds the record of what was done to disprove the finding,
+// or returns nil when nothing was offered.
+//
+// An attempt and a reason it could not be attempted are exclusive: a caller
+// with both has described two different reviews.
+func disproofFromFlags(fs *flag.FlagSet, action, cwd string, exitCode int,
+	output, outputSum, why string, contradicts bool,
+) (*pb.DisproofAttempt, error) {
+	offered := false
+	fs.Visit(func(f *flag.Flag) {
+		if strings.HasPrefix(f.Name, "disproof-") {
+			offered = true
+		}
+	})
+	if !offered {
+		return nil, nil
+	}
+	if why != "" && action != "" {
+		return nil, fmt.Errorf("--disproof-unavailable and --disproof-action are exclusive")
+	}
+	if why != "" {
+		return &pb.DisproofAttempt{Outcome: &pb.DisproofAttempt_Unavailable{Unavailable: why}}, nil
+	}
+	result, err := reproductionOf("disproof-", action, cwd, exitCode, output, outputSum)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.DisproofAttempt{
+		Outcome:          &pb.DisproofAttempt_Performed{Performed: result},
+		ContradictsClaim: contradicts,
+	}, nil
 }
 
 // reproductionOf records a command that was actually run. The prefix names the

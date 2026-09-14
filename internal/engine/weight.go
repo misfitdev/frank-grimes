@@ -62,6 +62,12 @@ func decide(in DeriveInput, counts *pb.FindingCounts) pb.Decision {
 	if in.CoverageIncomplete {
 		return pb.Decision_DECISION_CONDITIONAL
 	}
+	// A severe finding nobody tested carries no verdict weight, so it cannot
+	// block. It must not buy a pass either: skipping the disproof would then
+	// earn a softer decision than performing one that fails.
+	if carriesUntestedSevere(in.Candidates) {
+		return pb.Decision_DECISION_CONDITIONAL
+	}
 	// Accepting a P0 is a decision to carry the risk, not evidence it is gone.
 	if carriesAcceptedP0(in.Candidates) {
 		return pb.Decision_DECISION_CONDITIONAL
@@ -79,6 +85,22 @@ func carriesAcceptedP0(cands []Candidate) bool {
 			continue
 		}
 		if c.Severity == pb.Severity_SEVERITY_P0 && c.Status == pb.FindingStatus_FINDING_STATUS_ACCEPTED {
+			return true
+		}
+	}
+	return false
+}
+
+// carriesUntestedSevere reports whether an open P0 or P1 was never put to a
+// disproof, which is the one way a severe finding leaves verdict weight without
+// anyone having shown it wrong.
+func carriesUntestedSevere(cands []Candidate) bool {
+	for _, c := range cands {
+		if Weighted(c.Tags) || !Open(c.Status) {
+			continue
+		}
+		switch c.Severity {
+		case pb.Severity_SEVERITY_P0, pb.Severity_SEVERITY_P1:
 			return true
 		}
 	}

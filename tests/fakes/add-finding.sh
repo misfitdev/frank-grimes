@@ -30,7 +30,18 @@ if [[ -z "$QUOTE" ]]; then
     QUOTE="$(grep -m1 -E '[^[:space:]]' "$SOURCE" 2>/dev/null || true)"
 fi
 
+# The disproof this finding survived. A finding nobody attacked carries no
+# verdict weight, so a fake reporting a severity has to record the attack that
+# earned it. DISPROOF=unavailable models the reviewer who could not try.
+DISPROOF=("--disproof-action=tried to show the path is unreachable"
+    "--disproof-exit=1" "--disproof-output=still reachable")
+if [[ "${DISPROOF_UNAVAILABLE:-}" != "" ]]; then
+    DISPROOF=("--disproof-unavailable=$DISPROOF_UNAVAILABLE")
+elif [[ "${DISPROOF_NONE:-}" != "" ]]; then
+    DISPROOF=()
+fi
+
 grimes-contract report add \
     --category=SEC --severity="$SEVERITY" --blast="$BLAST" \
     --likelihood="$LIKELIHOOD" "${ANCHOR[@]}" \
-    --tier=E2 --claim="$CLAIM" --quote="$QUOTE" >/dev/null
+    --tier=E2 --claim="$CLAIM" --quote="$QUOTE" "${DISPROOF[@]}" >/dev/null
