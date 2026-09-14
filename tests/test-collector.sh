@@ -209,7 +209,7 @@ mkdir -p "$WS/src"
 printf 'echo one\n' >"$WS/src/a.sh"
 # A RED run exits non-zero by design, so the verdict is not what is under test.
 (cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-red.sh" src >/dev/null 2>&1) || true
-LEDGER="$(grimes-contract decode-report --type=Ledger "$WS/.grimes/ledger.pb" 2>/dev/null)"
+LEDGER="$(grimes-contract decode-report --type=Ledger "$WS/.grimes/ledger.pb" 2>/dev/null || true)"
 if grep -qE 'value: +"src/a.sh"' <<<"$LEDGER"; then
     pass "a finding is anchored at a unit of the target"
 else
@@ -248,6 +248,29 @@ for case in \
     fi
     rm -rf "$WS"
 done
+
+# A line that really is in the document, but not in the section the finding
+# anchors to. Checking the whole file would admit it, and the citation claims
+# the section rather than the document.
+WS="$(mktemp -d)"
+cat >"$WS/spec.md" <<'DOC'
+# Overview
+The service accepts requests.
+
+## Storage
+Records are written.
+DOC
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --kind=document \
+    --provider-command="$FAKES/provider-cross-section-quote.sh" spec.md 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" != "0" ]] && grep -qF "quoted text is not in" <<<"$OUT"; then
+    pass "a quote from another section of the same document is refused by name"
+else
+    fail "a cross-section quote was admitted (exit $CODE): $OUT"
+fi
+rm -rf "$WS"
 
 # A quote the reviewer really read, differing only in how the line ended. The
 # refusal has to be about the text being absent, not about line endings.
