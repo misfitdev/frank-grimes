@@ -206,7 +206,24 @@ func (stubCollector) Collect(ctx context.Context, spec TargetSpec) (*Collected, 
 		},
 		Categories:  categories,
 		ContentPath: filepath.Join(spec.Root, spec.Scope),
+		UnitDigests: stubDigests(spec),
 	}, nil
+}
+
+// stubDigests hashes what seedRoot holds, the way a real collector does while
+// fingerprinting. Evidence is checked against these, so a collector that
+// omitted them would be refused rather than trusted.
+func stubDigests(spec TargetSpec) map[string][]byte {
+	out := map[string][]byte{}
+	for _, u := range stubUnits(spec) {
+		body, err := os.ReadFile(filepath.Join(spec.Root, u.GetId()))
+		if err != nil {
+			continue
+		}
+		sum := sha256.Sum256(body)
+		out[u.GetId()] = sum[:]
+	}
+	return out
 }
 
 // stubUnits reports what seedRoot holds when the spec names it, and the scope

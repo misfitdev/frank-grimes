@@ -165,7 +165,15 @@ func unitBytes(unit *pb.TargetUnit, against *Collected) (string, error) {
 			return "", fmt.Errorf("%w: cannot read %q", ErrProviderOutput, unit.GetId())
 		}
 		want, known := against.UnitDigests[unit.GetId()]
-		if known && !bytes.Equal(sha256sum(body), want) {
+		// Fail closed. Treating a missing digest as "nothing to check" would
+		// make the whole check opt-in, and Collector is an exported seam: a
+		// collector that never filled these in would hand the provider back
+		// the ability to quote its own edits.
+		if !known {
+			return "", fmt.Errorf("%w: no collection-time digest for %q",
+				ErrTargetChanged, unit.GetId())
+		}
+		if !bytes.Equal(sha256sum(body), want) {
 			return "", fmt.Errorf("%w: %q changed during the review", ErrTargetChanged, unit.GetId())
 		}
 		return string(body), nil
