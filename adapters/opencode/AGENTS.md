@@ -84,3 +84,31 @@ grimes-contract adjudicate --decision=<d> --residual-risk=<r> \
 ```
 
 Run identity and target fingerprint come from the exported environment, so the prompt carries neither.
+
+## Refutation
+
+Refutation is engine-owned; the skill states the rule. This adapter supplies only the command that starts the attacking context:
+
+```bash
+grimes run --dir=. \
+  --refuter-command="opencode" \
+  --refuter-arg="run" \
+  --refuter-arg="<the refuter prompt>" \
+  --refuter-fresh \
+  ...
+```
+
+`--refuter-fresh` is the operator asserting that the command begins a new context.
+
+The engine exports the claims to that process. The prompt tells it to read them, attack each one, and answer every ref exactly once:
+
+```bash
+grimes-contract refute claims
+grimes-contract refute add --ref=<r> --refuted \
+    --action=<cmd> --cwd=<dir> --exit-code=<n> --output=<excerpt>
+grimes-contract refute add --ref=<r> --upheld ...
+grimes-contract refute add --ref=<r> --unavailable="<what was missing>"
+grimes-contract refute seal
+```
+
+Run identity and target fingerprint come from the exported environment, so the prompt carries neither. The engine plants its own control and maps each answer back to the finding it was issued for; the prompt carries no control and relays no outcome by hand.
