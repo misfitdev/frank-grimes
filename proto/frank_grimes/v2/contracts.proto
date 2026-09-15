@@ -644,6 +644,19 @@ enum FindingProvenance {
   FINDING_PROVENANCE_REFUTED = 3;
 }
 
+// Whether the refutation pass was shown capable of refuting, by being handed a
+// claim the engine had already established to be false about this target.
+//
+// UNSPECIFIED is no pass having run. INCONCLUSIVE covers a refuter that neither
+// broke the control nor vouched for it: it reported the control unavailable, or
+// did not answer on it at all.
+enum RefuterCheck {
+  REFUTER_CHECK_UNSPECIFIED = 0;
+  REFUTER_CHECK_PASSED = 1;
+  REFUTER_CHECK_FAILED = 2;
+  REFUTER_CHECK_INCONCLUSIVE = 3;
+}
+
 // ---------------------------------------------------------------------------
 // Findings and the ledger
 // ---------------------------------------------------------------------------
@@ -1028,6 +1041,7 @@ message GrimesResult {
     (buf.validate.field).repeated.items.string.min_len = 1
   ];
   string summary = 19 [(buf.validate.field).string.min_len = 1];
+  RefuterCheck refuter_check = 20 [(buf.validate.field).enum.defined_only = true];
 }
 
 message LoopState {

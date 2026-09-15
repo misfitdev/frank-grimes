@@ -182,6 +182,8 @@ Do NOT include the severity, the grime ID, the evidence you cited, your disproof
 
 Relay each outcome to the engine as the claim's refutation result. If the refuter cannot run, record the claim as unattacked; do not record it as upheld.
 
+Send one extra claim in the same shape that you have already checked to be false, per the skill's control rule: pick an identifier of at least twelve characters, confirm with Grep that it appears nowhere in the artifact, and claim that it is defined at the anchor of one of the real claims. Do not mark it, and do not send it first or last. If the refuter upholds it or says nothing about it, the whole pass is void: relay every claim in it as unattacked and record that the refuter failed its control. Never relay the control itself as a finding.
+
 ### Independent adjudication
 
 Required before any `pass`, per the skill's "Independent Adjudication" section. This adapter supplies the second context: delegate to the **grimey-verifier** subagent via the Agent tool, passing exactly this and nothing else:

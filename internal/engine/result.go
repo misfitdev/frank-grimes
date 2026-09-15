@@ -20,6 +20,7 @@ func (e *Engine) assemble(
 	digest []byte,
 	oscillation bool,
 	yield *pb.MarginalYield,
+	check pb.RefuterCheck,
 ) *pb.GrimesResult {
 	// The same stopping rule the stop hook applies, so the record cannot claim a
 	// review ended while the loop is still owed an iteration.
@@ -40,6 +41,7 @@ func (e *Engine) assemble(
 		CompletionState:   outcome.CompletionState(),
 		Verdict:           d.Verdict,
 		LegacyColor:       d.Color,
+		RefuterCheck:      check,
 		MarginalYield:     yield,
 		Counts:            d.Counts,
 		Findings:          snapshots(ledger),

@@ -133,8 +133,47 @@ assert_match "$OUT" 'unmet_gates: +"review_confidence"' \
 rm -rf "$WS"
 
 echo ""
-echo "--- The attacker's own context has to be known ---"
+echo "--- fg-64y.44: a refuter has to break a control before it is believed ---"
 
+# Every pass carries one claim the engine established to be false about this
+# target. A refuter that upholds it has been shown incapable of refuting, so
+# nothing it said about the real claims is recorded.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" \
+    --refuter-command="$FAKES/refuter-rubberstamp.sh" --refuter-fresh)"
+assert_match "$OUT" 'refuter_check: +REFUTER_CHECK_FAILED' \
+    "the record says the refuter failed its own check"
+assert_match "$OUT" 'provenance: +FINDING_PROVENANCE_UNATTACKED' \
+    "a rubber-stamped claim is left unattacked"
+assert_match "$OUT" 'unmet_gates: +"refutation"' \
+    "a rubber-stamp pass does not clear the refutation gate"
+assert_match "$OUT" 'unmet_gates: +"review_confidence"' \
+    "a rubber-stamp pass raises nothing"
+rm -rf "$WS"
+
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" \
+    --refuter-command="$FAKES/refuter-upheld.sh" --refuter-fresh)"
+assert_match "$OUT" 'refuter_check: +REFUTER_CHECK_PASSED' \
+    "a refuter that kills the control is believed"
+# The control is a claim about the target that nobody found, so it must not be
+# countable as one. The planted identifier appearing anywhere in the record
+# would mean it had reached the ledger.
+assert_no_match "$OUT" 'fgq[0-9a-f]{13}' \
+    "the control never reaches the record"
+assert_match "$OUT" 'total: +1' \
+    "the control is not counted as a finding"
+rm -rf "$WS"
+
+# No refutation pass at all is not a failed check; it is no check.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS")"
+assert_no_match "$OUT" 'refuter_check:' \
+    "a run with no refuter records no check rather than a failed one"
+rm -rf "$WS"
+
+echo ""
+echo "--- The attacker's own context has to be known ---"
 # Without --refuter-fresh the engine cannot tell whether the attack came from
 # the context that formed the claim. A claim upholding itself is not a survival.
 WS="$(workspace)"
@@ -194,6 +233,18 @@ done
 
 assert_match "$(cat "$SKILL")" 'Silence is not survival' \
     "the skill refuses to read an unmounted attack as survival"
+assert_match "$(cat "$SKILL")" 'shown capable of failing before its result means anything' \
+    "the skill holds the attacking context to the rule it holds probes to"
+assert_match "$(cat "$SKILL")" 'is not a finding and is never counted as one' \
+    "the skill keeps the control out of the finding set"
+assert_match "$(cat "$GRIND")" 'confirm with Grep that it appears nowhere' \
+    "the adapter establishes the control's falsity rather than asserting it"
+assert_match "$(cat "$GRIND")" 'do not send it first or last' \
+    "the adapter does not let position mark the control"
+# A refuter told that one claim is planted can pass the check by hunting for the
+# plant instead of attacking anything.
+assert_no_match "$(cat "$AGENT")" 'control' \
+    "the refuter is not told a control is coming"
 
 echo ""
 echo "Passed: $PASSED"

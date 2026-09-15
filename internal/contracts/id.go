@@ -153,6 +153,20 @@ func ClaimRef(runID string, iteration uint32, findingID string) string {
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
+// ControlToken returns the identifier the engine plants in a control claim.
+//
+// Derived rather than fixed so it cannot be recognised across runs, and long
+// enough that no artifact under review contains it by accident. The engine
+// still checks that it is absent before asserting it is there: a control whose
+// falsity was assumed proves nothing about the refuter that broke it.
+func ControlToken(runID string, iteration uint32) string {
+	h := sha256.New()
+	writeComponent(h, "control")
+	writeComponent(h, runID)
+	writeComponent(h, strconv.FormatUint(uint64(iteration), 10))
+	return "fgq" + hex.EncodeToString(h.Sum(nil))[:13]
+}
+
 // CategoryName maps the enum to the three-letter code used in IDs and reports.
 func CategoryName(c pb.Category) string {
 	name := c.String() // CATEGORY_SEC
