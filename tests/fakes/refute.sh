@@ -50,7 +50,7 @@ while IFS= read -r -d '' ref &&
     fi
 
     if [[ -n "$term" && "$STAMP" != "rubberstamp" ]]; then
-        hit="$(grep -rhF -- "$term" --exclude-dir=.grimes . 2>/dev/null || true)"
+        hit="$(grep -rhF --exclude-dir=.grimes -- "$term" . 2>/dev/null || true)"
         if [[ -n "$hit" ]]; then
             grimes-contract refute add --ref="$ref" --refuted \
                 --action="grep -rF <name> ." --cwd="." --exit-code=0 \

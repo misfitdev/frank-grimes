@@ -87,16 +87,19 @@ func controlTermIn(body []byte, seed string) (term, witness string, err error) {
 	type candidate struct{ term, line string }
 	var found []candidate
 
+	seen := map[string]bool{}
 	scan := bufio.NewScanner(bytes.NewReader(body))
 	scan.Buffer(make([]byte, 0, 64*1024), maxControlLine)
 	for scan.Scan() {
 		line := strings.TrimSpace(scan.Text())
-		if len(line) > maxControlLine {
+		if len(line) > maxControlLine || seen[line] {
 			continue
 		}
 		for _, m := range controlWord.FindAllString(line, -1) {
 			if len(line) > len(m) {
+				seen[line] = true
 				found = append(found, candidate{term: m, line: line})
+				break
 			}
 		}
 	}
@@ -106,9 +109,9 @@ func controlTermIn(body []byte, seed string) (term, witness string, err error) {
 	if len(found) == 0 {
 		return "", "", fmt.Errorf("no term in the target to model a control on")
 	}
-	// Distinct exhibits across a scan: one line is quoted once however many of
-	// its terms are eligible, so an earlier iteration's witness is not reused
-	// under a different name.
+	// One candidate per distinct line: a line offering many eligible terms would
+	// otherwise take a share of the choice proportional to how wordy it is, and
+	// the same witness would come back under a different name.
 	pick := found[int(contracts.Offset(seed, uint64(len(found))))]
 	return pick.term, pick.line, nil
 }

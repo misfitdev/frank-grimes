@@ -25,7 +25,7 @@ while IFS= read -r -d '' ref &&
     term="$(sed -n 's/^nothing at this anchor mentions \(.*\), so no path through it can depend on that name$/\1/p' <<<"$claim")"
     hit=""
     if [[ -n "$term" ]]; then
-        hit="$(grep -rhF -- "$term" --exclude-dir=.grimes . 2>/dev/null || true)"
+        hit="$(grep -rhF --exclude-dir=.grimes -- "$term" . 2>/dev/null || true)"
     fi
     if [[ -n "$hit" ]]; then
         grimes-contract refute add --ref="$ref" --refuted \
