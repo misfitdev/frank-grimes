@@ -238,9 +238,19 @@ for _ in $(seq 1 200); do
     [[ -e "$MARKER" ]] && break
     sleep 0.1
 done
-run_grimes "$WS" \
+# Both halves are what makes the runs overlap. Without them the second run can
+# finish before the first has claims on disk, and the first-run assertion below
+# passes without anything having been written underneath it.
+if [[ -e "$MARKER" ]]; then
+    pass "the first run holds mid-pass"
+else
+    fail "the first run holds mid-pass"
+fi
+SECOND="$(run_grimes "$WS" \
     --refuter-command="$FAKES/refuter-documented.sh" \
-    --refuter-arg="upheld" --refuter-fresh >/dev/null 2>&1 || true
+    --refuter-arg="upheld" --refuter-fresh)"
+assert_match "$SECOND" 'refuter_check: +REFUTER_CHECK_PASSED' \
+    "the second run completes a whole pass while the first is held"
 : >"$SENTINEL"
 wait "$FIRST_PID"
 OUT="$(cat "$FIRST")"
