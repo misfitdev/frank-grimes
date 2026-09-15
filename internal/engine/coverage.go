@@ -25,8 +25,9 @@ type Coverage struct {
 	// failing: one that caught a defect, or one shown able to catch one. A count
 	// of probes the provider typed is neither.
 	Probed bool
-	// UnknownRemains is true when a material unit was skipped or a category
-	// stopped because the evidence to continue was unavailable.
+	// UnknownRemains is true when a material unit was skipped, or a routed
+	// category stopped because the evidence to continue was unavailable, or a
+	// routed category was never reported on at all.
 	UnknownRemains bool
 }
 
@@ -102,7 +103,12 @@ func measure(report *pb.ProviderReport, inventory *pb.TargetInventory, routed []
 		if !ok || s.GetCondition() == pb.StopCondition_STOP_CONDITION_EVIDENCE_UNAVAILABLE {
 			cov.CategoriesStopped = false
 		}
+		// A category the report never mentioned went unprobed just as surely as
+		// one that stopped for want of evidence, and the report says less about
+		// it. Ranking silence below the confession would pay for dropping a
+		// category from the routed set instead of reporting what blocked it.
 		if !ok {
+			cov.UnknownRemains = true
 			continue
 		}
 		if s.GetCondition() == pb.StopCondition_STOP_CONDITION_EVIDENCE_UNAVAILABLE {

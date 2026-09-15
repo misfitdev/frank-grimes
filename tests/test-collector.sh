@@ -871,6 +871,26 @@ else
 fi
 rm -rf "$WS"
 
+# A report is checked against its own routed set, so dropping a category from
+# that set makes a short review internally consistent. The engine owns the
+# denominator: a category nobody reported on is as unprobed as one that
+# confessed it had no evidence.
+WS="$(mktemp -d)"
+mkdir -p "$WS/src"
+printf 'echo one\n' >"$WS/src/a.sh"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --format=prototext \
+    --provider-command="$FAKES/provider-drops-category.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh src 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" == "3" ]] && echo "$OUT" | grep -qE 'decision: +DECISION_CONDITIONAL'; then
+    pass "a routed category left out of the report decides conditional"
+else
+    fail "a shortened routed set still reached a pass (exit $CODE): $OUT"
+fi
+rm -rf "$WS"
+
 # Full accounting with no repository present, for the kinds that have none.
 for kind in document idea; do
     WS="$(mktemp -d)"
