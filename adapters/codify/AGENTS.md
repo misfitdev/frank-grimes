@@ -57,6 +57,24 @@ If you use MCP tools with Frank Grimes, note that Codex uses per-server `enabled
 
 ## Independent Adjudication
 
-A `pass` verdict requires a second review that never saw the first. Codex has no bundled equivalent of the Claude adapter's `grimey-verifier` subagent, so a grind here records `Independent adjudication: not available`, sets `review_confidence=low`, and caps at `conditional`/YELLOW.
+Adjudication is engine-owned; the skill states the rule. This adapter supplies only the command that starts the second context:
 
-To reach a pass, run the grind a second time in a fresh session given only the target — never the first report and never its verdict — and resolve the two by the stricter decision once both exist.
+```bash
+grimes run --dir=. \
+  --adjudicator-command="codex" \
+  --adjudicator-arg="exec" \
+  --adjudicator-arg="<the adjudicator prompt>" \
+  --adjudicator-fresh \
+  ...
+```
+
+`codex exec` is Codex's own non-interactive invocation; substitute whatever that is on your installation. `--adjudicator-fresh` is the operator asserting that the command begins a new context.
+
+The engine exports the request to that process. The prompt tells it to review `$GRIMES_TARGET_CONTENT` under the skill and to end with the report:
+
+```bash
+grimes-contract adjudicate --decision=<d> --residual-risk=<r> \
+    --review-confidence=<c> --review-completeness=<x>
+```
+
+Run identity and target fingerprint come from the exported environment, so the prompt carries neither.

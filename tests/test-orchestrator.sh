@@ -273,6 +273,26 @@ CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-green.sh" --adjudica
 assert_eq "$CODE" "1" "--adjudicator-fresh without an adjudicator is refused"
 rm -rf "$WS"
 
+# The wiring every adapter documents, run end to end: a second context that
+# hands its tuple back through `grimes-contract adjudicate` and is told the run
+# only through the environment the engine exported.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" \
+    --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-documented.sh" \
+    --adjudicator-fresh --format=prototext)"
+if echo "$OUT" | grep -qE 'context_origin: +CONTEXT_ORIGIN_ENGINE_SPAWNED'; then
+    pass "the documented adjudicator wiring reaches the engine"
+else
+    fail "the documented adjudicator wiring reaches the engine"
+fi
+if echo "$OUT" | grep -qE 'unmet_gates: +"adjudication"'; then
+    fail "the documented wiring still leaves adjudication unmet"
+else
+    pass "the documented wiring clears the adjudication gate"
+fi
+rm -rf "$WS"
+
 echo ""
 echo "--- The loop runs only when it was asked for ---"
 
