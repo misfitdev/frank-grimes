@@ -179,6 +179,7 @@ assert_match "$(cat "$AGENT" 2>/dev/null)" 'Do not report findings of your own' 
 
 # The template the adapter tells the orchestrator to send. Everything it must
 # not carry is an argument for the claim rather than a statement of it.
+# shellcheck disable=SC2016  # backticks are literal markdown fence characters
 PROMPT_BLOCK=$(awk '/^### Refutation$/{f=1;next} f&&/^#{2,3} /{f=0} f' "$GRIND" |
     sed -n '/```text/,/```/p')
 if [[ -n "$PROMPT_BLOCK" ]]; then
