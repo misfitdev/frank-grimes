@@ -59,20 +59,20 @@ func cmdRefute(args []string) error {
 func cmdRefuteClaims(args []string) error {
 	fs := flag.NewFlagSet("refute claims", flag.ContinueOnError)
 	path := fs.String("claims", os.Getenv("GRIMES_CLAIMS"), "claims to read; defaults to $GRIMES_CLAIMS")
+	file := fs.String("file", DefaultRefutationPath, "report this pass will build")
 	zero := fs.Bool("print0", false, "separate fields with NUL, for claims containing newlines")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *path == "" {
-		return errors.New("no claims file; the engine exports it as $GRIMES_CLAIMS")
-	}
-	data, err := os.ReadFile(*path)
+	task, err := loadClaims(*path)
 	if err != nil {
 		return err
 	}
-	task := &pb.RefutationTask{}
-	if err := contracts.UnmarshalCanonical(data, task); err != nil {
-		return fmt.Errorf("%s: %w", *path, err)
+	// Reading the claims is where a pass begins. A report left behind by one
+	// that died before sealing would otherwise be answered from again, and its
+	// outcomes would be delivered as this pass's attacks.
+	if err := os.Remove(*file); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
 	}
 	sep, end := "\t", "\n"
 	if *zero {
@@ -90,6 +90,21 @@ func cmdRefuteClaims(args []string) error {
 		}
 	}
 	return nil
+}
+
+func loadClaims(path string) (*pb.RefutationTask, error) {
+	if path == "" {
+		return nil, errors.New("no claims file; the engine exports it as $GRIMES_CLAIMS")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	task := &pb.RefutationTask{}
+	if err := contracts.UnmarshalCanonical(data, task); err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	return task, nil
 }
 
 // anchorText renders an anchor as the one string a refuter needs to find it.
@@ -111,6 +126,7 @@ func anchorText(a *pb.Anchor) string {
 func cmdRefuteAdd(args []string) error {
 	fs := flag.NewFlagSet("refute add", flag.ExitOnError)
 	file := fs.String("file", DefaultRefutationPath, "report being built")
+	claims := fs.String("claims", os.Getenv("GRIMES_CLAIMS"), "claims this answers; defaults to $GRIMES_CLAIMS")
 	ref := fs.String("ref", "", "the claim handle this answers")
 	refuted := fs.Bool("refuted", false, "the claim did not survive")
 	upheld := fs.Bool("upheld", false, "the claim survived the attack")
@@ -125,6 +141,15 @@ func cmdRefuteAdd(args []string) error {
 	}
 	if *ref == "" {
 		return errors.New("--ref is required; it is the handle the engine issued")
+	}
+	// The engine drops an answer to a claim it did not issue, so an outcome
+	// under a ref from some other pass would go missing without an error.
+	task, err := loadClaims(*claims)
+	if err != nil {
+		return err
+	}
+	if !issuedClaim(task, *ref) {
+		return fmt.Errorf("claim %s was not issued by this pass", *ref)
 	}
 
 	outcome := &pb.ClaimOutcome{Ref: *ref}
@@ -163,6 +188,15 @@ func cmdRefuteAdd(args []string) error {
 	}
 	report.Outcomes = append(report.Outcomes, outcome)
 	return saveRefutation(*file, report)
+}
+
+func issuedClaim(task *pb.RefutationTask, ref string) bool {
+	for _, c := range task.GetClaims() {
+		if c.GetRef() == ref {
+			return true
+		}
+	}
+	return false
 }
 
 func cmdRefuteSeal(args []string) error {

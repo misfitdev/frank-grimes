@@ -201,17 +201,20 @@ assert_no_match "$OUT" 'unmet_gates: +"refutation"' \
     "the documented commands clear the refutation gate"
 rm -rf "$WS"
 
-# A refuter that answers one claim twice is refused where it can still be told
-# which claim, rather than by the engine rejecting the whole report.
+# A refuter that answers one claim twice, or answers a claim nobody issued, is
+# refused where it can still be told which claim, rather than by the engine
+# dropping the answer or rejecting the whole report.
 WS="$(workspace)"
-mkdir -p "$WS/.grimes"
-OUT="$(cd "$WS" &&
-    grimes-contract refute add --ref=abc --upheld \
-        --action="sh -c true" --cwd="." --exit-code=0 --output="looked" 2>&1 &&
-    grimes-contract refute add --ref=abc --refuted \
-        --action="sh -c false" --cwd="." --exit-code=1 --output="looked again" 2>&1 || true)"
-assert_match "$OUT" 'already been answered' \
+OUT="$(run_grimes "$WS" \
+    --refuter-command="$FAKES/refuter-documented.sh" \
+    --refuter-arg="probe" --refuter-fresh)"
+ERR="$(cat "$WS/refute.err" 2>/dev/null || true)"
+assert_match "$ERR" 'was not issued by this pass' \
+    "answering a claim nobody issued is refused by name"
+assert_match "$ERR" 'already been answered' \
     "answering one claim twice is refused by name"
+assert_match "$OUT" 'refuter_check: +REFUTER_CHECK_PASSED' \
+    "a pass that reads its claims does not inherit an earlier pass's answers"
 rm -rf "$WS"
 
 echo ""
