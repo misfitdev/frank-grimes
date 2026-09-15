@@ -2,23 +2,29 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"os"
 	"path/filepath"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
 )
 
-// ClaimsPath is what a refutation pass was asked to attack, beside the ledger.
-const ClaimsPath = ".grimes/claims.pb"
+// ClaimsDir holds what refutation passes were asked to attack, beside the
+// ledger. One file per run: two runs over a directory would otherwise overwrite
+// each other's task between the save and the refuter's read, and a refuter
+// would be handed another run's claims and control.
+const ClaimsDir = ".grimes"
 
-// FileClaimStore persists the refutation task at path.
+// FileClaimStore persists a refutation task under dir.
 type FileClaimStore struct {
-	path string
+	dir string
 }
 
-// NewFileClaimStore roots the task under dir.
+// NewFileClaimStore roots the tasks under dir.
 func NewFileClaimStore(dir string) *FileClaimStore {
-	return &FileClaimStore{path: joinRoot(dir, ClaimsPath)}
+	return &FileClaimStore{dir: joinRoot(dir, ClaimsDir)}
 }
 
 // Save writes the task atomically and returns where a refuter can read it.
@@ -31,10 +37,28 @@ func (c *FileClaimStore) Save(ctx context.Context, task *pb.RefutationTask) (str
 	if err != nil {
 		return "", err
 	}
-	if err := contracts.WriteAtomic(c.path, encoded); err != nil {
+	path := filepath.Join(c.dir, "claims-"+RunSlug(task.GetRunId())+".pb")
+	if err := contracts.WriteAtomic(path, encoded); err != nil {
 		return "", err
 	}
 	// The refuter runs with its own working directory, so a relative path here
 	// would resolve against the wrong root and read as a missing file.
-	return filepath.Abs(c.path)
+	return filepath.Abs(path)
+}
+
+// Discard removes a task the pass is done with. A pass that left its file
+// behind would accumulate one per run.
+func (c *FileClaimStore) Discard(_ context.Context, path string) error {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+// RunSlug names a run in a path. A run identity is not constrained to the
+// characters a filename admits, so it is digested rather than sanitized: two
+// distinct runs that sanitize alike would collide on the file this is naming.
+func RunSlug(runID string) string {
+	sum := sha256.Sum256([]byte(runID))
+	return hex.EncodeToString(sum[:8])
 }

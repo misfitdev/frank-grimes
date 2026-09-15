@@ -159,6 +159,7 @@ type ContentStore interface {
 // refuter reads them from disk rather than from a prompt the engine composed.
 type ClaimStore interface {
 	Save(ctx context.Context, task *pb.RefutationTask) (path string, err error)
+	Discard(ctx context.Context, path string) error
 }
 
 // StateStore persists loop state between iterations.

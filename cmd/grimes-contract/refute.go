@@ -6,16 +6,22 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
 	"github.com/misfitdev/frank-grimes/internal/envelope"
+	"github.com/misfitdev/frank-grimes/internal/store"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// DefaultRefutationPath is where an in-progress refutation report accumulates.
-const DefaultRefutationPath = ".grimes/refutation.textproto"
+// defaultRefutationPath is where an in-progress refutation report accumulates.
+// One file per run: two passes in a directory would otherwise answer from each
+// other's outcomes, and the pass that sealed second would deliver both.
+func defaultRefutationPath() string {
+	return filepath.Join(".grimes", "refutation-"+store.RunSlug(os.Getenv("GRIMES_RUN_ID"))+".textproto")
+}
 
 const refuteUsage = `grimes-contract refute claims|add|seal ...
 
@@ -59,7 +65,7 @@ func cmdRefute(args []string) error {
 func cmdRefuteClaims(args []string) error {
 	fs := flag.NewFlagSet("refute claims", flag.ContinueOnError)
 	path := fs.String("claims", os.Getenv("GRIMES_CLAIMS"), "claims to read; defaults to $GRIMES_CLAIMS")
-	file := fs.String("file", DefaultRefutationPath, "report this pass will build")
+	file := fs.String("file", defaultRefutationPath(), "report this pass will build")
 	zero := fs.Bool("print0", false, "separate fields with NUL, for claims containing newlines")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -125,7 +131,7 @@ func anchorText(a *pb.Anchor) string {
 
 func cmdRefuteAdd(args []string) error {
 	fs := flag.NewFlagSet("refute add", flag.ExitOnError)
-	file := fs.String("file", DefaultRefutationPath, "report being built")
+	file := fs.String("file", defaultRefutationPath(), "report being built")
 	claims := fs.String("claims", os.Getenv("GRIMES_CLAIMS"), "claims this answers; defaults to $GRIMES_CLAIMS")
 	ref := fs.String("ref", "", "the claim handle this answers")
 	refuted := fs.Bool("refuted", false, "the claim did not survive")
@@ -201,7 +207,7 @@ func issuedClaim(task *pb.RefutationTask, ref string) bool {
 
 func cmdRefuteSeal(args []string) error {
 	fs := flag.NewFlagSet("refute seal", flag.ExitOnError)
-	file := fs.String("file", DefaultRefutationPath, "report being built")
+	file := fs.String("file", defaultRefutationPath(), "report being built")
 	refuterID := fs.String("refuter-id", "", "who mounted these attacks; defaults to $GRIMES_REFUTER_ID, then \"refuter\"")
 	runID := fs.String("run-id", "", "run identity; defaults to $GRIMES_RUN_ID")
 	targetFP := fs.String("target-fingerprint", "", "hex target fingerprint; defaults to $GRIMES_TARGET_FINGERPRINT")
