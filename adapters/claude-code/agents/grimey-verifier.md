@@ -29,12 +29,12 @@ You are read-only. Do not edit, create, or delete files. Do not commit, stage, s
 
 End your turn by running this and nothing else. It is the whole of what you hand back; the engine resolves your tuple against the other one afterwards:
 
+Substitute one value per flag: `--decision` takes `block`, `conditional`, or `pass`; `--residual-risk` takes `critical`, `high`, `moderate`, `low`, or `unknown`; `--review-confidence` takes `high`, `medium`, or `low`; `--review-completeness` takes `sufficient`, `limited`, or `inconclusive`.
+
 ```bash
 grimes-contract adjudicate \
-    --decision=block|conditional|pass \
-    --residual-risk=critical|high|moderate|low|unknown \
-    --review-confidence=high|medium|low \
-    --review-completeness=sufficient|limited|inconclusive
+    --decision=<d> --residual-risk=<r> \
+    --review-confidence=<c> --review-completeness=<x>
 ```
 
 Run identity and the target's fingerprint come from the environment the engine exported, so you supply neither.

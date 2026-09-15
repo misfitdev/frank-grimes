@@ -195,7 +195,7 @@ Required before any `pass`, per the skill's "Independent Adjudication" section. 
   --adjudicator-fresh \
 ```
 
-`claude -p` is Claude Code's own non-interactive invocation. `--adjudicator-fresh` is you asserting that it begins a new context; without it the second review is recorded as unknown-origin, which can still make the verdict worse but never better.
+`claude -p` is Claude Code's own non-interactive invocation. `--adjudicator-fresh` is you asserting that it begins a new context.
 
 The prompt is the body of `agents/grimey-verifier.md`. The engine exports the request to that process, so the prompt names no target and carries no digest:
 

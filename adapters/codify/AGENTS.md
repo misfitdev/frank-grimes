@@ -57,7 +57,7 @@ If you use MCP tools with Frank Grimes, note that Codex uses per-server `enabled
 
 ## Independent Adjudication
 
-The engine runs the adjudication pass and resolves the two verdicts; the skill states when one is required and what follows from its absence. This adapter supplies only the command that starts the second context:
+Adjudication is engine-owned; the skill states the rule. This adapter supplies only the command that starts the second context:
 
 ```bash
 grimes run --dir=. \
@@ -68,7 +68,7 @@ grimes run --dir=. \
   ...
 ```
 
-`codex exec` is Codex's own non-interactive invocation; substitute whatever that is on your installation. `--adjudicator-fresh` is the operator asserting the command begins a new context. Without it the review is recorded as unknown-origin: it can still make the verdict worse, never better.
+`codex exec` is Codex's own non-interactive invocation; substitute whatever that is on your installation. `--adjudicator-fresh` is the operator asserting that the command begins a new context.
 
 The engine exports the request to that process. The prompt tells it to review `$GRIMES_TARGET_CONTENT` under the skill and to end with the report:
 
@@ -77,4 +77,4 @@ grimes-contract adjudicate --decision=<d> --residual-risk=<r> \
     --review-confidence=<c> --review-completeness=<x>
 ```
 
-Run identity and target fingerprint come from the exported environment, so the prompt carries neither. It carries nothing from the first review either.
+Run identity and target fingerprint come from the exported environment, so the prompt carries neither.
