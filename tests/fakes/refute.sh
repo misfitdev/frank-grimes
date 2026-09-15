@@ -5,13 +5,14 @@
 # the severity, the reporter, or the evidence narrative is checking the case for
 # a claim rather than the claim, which is the hole the pass exists to close.
 #
-# The engine plants a control claim about an identifier that is not in the
-# target. This fake breaks it the way an honest refuter would, by looking: if
-# the claim names an identifier absent from the artifact, it is refuted. Pass
-# `rubberstamp` to get the failure mode instead, where the fixed outcome is
-# applied to the control too.
+# The engine plants a control claim that denies a name the target does carry.
+# This fake breaks it the way an honest refuter would, by looking: it searches
+# for the name and exhibits what came back. Pass `rubberstamp` to get the
+# failure mode where the fixed outcome is applied to the control too, or
+# `fabricate` to get the one where the control is recognised and answered with a
+# well-formed disproof that rests on nothing.
 #
-# Usage: refute.sh refuted|upheld|unavailable [rubberstamp]
+# Usage: refute.sh refuted|upheld|unavailable [rubberstamp|fabricate]
 set -euo pipefail
 
 OUTCOME="$1"
@@ -29,67 +30,51 @@ if [[ "${GRIMES_ROLE:-}" != "refuter" ]]; then
     exit 1
 fi
 
-# prototext spacing is randomized per binary build, so every pattern here
-# tolerates any amount of it rather than matching what one build happened to
-# emit. A claim's ref is the first field of its block and its text the last, so
-# pairing them in order needs no brace tracking.
-TASK="$(grimes-contract decode --type=RefutationTask "${GRIMES_CLAIMS}")"
-PAIRS="$(echo "$TASK" | awk '
-    match($0, /^[[:space:]]*ref:[[:space:]]*"/) { ref = $0; sub(/^[[:space:]]*ref:[[:space:]]*"/, "", ref); sub(/"[[:space:]]*$/, "", ref); next }
-    match($0, /^[[:space:]]*claim:[[:space:]]*"/) { c = $0; sub(/^[[:space:]]*claim:[[:space:]]*"/, "", c); sub(/"[[:space:]]*$/, "", c); print ref "\t" c }
-')"
-
-# shellcheck disable=SC2001 # a per-pair substitution is what sed is for here
-ESCAPED="$(echo "${GRIMES_TARGET_FINGERPRINT}" | sed 's/../\\x&/g')"
-
-outcome_for() {
-    local claim="$1" token
-    token="$(echo "$claim" | grep -oE 'fgq[0-9a-f]{13}' || true)"
-    if [[ -n "$token" && "$STAMP" != "rubberstamp" ]] &&
-        ! grep -rqF "$token" --exclude-dir=.grimes . 2>/dev/null; then
-        echo refuted
-        return
-    fi
-    echo "$OUTCOME"
+# The name a claim denies, when it denies one. Everything else is a real claim.
+denied_name() {
+    sed -n 's/^nothing at this anchor mentions \(.*\), so no path through it can depend on that name$/\1/p' <<<"$1"
 }
 
-{
-    echo 'schema_major: 2'
-    echo "run_id: \"${GRIMES_RUN_ID}\""
-    echo 'refuter_id: "fake-refuter"'
-    echo "target_fingerprint_sha256: \"${ESCAPED}\""
-    while IFS=$'\t' read -r ref claim; do
-        [[ -n "$ref" ]] || continue
-        echo "outcomes {"
-        echo "  ref: \"${ref}\""
-        case "$(outcome_for "$claim")" in
-            unavailable)
-                echo '  unavailable: "no runtime available to exercise this claim"'
-                ;;
-            refuted)
-                echo '  refuted {'
-                echo '    executed_command {'
-                echo '      action: "grep -rF <identifier> ."'
-                echo '      cwd { value: "." }'
-                echo '      exit_code: 1'
-                echo '      output_excerpt: "no such identifier in the target"'
-                echo '    }'
-                echo '    completed_at { seconds: 1780000000 }'
-                echo '  }'
-                ;;
-            *)
-                echo '  upheld {'
-                echo '    executed_command {'
-                echo '      action: "sh -c true"'
-                echo '      cwd { value: "." }'
-                echo '      exit_code: 0'
-                echo '      output_excerpt: "attacked the claim directly"'
-                echo '    }'
-                echo '    completed_at { seconds: 1780000000 }'
-                echo '  }'
-                ;;
-        esac
-        echo "}"
-    done <<<"$PAIRS"
-    echo 'completed_at { seconds: 1780000000 }'
-} | grimes-contract encode-report --type=RefutationReport /dev/stdin
+while IFS= read -r -d '' ref &&
+    IFS= read -r -d '' _category &&
+    IFS= read -r -d '' _anchor &&
+    IFS= read -r -d '' claim; do
+
+    term="$(denied_name "$claim")"
+
+    if [[ -n "$term" && "$STAMP" == "fabricate" ]]; then
+        grimes-contract refute add --ref="$ref" --refuted \
+            --action="grep -rF <name> ." --cwd="." --exit-code=1 \
+            --output="that name is carried nowhere at this anchor"
+        continue
+    fi
+
+    if [[ -n "$term" && "$STAMP" != "rubberstamp" ]]; then
+        hit="$(grep -rhF -- "$term" --exclude-dir=.grimes . 2>/dev/null || true)"
+        if [[ -n "$hit" ]]; then
+            grimes-contract refute add --ref="$ref" --refuted \
+                --action="grep -rF <name> ." --cwd="." --exit-code=0 \
+                --output="$hit"
+            continue
+        fi
+    fi
+
+    case "$OUTCOME" in
+        unavailable)
+            grimes-contract refute add --ref="$ref" \
+                --unavailable="no runtime available to exercise this claim"
+            ;;
+        refuted)
+            grimes-contract refute add --ref="$ref" --refuted \
+                --action="sh -c false" --cwd="." --exit-code=1 \
+                --output="the claim does not hold against the artifact"
+            ;;
+        *)
+            grimes-contract refute add --ref="$ref" --upheld \
+                --action="sh -c true" --cwd="." --exit-code=0 \
+                --output="attacked the claim directly"
+            ;;
+    esac
+done < <(grimes-contract refute claims --print0)
+
+grimes-contract refute seal

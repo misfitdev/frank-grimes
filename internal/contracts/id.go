@@ -153,18 +153,27 @@ func ClaimRef(runID string, iteration uint32, findingID string) string {
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
-// ControlToken returns the identifier the engine plants in a control claim.
+// ControlSeed returns what the engine's choice of control is derived from.
 //
-// Derived rather than fixed so it cannot be recognised across runs, and long
-// enough that no artifact under review contains it by accident. The engine
-// still checks that it is absent before asserting it is there: a control whose
-// falsity was assumed proves nothing about the refuter that broke it.
-func ControlToken(runID string, iteration uint32) string {
+// It never reaches the refuter. The control names a term out of the target
+// itself, so there is no minted identifier to recognise; what varies per run is
+// which of the target's own terms gets denied, and this is what varies it.
+func ControlSeed(runID string, iteration uint32) string {
 	h := sha256.New()
 	writeComponent(h, "control")
 	writeComponent(h, runID)
 	writeComponent(h, strconv.FormatUint(uint64(iteration), 10))
-	return "fgq" + hex.EncodeToString(h.Sum(nil))[:13]
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// Offset derives a choice in [0, n) from seed. A caller picking among candidates
+// it did not author needs the same one on every derivation of the same run.
+func Offset(seed string, n uint64) uint64 {
+	if n == 0 {
+		return 0
+	}
+	sum := sha256.Sum256([]byte(seed))
+	return binary.BigEndian.Uint64(sum[:8]) % n
 }
 
 // CategoryName maps the enum to the three-letter code used in IDs and reports.

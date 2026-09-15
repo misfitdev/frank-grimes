@@ -137,7 +137,7 @@ func (e *Engine) refute(ctx context.Context, ledger *pb.Ledger, target *pb.Targe
 		return none, nil
 	}
 
-	check := checkOf(attempts[ctrl.ref])
+	check := checkOf(attempts[ctrl.ref], ctrl)
 	if check != pb.RefuterCheck_REFUTER_CHECK_PASSED {
 		return check, nil
 	}
