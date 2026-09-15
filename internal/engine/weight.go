@@ -58,12 +58,8 @@ func decide(in DeriveInput, counts *pb.FindingCounts) pb.Decision {
 	if !in.AdjudicationAvailable {
 		return pb.Decision_DECISION_CONDITIONAL
 	}
-	// A verdict over part of a target is not a verdict over the target. A unit
-	// nobody accounted for, a skip the provider called material, and a category
-	// that stopped for want of evidence all leave part of the target holding a
-	// defect nobody looked for; ranking the confessed two below the silent one
-	// would pay for staying quiet.
-	if in.CoverageIncomplete || in.CriticalUnknownRemains {
+	// A verdict over part of a target is not a verdict over the target.
+	if criticalUnknown(in) {
 		return pb.Decision_DECISION_CONDITIONAL
 	}
 	// A severe finding nobody tested carries no verdict weight, so it cannot
@@ -173,11 +169,22 @@ func drivingFindings(cands []Candidate) []Candidate {
 	return out
 }
 
+// criticalUnknown reports whether part of the target may hold a defect nobody
+// looked for: a unit left unaccounted for, a skip the provider called material,
+// or a category that stopped for want of evidence.
+//
+// The decision and completeness read the same three together. Ranking the two
+// confessed ones below the silent one would pay for staying quiet, and a review
+// that never named a unit has not accounted for the target either way.
+func criticalUnknown(in DeriveInput) bool {
+	return in.CoverageIncomplete || in.CriticalUnknownRemains
+}
+
 func completeness(in DeriveInput) pb.ReviewCompleteness {
 	if !in.CriticalInvariantProbed {
 		return pb.ReviewCompleteness_REVIEW_COMPLETENESS_INCONCLUSIVE
 	}
-	if in.AllCategoriesStopped && !in.CriticalUnknownRemains {
+	if in.AllCategoriesStopped && !criticalUnknown(in) {
 		return pb.ReviewCompleteness_REVIEW_COMPLETENESS_SUFFICIENT
 	}
 	return pb.ReviewCompleteness_REVIEW_COMPLETENESS_LIMITED

@@ -292,6 +292,14 @@ func TestDeriveCompleteness(t *testing.T) {
 			in.CriticalUnknownRemains = true
 			return in
 		}, pb.ReviewCompleteness_REVIEW_COMPLETENESS_LIMITED},
+		// Every category can reach its stop while a unit goes unnamed: the
+		// stops are per category and the accounting is per unit. Completeness
+		// would then claim the review covered a target it never finished.
+		{"a unit unaccounted for", func() DeriveInput {
+			in := clean()
+			in.CoverageIncomplete = true
+			return in
+		}, pb.ReviewCompleteness_REVIEW_COMPLETENESS_LIMITED},
 		{"no critical invariant probed", func() DeriveInput {
 			in := clean()
 			in.CriticalInvariantProbed = false
