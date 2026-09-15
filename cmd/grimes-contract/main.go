@@ -58,6 +58,11 @@ Usage:
   grimes-contract state --ledger=<f> [--json]
       Summarize ledger state.
 
+  grimes-contract adjudicate --decision=<d> --residual-risk=<r>
+      --review-confidence=<c> --review-completeness=<x> [--raw]
+      Emit the report an independent review hands back. Run identity and
+      target fingerprint come from the environment the engine exported.
+
 Message types: Ledger, Finding, GrimesResult, LoopState, Verdict,
                ProviderReport, AdjudicationReport, CandidateFinding,
                RefutationTask, RefutationReport
@@ -91,6 +96,8 @@ func main() {
 		err = cmdReport(os.Args[2:])
 	case "state":
 		err = cmdState(os.Args[2:])
+	case "adjudicate":
+		err = cmdAdjudicate(os.Args[2:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return

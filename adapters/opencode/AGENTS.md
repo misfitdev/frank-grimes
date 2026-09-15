@@ -63,6 +63,24 @@ OpenCode honors `name` and `description` in skill frontmatter. Other fields (`al
 
 ## Independent Adjudication
 
-A `pass` verdict requires a second review that never saw the first. OpenCode has no bundled equivalent of the Claude adapter's `grimey-verifier` subagent, so a grind here records `Independent adjudication: not available`, sets `review_confidence=low`, and caps at `conditional`/YELLOW.
+The engine runs the adjudication pass and resolves the two verdicts; the skill states when one is required and what follows from its absence. This adapter supplies only the command that starts the second context:
 
-To reach a pass, run the grind a second time in a fresh session given only the target — never the first report and never its verdict — and resolve the two by the stricter decision once both exist.
+```bash
+grimes run --dir=. \
+  --adjudicator-command="opencode" \
+  --adjudicator-arg="run" \
+  --adjudicator-arg="<the adjudicator prompt>" \
+  --adjudicator-fresh \
+  ...
+```
+
+`opencode run` is OpenCode's own non-interactive invocation; substitute whatever that is on your installation. `--adjudicator-fresh` is the operator asserting the command begins a new context. Without it the review is recorded as unknown-origin: it can still make the verdict worse, never better.
+
+The engine exports the request to that process. The prompt tells it to review `$GRIMES_TARGET_CONTENT` under the skill and to end with the report:
+
+```bash
+grimes-contract adjudicate --decision=<d> --residual-risk=<r> \
+    --review-confidence=<c> --review-completeness=<x>
+```
+
+Run identity and target fingerprint come from the exported environment, so the prompt carries neither. It carries nothing from the first review either.

@@ -27,20 +27,16 @@ You are read-only. Do not edit, create, or delete files. Do not commit, stage, s
 
 ## What you return
 
-Report your own verdict tuple, then the comparison:
+End your turn by running this and nothing else. It is the whole of what you hand back; the engine resolves your tuple against the other one afterwards:
 
-```text
-Independent Adjudication
-- Independent decision: block | conditional | pass
-- Independent residual risk: critical | high | moderate | low | unknown
-- Independent review confidence: high | medium | low
-- Independent review completeness: sufficient | limited | inconclusive
-- Claimed decision: [the tuple you were given]
-- Agreement: confirms | contradicts | inconclusive
-- Basis: [one clause naming what drove your decision]
-- Independence: intact | compromised (give the reason)
+```bash
+grimes-contract adjudicate \
+    --decision=block|conditional|pass \
+    --residual-risk=critical|high|moderate|low|unknown \
+    --review-confidence=high|medium|low \
+    --review-completeness=sufficient|limited|inconclusive
 ```
 
-Then give the evidence for any P0 or P1 you found, in the standard clinical form. Your findings stand on their own; they are not annotations on someone else's report.
+Run identity and the target's fingerprint come from the environment the engine exported, so you supply neither.
 
-Disagreement is the useful outcome. You are not here to ratify. If you found a terminal defect the claim did not account for, say so plainly and let the orchestrator resolve it against you.
+Disagreement is the useful outcome. You are not here to ratify. If you found a terminal defect and the target does not account for it, your tuple says so and the stricter decision is the one that survives.
