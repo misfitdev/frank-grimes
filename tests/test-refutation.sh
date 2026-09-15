@@ -218,6 +218,37 @@ assert_match "$OUT" 'refuter_check: +REFUTER_CHECK_PASSED' \
 rm -rf "$WS"
 
 echo ""
+echo "--- Two runs over one directory do not share a pass ---"
+
+# Overlapping in time on purpose: the first run's refuter holds after answering
+# its claims, the second run completes a whole pass, and only then does the
+# first seal. Each was issued its own control, so a task that landed on top of
+# another would grade one run's answers against the other's control.
+WS="$(workspace)"
+MARKER="$WS/holding"
+SENTINEL="$WS/go"
+FIRST="$WS/first.txt"
+("$GRIMES" run --dir="$WS" \
+    --provider-command="$FAKES/provider-p2.sh" \
+    --refuter-command="$FAKES/refuter-overlapped.sh" \
+    --refuter-arg="$MARKER" --refuter-arg="$SENTINEL" --refuter-fresh \
+    --format=prototext src >"$FIRST" 2>&1 || true) &
+FIRST_PID=$!
+for _ in $(seq 1 200); do
+    [[ -e "$MARKER" ]] && break
+    sleep 0.1
+done
+run_grimes "$WS" \
+    --refuter-command="$FAKES/refuter-documented.sh" \
+    --refuter-arg="upheld" --refuter-fresh >/dev/null 2>&1 || true
+: >"$SENTINEL"
+wait "$FIRST_PID"
+OUT="$(cat "$FIRST")"
+assert_match "$OUT" 'refuter_check: +REFUTER_CHECK_PASSED' \
+    "a run whose refuter overlaps another still reads its own claims"
+rm -rf "$WS"
+
+echo ""
 echo "--- The attacker's own context has to be known ---"
 # Without --refuter-fresh the engine cannot tell whether the attack came from
 # the context that formed the claim. A claim upholding itself is not a survival.

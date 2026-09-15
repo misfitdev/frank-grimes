@@ -127,6 +127,7 @@ func (e *Engine) refute(ctx context.Context, ledger *pb.Ledger, target *pb.Targe
 	if err != nil {
 		return none, fmt.Errorf("claims: %w", err)
 	}
+	defer func() { _ = e.Claims.Discard(ctx, path) }()
 
 	attempts, err := e.Refuter.Refute(ctx, target, contentPath, path)
 	if err != nil {
