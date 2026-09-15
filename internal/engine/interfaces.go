@@ -137,7 +137,7 @@ type Ledger interface {
 
 // ResultStore persists the derived result so the loop can verify it.
 type ResultStore interface {
-	Load(ctx context.Context) (*pb.GrimesResult, error)
+	Load(ctx context.Context) (*pb.GrimesResult, []byte, error)
 	Save(ctx context.Context, r *pb.GrimesResult) ([]byte, error)
 }
 

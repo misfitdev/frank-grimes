@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
 	"os"
 	"path/filepath"
 	"strings"
@@ -296,12 +297,12 @@ func sampleResult() *pb.GrimesResult {
 }
 
 func TestFileResultStoreLoadMissingReturnsNil(t *testing.T) {
-	got, err := NewFileResultStore(t.TempDir()).Load(context.Background())
+	got, digest, err := NewFileResultStore(t.TempDir()).Load(context.Background())
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if got != nil {
-		t.Errorf("result = %v, want nil", got)
+	if got != nil || digest != nil {
+		t.Errorf("result = %v, digest = %x, want nil, nil", got, digest)
 	}
 }
 
@@ -315,12 +316,15 @@ func TestFileResultStoreRoundTrip(t *testing.T) {
 	if len(sum) != 32 {
 		t.Errorf("digest length = %d, want 32", len(sum))
 	}
-	got, err := r.Load(context.Background())
+	got, digest, err := r.Load(context.Background())
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
 	if !proto.Equal(got, want) {
 		t.Error("round-tripped result differs from what was saved")
+	}
+	if string(digest) != string(sum) {
+		t.Error("the digest Load reports is not the one Save recorded")
 	}
 }
 
@@ -349,12 +353,46 @@ func TestFileResultStoreCorruptQuarantines(t *testing.T) {
 	if err := os.WriteFile(r.Path, []byte("not a protobuf"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.Load(context.Background()); err == nil {
+	if _, _, err := r.Load(context.Background()); err == nil {
 		t.Fatal("want an error for a corrupt result")
 	}
 	matches, _ := filepath.Glob(filepath.Join(dir, ".grimes", "quarantine", "*"))
 	if len(matches) == 0 {
 		t.Error("corrupt result was not preserved in quarantine")
+	}
+}
+
+// A result recorded before FindingSnapshot.provenance existed gains the field on
+// read. The loop binds its state to the digest the writing run recorded, so the
+// digest Load reports has to be over the bytes as stored, not over a re-encoding
+// of the filled-in message.
+func TestFileResultStoreLegacyDigestIsOverStoredBytes(t *testing.T) {
+	recorded, err := os.ReadFile(filepath.Join("..", "..", "tests", "contracts", "result.pre-provenance.bin"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := NewFileResultStore(t.TempDir())
+	if err := os.MkdirAll(filepath.Dir(r.Path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(r.Path, recorded, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, digest, err := r.Load(context.Background())
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	want := sha256.Sum256(recorded)
+	if string(digest) != string(want[:]) {
+		t.Error("the digest Load reports is not over the bytes it read")
+	}
+	filled, err := contracts.Digest(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(filled) == string(digest) {
+		t.Fatal("the fixture does not exercise filling: it digests the same either way")
 	}
 }
 
