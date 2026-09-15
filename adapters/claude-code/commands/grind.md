@@ -168,21 +168,35 @@ Record the command, working directory, exit code, and bounded output. Commit onl
 
 ### Refutation
 
-Required before a finding can raise confidence, per the skill's Phase 6. This adapter supplies the attacking context: one delegation to the **grimey-refuter** subagent via the Agent tool, carrying every surviving claim and the control the skill requires in a single batch, each as exactly this and nothing else:
+Required before a finding can raise confidence, per the skill's Phase 6. The engine runs the pass, plants its own control, and records the outcomes. This adapter supplies only the command that starts the attacking context, on the same `grimes run` invocation that seals the report:
 
-```text
-Claim: <handle>
-Category: <three-letter code>
-Anchor: <repository-relative path, document section, argument step, or source URI>
-Claim text: <the claim, as written>
-Artifact: <repository-relative path or scope>
+```bash
+  --refuter-command="claude" \
+  --refuter-arg="-p" \
+  --refuter-arg="<the refuter prompt>" \
+  --refuter-fresh \
 ```
 
-Do NOT include the severity, the grime ID, the evidence you cited, your disproof attempt, the reporter, or your verdict tuple.
+`--refuter-fresh` is you asserting that the command begins a new context.
 
-Build the control with Grep: choose an identifier of at least twelve characters, confirm it appears nowhere in the artifact, and write it into a claim at the anchor of one of the real ones. Vary where in the batch it goes.
+The prompt is the body of `agents/grimey-refuter.md`. The engine writes the claims it must answer to `$GRIMES_CLAIMS` and exports the run, so the prompt carries neither:
 
-Relay each outcome to the engine against the handle it was issued under. Never relay the control as a finding.
+```text
+You are attacking claims another reviewer raised. Read them with
+`grimes-contract refute claims`, attack each one against the artifact,
+and answer every ref exactly once:
+
+grimes-contract refute add --ref=<r> --refuted \
+    --action=<cmd> --cwd=<dir> --exit-code=<n> --output=<excerpt>
+grimes-contract refute add --ref=<r> --upheld ...
+grimes-contract refute add --ref=<r> --unavailable="<what was missing>"
+
+End your turn with `grimes-contract refute seal`, and nothing else.
+```
+
+Do NOT add anything to that prompt: not the severity, the grime ID, the evidence you cited, your disproof attempt, the reporter, or your verdict tuple. The engine hands over the handle, the category, the anchor, and the claim text, and those are the whole of what a refuter is given.
+
+Do not plant a control of your own and do not relay outcomes by hand. The engine establishes the control against the artifact and maps each answer back to the finding it was issued for.
 
 ### Independent adjudication
 
@@ -316,6 +330,10 @@ grimes run --dir=. \
   --adjudicator-arg="-p" \
   --adjudicator-arg="<the adjudicator prompt>" \
   --adjudicator-fresh \
+  --refuter-command="claude" \
+  --refuter-arg="-p" \
+  --refuter-arg="<the refuter prompt>" \
+  --refuter-fresh \
   <target>
 ```
 

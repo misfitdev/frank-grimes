@@ -58,6 +58,9 @@ Usage:
   grimes-contract state --ledger=<f> [--json]
       Summarize ledger state.
 
+  grimes-contract refute claims|add|seal ...
+      Answer the claims a refutation pass was handed, one at a time.
+
   grimes-contract adjudicate --decision=<d> --residual-risk=<r>
       --review-confidence=<c> --review-completeness=<x> [--raw]
       Emit the report an independent review hands back. Run identity and
@@ -98,6 +101,8 @@ func main() {
 		err = cmdState(os.Args[2:])
 	case "adjudicate":
 		err = cmdAdjudicate(os.Args[2:])
+	case "refute":
+		err = cmdRefute(os.Args[2:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
 		return

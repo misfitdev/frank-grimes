@@ -184,6 +184,40 @@ assert_no_match "$OUT" 'refuter_check:' \
 rm -rf "$WS"
 
 echo ""
+echo "--- The documented commands carry a whole pass ---"
+
+# The wiring the adapters describe, run end to end: claims out of the engine
+# through `refute claims`, each answer back through `refute add`, the report
+# through `refute seal`. Nothing in the path parses prototext.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" \
+    --refuter-command="$FAKES/refuter-documented.sh" \
+    --refuter-arg="upheld" --refuter-fresh)"
+assert_match "$OUT" 'refuter_check: +REFUTER_CHECK_PASSED' \
+    "the documented commands break the control"
+assert_match "$OUT" 'provenance: +FINDING_PROVENANCE_UPHELD' \
+    "the documented commands record a survival against the finding"
+assert_no_match "$OUT" 'unmet_gates: +"refutation"' \
+    "the documented commands clear the refutation gate"
+rm -rf "$WS"
+
+# A refuter that answers one claim twice, or answers a claim nobody issued, is
+# refused where it can still be told which claim, rather than by the engine
+# dropping the answer or rejecting the whole report.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" \
+    --refuter-command="$FAKES/refuter-documented.sh" \
+    --refuter-arg="probe" --refuter-fresh)"
+ERR="$(cat "$WS/refute.err" 2>/dev/null || true)"
+assert_match "$ERR" 'was not issued by this pass' \
+    "answering a claim nobody issued is refused by name"
+assert_match "$ERR" 'already been answered' \
+    "answering one claim twice is refused by name"
+assert_match "$OUT" 'refuter_check: +REFUTER_CHECK_PASSED' \
+    "a pass that reads its claims does not inherit an earlier pass's answers"
+rm -rf "$WS"
+
+echo ""
 echo "--- The attacker's own context has to be known ---"
 # Without --refuter-fresh the engine cannot tell whether the attack came from
 # the context that formed the claim. A claim upholding itself is not a survival.
@@ -248,10 +282,12 @@ assert_match "$(cat "$SKILL")" 'shown capable of failing before its result means
     "the skill holds the attacking context to the rule it holds probes to"
 assert_match "$(cat "$SKILL")" 'is not a finding and is never counted as one' \
     "the skill keeps the control out of the finding set"
-assert_match "$(cat "$GRIND")" 'Build the control with Grep' \
-    "the adapter establishes the control's falsity rather than asserting it"
-assert_match "$(cat "$GRIND")" 'single batch' \
-    "the adapter sends one pass rather than one call per claim"
+assert_match "$(cat "$GRIND")" 'refuter-command=' \
+    "the adapter starts the attacking context through the engine"
+assert_match "$(cat "$GRIND")" 'refuter-fresh' \
+    "the adapter asserts the attacking context's origin"
+assert_match "$PROMPT_BLOCK" 'grimes-contract refute seal' \
+    "the refuter prompt ends the pass through the contract rather than in prose"
 assert_match "$(cat "$SKILL")" 'where it sits among them is not fixed' \
     "the skill does not let position mark the control"
 # A refuter told that one claim is planted can pass the check by hunting for the
