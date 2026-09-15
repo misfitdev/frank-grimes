@@ -58,7 +58,9 @@ type memResults struct {
 	saves  int
 }
 
-func (m *memResults) Load(context.Context) (*pb.GrimesResult, error) { return m.result, nil }
+func (m *memResults) Load(context.Context) (*pb.GrimesResult, []byte, error) {
+	return m.result, nil, nil
+}
 func (m *memResults) Save(_ context.Context, r *pb.GrimesResult) ([]byte, error) {
 	m.saves++
 	m.result = r
