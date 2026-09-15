@@ -37,7 +37,7 @@ func (r *FileResultStore) Load(ctx context.Context) (*pb.GrimesResult, error) {
 		return nil, err
 	}
 	result := &pb.GrimesResult{}
-	if err := contracts.UnmarshalCanonical(data, result); err != nil {
+	if err := contracts.UnmarshalRecorded(data, result); err != nil {
 		dest, qerr := contracts.Quarantine(r.Path, "invalid")
 		if qerr != nil {
 			return nil, fmt.Errorf("result invalid (%w) and could not be quarantined: %v", err, qerr)

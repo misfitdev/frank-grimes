@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"buf.build/go/protovalidate"
+	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -70,6 +71,80 @@ func UnmarshalCanonical(b []byte, m proto.Message) error {
 		return fmt.Errorf("non-canonical encoding: input is %d bytes, canonical form is %d", len(b), len(round))
 	}
 	return nil
+}
+
+// UnmarshalRecorded decodes a result written by an earlier build of this schema
+// major, filling in what that build had no field for.
+//
+// The canonicality check runs against the bytes as they were written, and the
+// defaults are applied after it, so a record keeps whatever guarantee its own
+// encoding earned. Writing still goes through Validate with nothing filled in:
+// a value absent because nobody set it is a defect, and a value absent because
+// the field did not exist yet is a fact about when the record was written.
+func UnmarshalRecorded(b []byte, m proto.Message) error {
+	opts := proto.UnmarshalOptions{DiscardUnknown: false}
+	if err := opts.Unmarshal(b, m); err != nil {
+		return fmt.Errorf("malformed wire data: %w", err)
+	}
+	if n := len(m.ProtoReflect().GetUnknown()); n > 0 {
+		return fmt.Errorf("message carries %d bytes of unknown fields; schema drift or tampering", n)
+	}
+	if err := hasNoUnknownFields(m.ProtoReflect()); err != nil {
+		return err
+	}
+	round, err := marshalCanonical(m)
+	if err != nil {
+		return fmt.Errorf("re-marshal: %w", err)
+	}
+	if !bytes.Equal(b, round) {
+		return fmt.Errorf("non-canonical encoding: input is %d bytes, canonical form is %d", len(b), len(round))
+	}
+	fillRecordedDefaults(m.ProtoReflect())
+	return Validate(m)
+}
+
+// recordedDefaults names the fields a later build added, and what an earlier
+// build's silence about each one means.
+//
+// A snapshot written before the refutation pass existed describes a finding
+// nobody attacked, which is exactly what UNATTACKED says.
+var recordedDefaults = map[protoreflect.FullName]protoreflect.Value{
+	"frank_grimes.v2.FindingSnapshot.provenance": protoreflect.ValueOfEnum(
+		protoreflect.EnumNumber(pb.FindingProvenance_FINDING_PROVENANCE_UNATTACKED)),
+}
+
+// fillRecordedDefaults walks the message and supplies them wherever they apply.
+// Keyed by full name rather than by position, so a field reached through a new
+// nesting is still filled.
+func fillRecordedDefaults(m protoreflect.Message) {
+	fields := m.Descriptor().Fields()
+	for i := 0; i < fields.Len(); i++ {
+		fd := fields.Get(i)
+		if v, ok := recordedDefaults[fd.FullName()]; ok && !m.Has(fd) {
+			m.Set(fd, v)
+			continue
+		}
+		if !m.Has(fd) {
+			continue
+		}
+		val := m.Get(fd)
+		switch {
+		case fd.IsMap():
+			if fd.MapValue().Kind() == protoreflect.MessageKind {
+				val.Map().Range(func(_ protoreflect.MapKey, mv protoreflect.Value) bool {
+					fillRecordedDefaults(mv.Message())
+					return true
+				})
+			}
+		case fd.IsList() && fd.Kind() == protoreflect.MessageKind:
+			l := val.List()
+			for j := 0; j < l.Len(); j++ {
+				fillRecordedDefaults(l.Get(j).Message())
+			}
+		case fd.Kind() == protoreflect.MessageKind:
+			fillRecordedDefaults(val.Message())
+		}
+	}
 }
 
 // Nested messages carry their own unknown-field sets, so the top-level check is

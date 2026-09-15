@@ -316,7 +316,7 @@ func cmdValidate(args []string) error {
 			return err
 		}
 	case "binary":
-		if err := contracts.UnmarshalCanonical(data, m); err != nil {
+		if err := contracts.UnmarshalRecorded(data, m); err != nil {
 			return err
 		}
 	default:
@@ -342,7 +342,7 @@ func cmdEncodeResult(args []string) error {
 		if err := contracts.ParseTextProto(data, result); err != nil {
 			return err
 		}
-	} else if err := contracts.UnmarshalCanonical(data, result); err != nil {
+	} else if err := contracts.UnmarshalRecorded(data, result); err != nil {
 		return err
 	}
 	encoded, err := contracts.EncodeCanonical(result)
@@ -459,7 +459,7 @@ func cmdDecode(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := contracts.UnmarshalCanonical(data, m); err != nil {
+	if err := contracts.UnmarshalRecorded(data, m); err != nil {
 		return err
 	}
 	out, err := prototextMarshal(m)
@@ -486,7 +486,7 @@ func cmdDecodeResult(args []string) error {
 		}
 	}
 	result := &pb.GrimesResult{}
-	if err := contracts.UnmarshalCanonical(data, result); err != nil {
+	if err := contracts.UnmarshalRecorded(data, result); err != nil {
 		return err
 	}
 	out, err := prototextMarshal(result)
