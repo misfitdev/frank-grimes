@@ -26,7 +26,7 @@ func (r *repeatedArg) Set(v string) error {
 
 // argTakingFlags are the options whose value is an opaque argument, so a bare
 // option name following one of them is almost certainly a mistake.
-var argTakingFlags = []string{"provider-arg", "adjudicator-arg"}
+var argTakingFlags = []string{"provider-arg", "adjudicator-arg", "refuter-arg"}
 
 // rejectSwallowedFlags refuses `--provider-arg --auto-loop`, where the flag
 // package would consume --auto-loop as the argument and leave the engine's own
@@ -78,6 +78,7 @@ type config struct {
 	Research           string
 	ProviderCommand    []string
 	AdjudicatorCommand []string
+	RefuterCommand     []string
 	ProviderTimeout    time.Duration
 	MaxOutputBytes     int64
 	Format             string
@@ -85,6 +86,7 @@ type config struct {
 	Kind               pb.TargetKind
 	Snapshot           string
 	AdjudicatorFresh   bool
+	RefuterFresh       bool
 }
 
 // Root is the repository root a code target is taken from. Only a code target
@@ -112,9 +114,12 @@ func parseRun(args []string) (*config, error) {
 	providerCmd := fs.String("provider-command", "", "command that performs the review; split on whitespace")
 	adjudicatorCmd := fs.String("adjudicator-command", "", "command that performs the independent review; split on whitespace")
 	adjudicatorFresh := fs.Bool("adjudicator-fresh", false, "assert the adjudicator command begins a new context; without it the review is recorded as unknown-origin and cannot raise confidence")
-	var providerArgs, adjudicatorArgs repeatedArg
+	refuterCmd := fs.String("refuter-command", "", "command that attacks the surviving findings; split on whitespace")
+	refuterFresh := fs.Bool("refuter-fresh", false, "assert the refuter command begins a new context; without it nothing it upholds can raise confidence")
+	var providerArgs, adjudicatorArgs, refuterArgs repeatedArg
 	fs.Var(&providerArgs, "provider-arg", "one argument for the provider command; repeatable, not split")
 	fs.Var(&adjudicatorArgs, "adjudicator-arg", "one argument for the adjudicator command; repeatable, not split")
+	fs.Var(&refuterArgs, "refuter-arg", "one argument for the refuter command; repeatable, not split")
 	timeout := fs.Duration("provider-timeout", 10*time.Minute, "per-invocation provider timeout")
 	maxBytes := fs.Int64("max-output-bytes", 1<<20, "maximum bytes accepted from a provider")
 	format := fs.String("format", "envelope", "envelope or prototext")
@@ -147,6 +152,7 @@ func parseRun(args []string) (*config, error) {
 		Dir:              *dir,
 		Snapshot:         *snapshot,
 		AdjudicatorFresh: *adjudicatorFresh,
+		RefuterFresh:     *refuterFresh,
 	}
 
 	var err error
@@ -166,6 +172,13 @@ func parseRun(args []string) (*config, error) {
 	}
 	if *adjudicatorCmd == "" && *adjudicatorFresh {
 		return nil, fmt.Errorf("--adjudicator-fresh needs --adjudicator-command")
+	}
+	c.RefuterCommand = append(strings.Fields(*refuterCmd), refuterArgs...)
+	if *refuterCmd == "" && len(refuterArgs) > 0 {
+		return nil, fmt.Errorf("--refuter-arg needs --refuter-command")
+	}
+	if *refuterCmd == "" && *refuterFresh {
+		return nil, fmt.Errorf("--refuter-fresh needs --refuter-command")
 	}
 
 	return c, c.validate()

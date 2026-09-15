@@ -20,6 +20,7 @@ func (e *Engine) assemble(
 	digest []byte,
 	oscillation bool,
 	yield *pb.MarginalYield,
+	check pb.RefuterCheck,
 ) *pb.GrimesResult {
 	// The same stopping rule the stop hook applies, so the record cannot claim a
 	// review ended while the loop is still owed an iteration.
@@ -28,6 +29,7 @@ func (e *Engine) assemble(
 		Iteration:     iteration,
 		MaxIterations: e.MaxIterations,
 		NewP0P1:       yield.GetNewP0P1(),
+		Exhausted:     Exhausted(d.UnmetGates),
 	})
 	return &pb.GrimesResult{
 		SchemaMajor:       contracts.SchemaMajor,
@@ -40,6 +42,7 @@ func (e *Engine) assemble(
 		CompletionState:   outcome.CompletionState(),
 		Verdict:           d.Verdict,
 		LegacyColor:       d.Color,
+		RefuterCheck:      check,
 		MarginalYield:     yield,
 		Counts:            d.Counts,
 		Findings:          snapshots(ledger),
@@ -66,6 +69,7 @@ func snapshots(ledger *pb.Ledger) []*pb.FindingSnapshot {
 			Risk:           f.GetRisk(),
 			EvidenceTier:   f.GetEvidence().GetTier(),
 			EvidenceSha256: f.GetEvidenceSha256(),
+			Provenance:     provenanceOf(f),
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].GetId() < out[j].GetId() })

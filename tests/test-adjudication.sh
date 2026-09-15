@@ -78,8 +78,11 @@ assert_absent "$AGENT" '^tools:.*\bWrite\b' \
 echo ""
 echo "--- The prompt carries no knowledge of the primary review ---"
 # Extract the fenced prompt template the adapter tells the orchestrator to send.
+# Anchored to the section heading: the adapter templates a prompt for more than
+# one role, and an unanchored range would assert against whichever came first.
 # shellcheck disable=SC2016  # backticks are literal markdown fence characters
-PROMPT_BLOCK=$(awk '/passing exactly this and nothing else/,/^```$/' "$GRIND" | sed -n '/```text/,/```/p')
+PROMPT_BLOCK=$(awk '/^### Independent adjudication$/{f=1;next} f&&/^#{2,3} /{f=0} f' "$GRIND" |
+    sed -n '/```text/,/```/p')
 
 if [[ -n "$PROMPT_BLOCK" ]]; then
     pass "adapter defines an explicit verifier prompt template"

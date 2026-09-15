@@ -76,7 +76,13 @@ func cmdLoop(args []string) (int, error) {
 		if err := states.Clear(ctx); err != nil {
 			return 0, err
 		}
-		fmt.Printf("Grimes Grind complete: %s. %s\n", decision.Outcome, decision.Reason)
+		headline := "Grimes Grind complete"
+		if decision.Outcome == engine.OutcomeBounded {
+			// A review that stopped without exhausting coverage or refutation
+			// did not complete, and the line the operator reads says so.
+			headline = "Grimes Grind stopped short"
+		}
+		fmt.Printf("%s: %s. %s\n", headline, decision.Outcome, decision.Reason)
 		return exitAllowExit, nil
 	}
 }

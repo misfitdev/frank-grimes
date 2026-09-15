@@ -19,9 +19,11 @@ type Engine struct {
 	Provider    Provider
 	Broker      EvidenceBroker
 	Adjudicator Adjudicator
+	Refuter     Refuter
 	Gate        GateRunner
 	Inventory   InventoryStore
 	Content     ContentStore
+	Claims      ClaimStore
 	Ledger      Ledger
 	Results     ResultStore
 	State       StateStore
@@ -107,6 +109,14 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		return nil, fmt.Errorf("gate: %w", err)
 	}
 
+	// Before either derivation reads the ledger: both tuples have to be over the
+	// same findings, and a claim's standing under attack is part of the finding
+	// rather than of the verdict that reads it.
+	check, err := e.refute(ctx, ledger, target, collected.ContentPath, iteration)
+	if err != nil {
+		return nil, err
+	}
+
 	candidates := candidatesOf(ledger)
 	blocked := rankingBlocked(ledger)
 	falsifierUnavailable := criticalFalsifierUnavailable(ledger)
@@ -152,7 +162,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	}
 
 	yield := marginalYield(report, ledger, surfaced)
-	result := e.assemble(target, mode, iteration, final, review, verification, ledger, digest, oscillation, yield)
+	result := e.assemble(target, mode, iteration, final, review, verification, ledger, digest, oscillation, yield, check)
 	if _, err := contracts.EncodeCanonical(result); err != nil {
 		return nil, fmt.Errorf("derived result rejected by the contract: %w", err)
 	}

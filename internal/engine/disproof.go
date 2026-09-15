@@ -10,7 +10,8 @@ import (
 // none of it: a tag removes a finding from verdict weight, and a provider that
 // could write one could defuse its own accusation by relabelling it, which is a
 // severity change under another name. Severity itself only ratchets for the
-// same reason.
+// same reason. Provenance is the exception in the other direction — the engine
+// writes it from what a separate context did to the claim.
 func weigh(f *pb.Finding) Candidate {
 	d := f.GetEvidence().GetDisproof()
 	return Candidate{
@@ -20,6 +21,7 @@ func weigh(f *pb.Finding) Candidate {
 		Tags:             tagsFor(f),
 		ProbeAttempted:   attempted(d),
 		EvidenceConflict: d.GetContradictsClaim(),
+		Provenance:       provenanceOf(f),
 	}
 }
 

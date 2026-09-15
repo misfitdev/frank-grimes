@@ -139,6 +139,34 @@ func FindingID(category pb.Category, fingerprint []byte, wide bool) string {
 	return fmt.Sprintf("FG-%s-%s", CategoryName(category), hex.EncodeToString(fingerprint)[:width])
 }
 
+// ClaimRef is the opaque handle a claim is put to a refuter under.
+//
+// A finding ID would carry its category and stay the same across iterations, so
+// a refuter that saw one twice would know it was looking at a claim it had
+// already judged. Deriving over the run and the iteration keeps the handle
+// meaningless outside the pass that issued it.
+func ClaimRef(runID string, iteration uint32, findingID string) string {
+	h := sha256.New()
+	writeComponent(h, runID)
+	writeComponent(h, strconv.FormatUint(uint64(iteration), 10))
+	writeComponent(h, findingID)
+	return hex.EncodeToString(h.Sum(nil))[:16]
+}
+
+// ControlToken returns the identifier the engine plants in a control claim.
+//
+// Derived rather than fixed so it cannot be recognised across runs, and long
+// enough that no artifact under review contains it by accident. The engine
+// still checks that it is absent before asserting it is there: a control whose
+// falsity was assumed proves nothing about the refuter that broke it.
+func ControlToken(runID string, iteration uint32) string {
+	h := sha256.New()
+	writeComponent(h, "control")
+	writeComponent(h, runID)
+	writeComponent(h, strconv.FormatUint(uint64(iteration), 10))
+	return "fgq" + hex.EncodeToString(h.Sum(nil))[:13]
+}
+
 // CategoryName maps the enum to the three-letter code used in IDs and reports.
 func CategoryName(c pb.Category) string {
 	name := c.String() // CATEGORY_SEC

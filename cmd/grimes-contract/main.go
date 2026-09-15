@@ -32,13 +32,16 @@ Usage:
   grimes-contract validate --type=<message> [--format=binary|textproto] [file]
       Validate a message. Binary input must also be in canonical encoding.
 
+  grimes-contract decode --type=<message> [file]
+      Read canonical binary and emit TextProto.
+
   grimes-contract encode-result [--format=textproto] [file]
       Read a GrimesResult, validate it, emit the canonical envelope.
 
-  grimes-contract encode-report [--type=ProviderReport|AdjudicationReport] [--format=...] [--raw] [file]
+  grimes-contract encode-report [--type=ProviderReport|AdjudicationReport|RefutationReport] [--format=...] [--raw] [file]
       Wrap a ProviderReport in the report envelope a provider hands back.
 
-  grimes-contract decode-report [--type=ProviderReport|AdjudicationReport] [file]
+  grimes-contract decode-report [--type=ProviderReport|AdjudicationReport|RefutationReport] [file]
       Decode a report envelope or canonical report bytes.
 
   grimes-contract decode-result [file]
@@ -56,7 +59,8 @@ Usage:
       Summarize ledger state.
 
 Message types: Ledger, Finding, GrimesResult, LoopState, Verdict,
-               ProviderReport, AdjudicationReport, CandidateFinding
+               ProviderReport, AdjudicationReport, CandidateFinding,
+               RefutationTask, RefutationReport
 States: open, fixed, verified, accepted, false_positive, regressed
 `
 
@@ -71,6 +75,8 @@ func main() {
 		err = cmdID(os.Args[2:])
 	case "validate":
 		err = cmdValidate(os.Args[2:])
+	case "decode":
+		err = cmdDecode(os.Args[2:])
 	case "encode-result":
 		err = cmdEncodeResult(os.Args[2:])
 	case "decode-result":
@@ -114,6 +120,10 @@ func newMessage(name string) (proto.Message, error) {
 		return &pb.ProviderReport{}, nil
 	case "AdjudicationReport", "frank_grimes.v2.AdjudicationReport":
 		return &pb.AdjudicationReport{}, nil
+	case "RefutationTask", "frank_grimes.v2.RefutationTask":
+		return &pb.RefutationTask{}, nil
+	case "RefutationReport", "frank_grimes.v2.RefutationReport":
+		return &pb.RefutationReport{}, nil
 	case "CandidateFinding", "frank_grimes.v2.CandidateFinding":
 		return &pb.CandidateFinding{}, nil
 	case "TargetInventory", "frank_grimes.v2.TargetInventory":
@@ -335,18 +345,29 @@ func cmdEncodeResult(args []string) error {
 	return nil
 }
 
+// isReportType names the messages a provider role hands back inside a report
+// envelope. Every other message in the contract is written by the engine.
+func isReportType(name string) bool {
+	switch name {
+	case "ProviderReport", "AdjudicationReport", "RefutationReport":
+		return true
+	default:
+		return false
+	}
+}
+
 // cmdEncodeReport is the provider-side mirror of encode-result: it wraps a
 // ProviderReport in the report envelope.
 func cmdEncodeReport(args []string) error {
 	fs := flag.NewFlagSet("encode-report", flag.ExitOnError)
 	format := fs.String("format", "textproto", "textproto or binary")
-	typeName := fs.String("type", "ProviderReport", "ProviderReport or AdjudicationReport")
+	typeName := fs.String("type", "ProviderReport", "ProviderReport, AdjudicationReport, or RefutationReport")
 	raw := fs.Bool("raw", false, "write canonical bytes instead of the envelope")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *typeName != "ProviderReport" && *typeName != "AdjudicationReport" {
-		return fmt.Errorf("--type must be ProviderReport or AdjudicationReport")
+	if !isReportType(*typeName) {
+		return fmt.Errorf("--type must be ProviderReport, AdjudicationReport, or RefutationReport")
 	}
 	data, err := readInput(fs.Args())
 	if err != nil {
@@ -377,7 +398,7 @@ func cmdEncodeReport(args []string) error {
 
 func cmdDecodeReport(args []string) error {
 	fs := flag.NewFlagSet("decode-report", flag.ExitOnError)
-	typeName := fs.String("type", "ProviderReport", "ProviderReport or AdjudicationReport")
+	typeName := fs.String("type", "ProviderReport", "ProviderReport, AdjudicationReport, or RefutationReport")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -399,6 +420,37 @@ func cmdDecodeReport(args []string) error {
 		return err
 	}
 	out, err := prototextMarshal(report)
+	if err != nil {
+		return err
+	}
+	fmt.Print(out)
+	return nil
+}
+
+// cmdDecode renders a canonical message as TextProto. The engine writes several
+// of these for a provider to read, and a provider that cannot read one has to
+// parse the wire format by hand.
+func cmdDecode(args []string) error {
+	fs := flag.NewFlagSet("decode", flag.ExitOnError)
+	typeName := fs.String("type", "", "message type")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *typeName == "" {
+		return fmt.Errorf("--type is required")
+	}
+	m, err := newMessage(*typeName)
+	if err != nil {
+		return err
+	}
+	data, err := readInput(fs.Args())
+	if err != nil {
+		return err
+	}
+	if err := contracts.UnmarshalCanonical(data, m); err != nil {
+		return err
+	}
+	out, err := prototextMarshal(m)
 	if err != nil {
 		return err
 	}

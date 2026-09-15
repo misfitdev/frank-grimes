@@ -20,13 +20,15 @@ type TargetSpec struct {
 	Categories []pb.Category
 }
 
-// Role distinguishes the primary review from adjudication, which receives far
-// less input.
+// Role distinguishes the primary review from the roles that receive far less
+// input: adjudication, which sees only the target, and refutation, which sees
+// the claims under attack and nothing that argues for them.
 type Role int
 
 const (
 	RolePrimary Role = iota
 	RoleAdjudicator
+	RoleRefuter
 )
 
 // Request is everything a provider is given. An adjudicator request carries
@@ -44,11 +46,14 @@ type Request struct {
 	// denominator it is being measured against. The adjudicator reports no
 	// coverage and does not receive it.
 	InventoryPath string
-	Mode          pb.Mode
-	Iteration     uint32
-	Categories    []pb.Category
-	Research      string
-	Claimed       *pb.Verdict
+	// ClaimsPath is where a refuter reads the claims it is to attack. No other
+	// role receives it.
+	ClaimsPath string
+	Mode       pb.Mode
+	Iteration  uint32
+	Categories []pb.Category
+	Research   string
+	Claimed    *pb.Verdict
 }
 
 // ProviderOutput is raw transport output. Raw is untrusted bytes; the engine
@@ -109,6 +114,15 @@ type Adjudicator interface {
 	Adjudicate(ctx context.Context, target *pb.Target, contentPath string, claimed *pb.Verdict) (*pb.IndependentReview, error)
 }
 
+// Refuter puts claims to a context that did not form them and reports what
+// that context managed to do to each, keyed by the ref the engine issued.
+//
+// An error means the pass did not happen. That is not the same as every claim
+// surviving one, and the verdict reads the difference.
+type Refuter interface {
+	Refute(ctx context.Context, target *pb.Target, contentPath, claimsPath string) (map[string]*pb.RefutationAttempt, error)
+}
+
 // GateRunner runs the verification command once over a batch.
 type GateRunner interface {
 	Run(ctx context.Context, cwd string) (*pb.Verification, error)
@@ -139,6 +153,12 @@ type InventoryStore interface {
 // provider can be pointed at them.
 type ContentStore interface {
 	Save(ctx context.Context, content []byte) (path string, err error)
+}
+
+// ClaimStore persists the claims a refutation pass was asked to attack, so the
+// refuter reads them from disk rather than from a prompt the engine composed.
+type ClaimStore interface {
+	Save(ctx context.Context, task *pb.RefutationTask) (path string, err error)
 }
 
 // StateStore persists loop state between iterations.
