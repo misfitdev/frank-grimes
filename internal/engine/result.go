@@ -29,6 +29,7 @@ func (e *Engine) assemble(
 		Iteration:     iteration,
 		MaxIterations: e.MaxIterations,
 		NewP0P1:       yield.GetNewP0P1(),
+		Exhausted:     Exhausted(d.UnmetGates),
 	})
 	return &pb.GrimesResult{
 		SchemaMajor:       contracts.SchemaMajor,

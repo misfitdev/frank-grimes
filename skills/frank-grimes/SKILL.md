@@ -172,6 +172,10 @@ Keep Phase 1's three-question clarification budget. The 3–5 probes on an attac
 
 Account for every unit of the target. Each unit is either examined or explicitly skipped with a stated reason, and a skip is material when the unit could hold a defect that would change the verdict. A unit left unnamed is a coverage limit, not a pass, and a material skip leaves a critical unknown standing.
 
+A review is **complete** only when both standing conditions hold: every routed category has reached a recorded stop against the inventory, and every surviving finding has been put to a context that was shown capable of breaking it. A run out of new findings is not one of those conditions. Silence is what a reviewer produces when it has run out of ideas, which is not the same thing as a target having run out of defects, and a loop that stops on agreement stops on the thing both sides are worst at. Marginal yield may inform the loop and may stop an individual category; it may not end the review on its own.
+
+A review that stops with either condition unmet is **bounded**, not complete, and is recorded that way with the condition it fell short of named. Bounded is an honest ending. Recording it as completion is the failure.
+
 Exclude every `assumption-dependent` or `unverified` finding from verdict weight. Keep it in the register or appendix with its tag and required evidence; uncertainty limits completeness instead of manufacturing risk weight. Cap the main Risk Register at 12 survivors, keep all terminal P0/P1 findings ahead of P2/P3 findings, and put every remaining survivor in the appendix.
 
 Derive the verdict tuple from the surviving, verdict-weighted findings and the recorded review limits:

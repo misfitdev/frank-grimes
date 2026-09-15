@@ -443,15 +443,16 @@ else
 fi
 rm -rf "$WS"
 
-# A second iteration over the same report adds no new P0/P1, which is where the
-# review genuinely ends at RED.
+# A second iteration over the same report adds no new P0/P1. Nothing attacked
+# the surviving findings, so the loop stops without having finished: silence is
+# this reviewer out of ideas, not the target out of defects.
 WS="$(workspace)"
 run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" --auto-loop >/dev/null
 OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" --auto-loop --format=prototext)"
-if echo "$OUT" | grep -qE 'completion_state: +COMPLETION_STATE_REVIEW_COMPLETE'; then
-    pass "an exhausted iteration records the review as complete"
+if echo "$OUT" | grep -qE 'completion_state: +COMPLETION_STATE_BOUNDED'; then
+    pass "a quiet iteration short of refutation records itself as bounded"
 else
-    fail "an exhausted iteration does not record the review as complete"
+    fail "a quiet iteration short of refutation does not record itself as bounded"
 fi
 if echo "$OUT" | grep -qE 'iteration: +2'; then
     pass "the second run is recorded as iteration 2"
@@ -459,11 +460,61 @@ else
     fail "the second run is not recorded as iteration 2"
 fi
 set +e
-"$GRIMES" loop --dir="$WS" >/dev/null 2>&1
+LOOP_OUT="$("$GRIMES" loop --dir="$WS" 2>/dev/null)"
 LOOP_CODE=$?
 set -e
-assert_eq "$LOOP_CODE" "0" "the loop agrees the exhausted review ends"
+assert_eq "$LOOP_CODE" "0" "the loop agrees the bounded review ends"
+if echo "$LOOP_OUT" | grep -q 'stopped short'; then
+    pass "the loop says it stopped short rather than completed"
+else
+    fail "the loop reports a bounded review as complete"
+fi
+if echo "$LOOP_OUT" | grep -q 'refutation remains unmet'; then
+    pass "the loop names what the review stopped short of"
+else
+    fail "the loop does not name what the review stopped short of"
+fi
 rm -rf "$WS"
+
+# The same quiet iteration, with every surviving claim put to a context that
+# broke a control first. Now the silence is an exhausted review.
+WS="$(workspace)"
+COMPLETE=(--provider-command="$FAKES/provider-red.sh"
+    --refuter-command="$FAKES/refuter-upheld.sh" --refuter-fresh --auto-loop)
+run_grimes "$WS" "${COMPLETE[@]}" >/dev/null
+OUT="$(run_grimes "$WS" "${COMPLETE[@]}" --format=prototext)"
+if echo "$OUT" | grep -qE 'completion_state: +COMPLETION_STATE_REVIEW_COMPLETE'; then
+    pass "a quiet iteration with coverage and refutation exhausted records completion"
+else
+    fail "a quiet iteration with coverage and refutation exhausted does not record completion"
+fi
+rm -rf "$WS"
+
+# Refutation exhausted, coverage not: a routed category that never reached a
+# stop leaves the review bounded however quiet the iteration was.
+WS="$(workspace)"
+SHORT=(--provider-command="$FAKES/provider-drops-category.sh"
+    --refuter-command="$FAKES/refuter-upheld.sh" --refuter-fresh --auto-loop)
+run_grimes "$WS" "${SHORT[@]}" >/dev/null
+OUT="$(run_grimes "$WS" "${SHORT[@]}" --format=prototext)"
+if echo "$OUT" | grep -qE 'completion_state: +COMPLETION_STATE_BOUNDED'; then
+    pass "a routed category short of its stop keeps the review bounded"
+else
+    fail "a routed category short of its stop does not keep the review bounded"
+fi
+rm -rf "$WS"
+
+SKILL="$PROJECT_ROOT/skills/frank-grimes/SKILL.md"
+if grep -q 'it may not end the review on its own' "$SKILL"; then
+    pass "the skill refuses to let marginal yield end a review"
+else
+    fail "the skill lets marginal yield end a review"
+fi
+if grep -q 'Bounded is an honest ending' "$SKILL"; then
+    pass "the skill names the ending a review short of its conditions gets"
+else
+    fail "the skill does not name the ending a review short of its conditions gets"
+fi
 
 echo ""
 echo "--- State ---"

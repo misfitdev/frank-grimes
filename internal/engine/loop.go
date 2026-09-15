@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
@@ -20,8 +21,12 @@ const (
 	OutcomeConfirmedPass
 	// OutcomeIterationLimit means the bound was reached without a pass.
 	OutcomeIterationLimit
-	// OutcomeYieldExhausted means an iteration surfaced nothing new.
+	// OutcomeYieldExhausted means an iteration surfaced nothing new and the
+	// review had already run coverage and refutation out.
 	OutcomeYieldExhausted
+	// OutcomeBounded means an iteration surfaced nothing new while coverage or
+	// refutation was still short. The loop stops, and says what it stopped on.
+	OutcomeBounded
 	// OutcomeUnverified means the run record could not be trusted.
 	OutcomeUnverified
 )
@@ -38,6 +43,8 @@ func (o LoopOutcome) String() string {
 		return "iteration_limit"
 	case OutcomeYieldExhausted:
 		return "yield_exhausted"
+	case OutcomeBounded:
+		return "bounded"
 	default:
 		return "unverified"
 	}
@@ -53,6 +60,8 @@ func (o LoopOutcome) CompletionState() pb.CompletionState {
 		return pb.CompletionState_COMPLETION_STATE_ITERATION_LIMIT
 	case OutcomeConfirmedPass, OutcomeYieldExhausted:
 		return pb.CompletionState_COMPLETION_STATE_REVIEW_COMPLETE
+	case OutcomeBounded:
+		return pb.CompletionState_COMPLETION_STATE_BOUNDED
 	case OutcomeContinue:
 		return pb.CompletionState_COMPLETION_STATE_CONTINUE
 	default:
@@ -68,6 +77,25 @@ type Progress struct {
 	Iteration     uint32
 	MaxIterations uint32
 	NewP0P1       uint32
+	// Exhausted is every unit of the target accounted for, every routed
+	// category stopped, and every surviving finding put to a context that could
+	// break it. Without it an iteration that surfaced nothing has established
+	// that this reviewer ran out of ideas, not that the target ran out of
+	// defects.
+	Exhausted bool
+}
+
+// Exhausted reads the two gates that decide whether a quiet iteration is a
+// finished review. Coverage and refutation are the standing conditions; every
+// other gate is about the verdict this review reached, not about whether it is
+// entitled to stop looking.
+func Exhausted(gates []string) bool {
+	for _, g := range gates {
+		if g == GateCoverage || g == GateRefutation {
+			return false
+		}
+	}
+	return true
 }
 
 // stopRule applies the stopping rule. It is the only place a review is judged
@@ -79,8 +107,13 @@ func stopRule(p Progress) LoopOutcome {
 	if p.Iteration >= p.MaxIterations {
 		return OutcomeIterationLimit
 	}
-	// Re-grinding a target that produced nothing new restates the same findings.
+	// Re-grinding a target that produced nothing new restates the same findings,
+	// so silence still stops the loop. What it does not do is decide which of
+	// the two stops this was.
 	if p.Iteration > 1 && p.NewP0P1 == 0 {
+		if !p.Exhausted {
+			return OutcomeBounded
+		}
 		return OutcomeYieldExhausted
 	}
 	return OutcomeContinue
@@ -117,6 +150,7 @@ func DecideLoop(state *pb.LoopState, result *pb.GrimesResult, resultDigest []byt
 		Iteration:     state.GetIteration(),
 		MaxIterations: state.GetMaxIterations(),
 		NewP0P1:       result.GetMarginalYield().GetNewP0P1(),
+		Exhausted:     Exhausted(result.GetUnmetGates()),
 	}
 	outcome := stopRule(progress)
 	var reason string
@@ -126,11 +160,25 @@ func DecideLoop(state *pb.LoopState, result *pb.GrimesResult, resultDigest []byt
 	case OutcomeIterationLimit:
 		reason = fmt.Sprintf("iteration limit of %d reached at %s", progress.MaxIterations, color)
 	case OutcomeYieldExhausted:
-		reason = fmt.Sprintf("iteration %d surfaced no new P0/P1", progress.Iteration)
+		reason = fmt.Sprintf("iteration %d surfaced no new P0/P1 with coverage and refutation exhausted", progress.Iteration)
+	case OutcomeBounded:
+		reason = fmt.Sprintf("iteration %d surfaced no new P0/P1, but %s", progress.Iteration, shortfall(result.GetUnmetGates()))
 	default:
 		reason = fmt.Sprintf("%s at iteration %d of %d", color, progress.Iteration, progress.MaxIterations)
 	}
 	return LoopDecision{Outcome: outcome, Reason: reason, Color: color}
+}
+
+// shortfall names what a bounded review stopped short of, in the fixed order
+// the gates are reported in.
+func shortfall(gates []string) string {
+	var short []string
+	for _, g := range gates {
+		if g == GateCoverage || g == GateRefutation {
+			short = append(short, g)
+		}
+	}
+	return strings.Join(short, " and ") + " remains unmet"
 }
 
 func bindingFailure(state *pb.LoopState, result *pb.GrimesResult, resultDigest []byte) string {

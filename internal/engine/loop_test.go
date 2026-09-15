@@ -66,6 +66,7 @@ func loopResult(t *testing.T, mutate func(*pb.GrimesResult)) *pb.GrimesResult {
 		Iteration:     r.GetIteration(),
 		MaxIterations: r.GetMaxIterations(),
 		NewP0P1:       r.GetMarginalYield().GetNewP0P1(),
+		Exhausted:     Exhausted(r.GetUnmetGates()),
 	}).CompletionState()
 	return r
 }
@@ -350,25 +351,31 @@ func TestCompletionStateAgreesWithTheContract(t *testing.T) {
 		for iteration := uint32(1); iteration <= 4; iteration++ {
 			for max := uint32(1); max <= 4; max++ {
 				for _, yield := range []uint32{0, 3} {
-					if iteration > max {
-						continue
-					}
-					r := loopResult(t, nil)
-					if green {
-						r = greenResult(t)
-					}
-					r.Iteration = iteration
-					r.MaxIterations = max
-					r.MarginalYield.NewP0P1 = yield
-					r.CompletionState = stopRule(Progress{
-						Green:         green,
-						Iteration:     iteration,
-						MaxIterations: max,
-						NewP0P1:       yield,
-					}).CompletionState()
-					if _, err := contracts.EncodeCanonical(r); err != nil {
-						t.Errorf("green=%v iteration=%d/%d yield=%d recorded %v: %v",
-							green, iteration, max, yield, r.GetCompletionState(), err)
+					for _, gates := range [][]string{{"decision"}, {"decision", GateCoverage}, {"decision", GateRefutation}} {
+						if iteration > max {
+							continue
+						}
+						r := loopResult(t, nil)
+						if green {
+							r = greenResult(t)
+						}
+						r.Iteration = iteration
+						r.MaxIterations = max
+						r.MarginalYield.NewP0P1 = yield
+						if !green {
+							r.UnmetGates = gates
+						}
+						r.CompletionState = stopRule(Progress{
+							Green:         green,
+							Iteration:     iteration,
+							MaxIterations: max,
+							NewP0P1:       yield,
+							Exhausted:     Exhausted(r.GetUnmetGates()),
+						}).CompletionState()
+						if _, err := contracts.EncodeCanonical(r); err != nil {
+							t.Errorf("green=%v iteration=%d/%d yield=%d gates=%v recorded %v: %v",
+								green, iteration, max, yield, gates, r.GetCompletionState(), err)
+						}
 					}
 				}
 			}

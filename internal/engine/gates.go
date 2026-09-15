@@ -44,7 +44,10 @@ func unmetGates(v *pb.Verdict, in DeriveInput) []string {
 	if unrefuted(in.Candidates) {
 		gates = append(gates, GateRefutation)
 	}
-	if in.CoverageIncomplete {
+	// A unit nobody named and a category that stopped attacking before it ran
+	// out of probes are the same shortfall measured two ways, so they answer to
+	// one gate.
+	if in.CoverageIncomplete || !in.AllCategoriesStopped {
 		gates = append(gates, GateCoverage)
 	}
 	if in.Oscillation {

@@ -815,6 +815,9 @@ enum CompletionState {
   COMPLETION_STATE_FIX_COMPLETE = 3;
   COMPLETION_STATE_ITERATION_LIMIT = 4;
   COMPLETION_STATE_BLOCKED = 5;
+  // The loop ran out of new findings without having exhausted either coverage
+  // or refutation. It stopped; it did not finish.
+  COMPLETION_STATE_BOUNDED = 6;
 }
 
 enum ProducerRole {
@@ -969,12 +972,14 @@ message GrimesResult {
   // mode has no stated rule yet, so it is left out rather than guessed at.
   option (buf.validate.message).cel = {
     id: "result.report_completion_is_derived"
-    message: "the completion state must be the one the colour, iteration, bound, and new P0/P1 count imply"
+    message: "the completion state must be the one the colour, iteration, bound, exhaustion, and new P0/P1 count imply"
     expression:
       "this.mode != 1 || this.completion_state == ("
       "this.legacy_color == 1 ? 2 : "
       "this.iteration >= this.max_iterations ? 4 : "
-      "(this.iteration > 1 && this.marginal_yield.new_p0_p1 == 0u) ? 2 : 1)"
+      "(this.iteration > 1 && this.marginal_yield.new_p0_p1 == 0u) ? ("
+      "this.unmet_gates.exists(g, g == 'coverage' || g == 'refutation') ? 6 : 2"
+      ") : 1)"
   };
   option (buf.validate.message).cel = {
     id: "result.green_is_independent_and_verified"
