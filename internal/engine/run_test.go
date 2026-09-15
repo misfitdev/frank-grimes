@@ -165,6 +165,7 @@ func seededLedger(t *testing.T, status pb.FindingStatus) *pb.Ledger {
 					Detail: &pb.Evidence_Citation{Citation: &pb.Citation{
 						Anchor: contracts.RepoAnchor(path), Quote: seedQuote,
 					}},
+					Disproof: heldUp(),
 				},
 				EvidenceSha256: make([]byte, 32),
 				Status:         status,
@@ -287,6 +288,21 @@ func reportAt(t *testing.T, iteration uint32, candidates ...*pb.CandidateFinding
 }
 
 // candidate builds a cited finding at the given severity and path.
+// heldUp is a disproof that was performed and failed to disprove the finding.
+func heldUp() *pb.DisproofAttempt {
+	return &pb.DisproofAttempt{Outcome: &pb.DisproofAttempt_Performed{
+		Performed: &pb.Reproduction{
+			CompletedAt: timestamppb.New(testTime()),
+			Exhibit: &pb.Reproduction_ExecutedCommand{ExecutedCommand: &pb.ExecutedCommand{
+				Action:   "tried to show the path is unreachable",
+				Cwd:      &pb.RepoPath{Value: "."},
+				ExitCode: 1,
+				Output:   &pb.ExecutedCommand_OutputExcerpt{OutputExcerpt: "still reachable"},
+			}},
+		},
+	}}
+}
+
 func candidate(path, claim string, sev pb.Severity) *pb.CandidateFinding {
 	return &pb.CandidateFinding{
 		Category: pb.Category_CATEGORY_SEC,
@@ -302,6 +318,9 @@ func candidate(path, claim string, sev pb.Severity) *pb.CandidateFinding {
 			Detail: &pb.Evidence_Citation{Citation: &pb.Citation{
 				Anchor: contracts.RepoAnchor(path), Quote: seedQuote,
 			}},
+			// A finding nobody attacked carries no verdict weight, so a fixture
+			// about severity has to record the attack that earned it.
+			Disproof: heldUp(),
 		},
 	}
 }

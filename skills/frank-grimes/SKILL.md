@@ -147,7 +147,7 @@ Freeze the candidate set before reporting. For every candidate, write the specif
 
 - If the disproof observation occurs, delete the candidate from the finding set and count it as killed.
 - If the probe does not disprove the candidate, retain both the candidate's primary evidence and the self-grind result.
-- If the probe cannot be attempted, record the missing prerequisite, mark the candidate `unverified`, and cap it at P2.
+- If the probe cannot be attempted, record the missing prerequisite and mark the candidate `unverified`. Keep the severity it would carry if true: severity is how bad the defect is, not how sure you are of it, and lowering it for an uncertainty reason manufactures the risk weight Phase 7 excludes. Phase 7 drops it from verdict weight and refuses a pass while it stands.
 - If a retained candidate still rests on an unconfirmed assumption, tag it `assumption-dependent`; Phase 7 excludes it from verdict weight.
 
 Deduplicate survivors by root cause and violated invariant; multiple symptoms may be evidence for one finding but are not multiple findings. Report the reconciliation exactly as **“N candidates, M survived, K killed”**, where `N = M + K`. A candidate absent from that arithmetic cannot appear in the report.
@@ -162,7 +162,7 @@ Exclude every `assumption-dependent` or `unverified` finding from verdict weight
 
 Derive the verdict tuple from the surviving, verdict-weighted findings and the recorded review limits:
 
-- `decision = block` when any open P0 remains; `conditional` when any open P1 remains, when independent adjudication is pending or unavailable, or when a human-accepted P0 is carried unfixed; `pass` only when no verdict-weighted P0/P1 remains and independent adjudication confirmed it under "Independent Adjudication" above.
+- `decision = block` when any open P0 remains; `conditional` when any open P1 remains, when independent adjudication is pending or unavailable, when a human-accepted P0 is carried unfixed, or when an open P0/P1 was never put to a disproof; `pass` only when no verdict-weighted P0/P1 remains and independent adjudication confirmed it under "Independent Adjudication" above. An untested severe finding carries no verdict weight and so cannot block, but it must not buy a pass either: skipping the disproof would otherwise earn a softer decision than performing one that fails.
 - `residual_risk = critical | high | moderate | low | unknown`: map the highest open verdict-weighted P0/P1/P2/P3 to `critical`/`high`/`moderate`/`low`; use `low` when none remain and `unknown` when missing evidence prevents the ranking.
 - `review_confidence = high | medium | low`: use `high` when every verdict-driving finding has E1/E2, its self-grind probe was attempted, no material evidence conflicts, and the adjudicating context's origin was established; use `medium` when an E3 P1 drives the verdict but its available falsifier was attempted and no material evidence conflicts; use `low` when critical evidence conflicts or a critical falsifier was unavailable.
 - `review_completeness = sufficient | limited | inconclusive`: use `sufficient` when every routed category reached its marginal-yield stop and no critical contract unknown remains; use `limited` when unavailable evidence leaves at least one routed category short but at least one critical invariant was probed; use `inconclusive` when no critical invariant was probed. Apply the stricter Phase 1 unknown cap.

@@ -212,6 +212,19 @@ The anchor is one of `--path`, `--document` with `--section`, `--argument` with
 takes `--assumption`, `--reasoning`, and `--falsifier`. Add `--suggested-fix` to
 record a fix as text without applying it.
 
+Every finding records what was done to disprove it, or why that could not be
+done:
+
+```bash
+  --disproof-action="<command>" --disproof-exit=<n> --disproof-output="<excerpt>" \
+  [--disproof-contradicts]
+  # or, when it could not be attempted:
+  --disproof-unavailable="<what was missing>"
+```
+
+The two forms are exclusive. The skill governs when a disproof is required and
+what follows from its result.
+
 A rejected call prints the contract rule it failed. The skill governs what to do
 about it.
 

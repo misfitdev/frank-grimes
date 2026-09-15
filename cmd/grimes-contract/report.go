@@ -70,7 +70,10 @@ const reportUsage = `report subcommands:
 Anchor:   --path / --document with --section / --argument with --step / --source
 Evidence: E1 --action --cwd --exit-code (--output | --output-sha256)
           E2 --quote
-          E3 --assumption --reasoning --falsifier`
+          E3 --assumption --reasoning --falsifier
+Disproof: --disproof-action [--disproof-cwd] --disproof-exit \
+            (--disproof-output | --disproof-output-sha256) [--disproof-contradicts]
+          or --disproof-unavailable=<why>`
 
 func cmdReportAdd(args []string) error {
 	fs := flag.NewFlagSet("report add", flag.ExitOnError)
@@ -103,6 +106,14 @@ func cmdReportAdd(args []string) error {
 	assumption := fs.String("assumption", "", "E3: the explicit assumption")
 	reasoning := fs.String("reasoning", "", "E3: observed facts used by the inference")
 	falsifier := fs.String("falsifier", "", "E3: an observation that would falsify it")
+
+	disproofAction := fs.String("disproof-action", "", "the probe performed against this finding")
+	disproofCwd := fs.String("disproof-cwd", ".", "working directory the disproof ran in")
+	disproofExit := fs.Int("disproof-exit", 0, "exit status of the disproof")
+	disproofOutput := fs.String("disproof-output", "", "result excerpt from the disproof")
+	disproofSum := fs.String("disproof-output-sha256", "", "hex digest of the disproof output instead of an excerpt")
+	disproofUnavailable := fs.String("disproof-unavailable", "", "why the disproof could not be attempted")
+	contradicts := fs.Bool("disproof-contradicts", false, "the probe came back against the finding")
 
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -143,6 +154,13 @@ func cmdReportAdd(args []string) error {
 	if err != nil {
 		return err
 	}
+
+	disproof, err := disproofFromFlags(fs, *disproofAction, *disproofCwd, *disproofExit,
+		*disproofOutput, *disproofSum, *disproofUnavailable, *contradicts)
+	if err != nil {
+		return err
+	}
+	evidence.Disproof = disproof
 
 	candidate := &pb.CandidateFinding{
 		Category: cat,
@@ -638,8 +656,60 @@ func saveReport(path string, report *pb.ProviderReport) error {
 	return contracts.WriteAtomic(path, []byte(out))
 }
 
+// disproofFromFlags builds the record of what was done to disprove the finding,
+// or returns nil when nothing was offered.
+//
+// An attempt and a reason it could not be attempted are exclusive: a caller
+// with both has described two different reviews.
+func disproofFromFlags(fs *flag.FlagSet, action, cwd string, exitCode int,
+	output, outputSum, why string, contradicts bool,
+) (*pb.DisproofAttempt, error) {
+	var offered, performed []string
+	fs.Visit(func(f *flag.Flag) {
+		if !strings.HasPrefix(f.Name, "disproof-") {
+			return
+		}
+		offered = append(offered, "--"+f.Name)
+		if f.Name != "disproof-unavailable" {
+			performed = append(performed, "--"+f.Name)
+		}
+	})
+	if len(offered) == 0 {
+		return nil, nil
+	}
+	// Presence, not value: --disproof-cwd carries a default, so a caller who
+	// passed it would otherwise be indistinguishable from one who did not.
+	// Dropping these silently would record an attempt nobody made as one
+	// nobody could make, and the difference is the whole point of the record.
+	if why != "" && len(performed) > 0 {
+		return nil, fmt.Errorf("--disproof-unavailable describes an attempt that did not happen, so it cannot be given with %s",
+			strings.Join(performed, ", "))
+	}
+	if why != "" {
+		return &pb.DisproofAttempt{Outcome: &pb.DisproofAttempt_Unavailable{Unavailable: why}}, nil
+	}
+	result, err := reproductionOf("disproof-", action, cwd, exitCode, output, outputSum)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.DisproofAttempt{
+		Outcome:          &pb.DisproofAttempt_Performed{Performed: result},
+		ContradictsClaim: contradicts,
+	}, nil
+}
+
 // reproductionOf records a command that was actually run. The prefix names the
 // flag family at fault, since an acquittal supplies two of them.
+// exitFlag names the exit-status flag for a family. Unprefixed it is
+// --exit-code; every prefixed form shortens it, so deriving one from the other
+// by concatenation names a flag nobody defined.
+func exitFlag(prefix string) string {
+	if prefix == "" {
+		return "exit-code"
+	}
+	return prefix + "exit"
+}
+
 func reproductionOf(prefix, action, cwd string, exitCode int, output, outputSum string) (*pb.Reproduction, error) {
 	if action == "" {
 		return nil, fmt.Errorf("--%saction is required", prefix)
@@ -647,7 +717,7 @@ func reproductionOf(prefix, action, cwd string, exitCode int, output, outputSum 
 	// int32 in the contract: a wider value would wrap and the record would
 	// carry an outcome the command did not have.
 	if exitCode > math.MaxInt32 || exitCode < math.MinInt32 {
-		return nil, fmt.Errorf("--%sexit-code must be between %d and %d", prefix,
+		return nil, fmt.Errorf("--%s must be between %d and %d", exitFlag(prefix),
 			int32(math.MinInt32), int32(math.MaxInt32))
 	}
 	cmd := &pb.ExecutedCommand{

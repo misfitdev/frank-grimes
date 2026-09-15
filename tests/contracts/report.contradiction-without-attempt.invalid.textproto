@@ -1,0 +1,25 @@
+# A disproof nobody performed cannot have come back against anything. The flag
+# would otherwise reach the verdict as an evidence conflict raised by an attempt
+# that was never made.
+schema_major: 2
+run_id: "run-001"
+target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
+mode: MODE_REPORT
+iteration: 1
+routed_categories: [CATEGORY_SEC]
+category_stops { category: CATEGORY_SEC condition: STOP_CONDITION_MARGINAL_YIELD probes_attempted: 3 }
+coverage { examined: "src/a.sh" }
+candidates {
+  category: CATEGORY_SEC
+  location { anchor { repo_line { path { value: "src/a.sh" } } } }
+  risk { severity: SEVERITY_P1 likelihood: LIKELIHOOD_LIKELY blast_radius: BLAST_RADIUS_SERVICE }
+  evidence {
+    tier: EVIDENCE_TIER_E2
+    claim: "caller-controlled deletion path"
+    citation { anchor { repo_line { path { value: "src/a.sh" } } } quote: "rm -rf" }
+    disproof { unavailable: "the service is not reachable" contradicts_claim: true }
+  }
+}
+candidates_examined: 1
+candidates_disproved: 0
+summary: "A contradiction from an attempt nobody made."

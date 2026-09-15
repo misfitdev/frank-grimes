@@ -272,6 +272,36 @@ message Citation {
   Anchor anchor = 4 [(buf.validate.field).required = true];
 }
 
+// What was done to disprove a finding, and what came of it.
+//
+// Every candidate is supposed to survive an attempt on its own life. Recording
+// the attempt is what separates a finding that was attacked and held from one
+// nobody tried, which otherwise read the same.
+//
+// An attempt that could not be made carries its reason instead. That caps the
+// verdict rather than acquitting the finding, which is the treatment the skill
+// already gives an unattemptable falsifier.
+message DisproofAttempt {
+  // Only a probe that ran can have come back against anything. The CLI never
+  // pairs the two, but a provider writes its own report: the flag would reach
+  // the verdict as an evidence conflict raised by an attempt nobody made.
+  option (buf.validate.message).cel = {
+    id: "disproof.contradiction_needs_an_attempt"
+    message: "a disproof that was not performed cannot contradict the claim"
+    expression: "!this.contradicts_claim || has(this.performed)"
+  };
+
+  oneof outcome {
+    option (buf.validate.oneof).required = true;
+    Reproduction performed = 1;
+    string unavailable = 2 [(buf.validate.field).string.min_len = 1];
+  }
+  // Set when the attempt came back against the finding: the probe ran and said
+  // the accusation is wrong. Reported anyway, the two records disagree, and a
+  // verdict resting on the pair cannot be confident.
+  bool contradicts_claim = 3;
+}
+
 message Inference {
   string assumption = 1 [(buf.validate.field).string.min_len = 1];
   string reasoning = 2 [(buf.validate.field).string.min_len = 1];
@@ -301,6 +331,9 @@ message Evidence {
     Citation citation = 4;
     Inference inference = 5;
   }
+  // Absent means nobody tried. That is a coverage limit rather than a lie, so
+  // it is expressible; it simply earns nothing.
+  DisproofAttempt disproof = 6;
 }
 
 // ---------------------------------------------------------------------------
