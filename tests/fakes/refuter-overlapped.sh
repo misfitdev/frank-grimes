@@ -21,11 +21,15 @@ while IFS= read -r -d '' ref &&
     IFS= read -r -d '' _anchor &&
     IFS= read -r -d '' claim; do
 
-    token="$(grep -oE 'fgq[0-9a-f]{13}' <<<"$claim" || true)"
-    if [[ -n "$token" ]] && ! grep -rqF "$token" --exclude-dir=.grimes . 2>/dev/null; then
+    # An honest attack on a claim that denies a name is to look for the name.
+    term="$(sed -n 's/^nothing at this anchor mentions \(.*\), so no path through it can depend on that name$/\1/p' <<<"$claim")"
+    hit=""
+    if [[ -n "$term" ]]; then
+        hit="$(grep -rhF --exclude-dir=.grimes -- "$term" . 2>/dev/null || true)"
+    fi
+    if [[ -n "$hit" ]]; then
         grimes-contract refute add --ref="$ref" --refuted \
-            --action="grep -rF <identifier> ." --cwd="." --exit-code=1 \
-            --output="no such identifier in target"
+            --action="grep -rF <name> ." --cwd="." --exit-code=0 --output="$hit"
     else
         grimes-contract refute add --ref="$ref" --upheld \
             --action="sh -c true" --cwd="." --exit-code=0 \

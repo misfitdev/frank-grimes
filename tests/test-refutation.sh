@@ -159,7 +159,7 @@ assert_match "$OUT" 'refuter_check: +REFUTER_CHECK_PASSED' \
 # The control is a claim about the target that nobody found, so it must not be
 # countable as one. The planted identifier appearing anywhere in the record
 # would mean it had reached the ledger.
-assert_no_match "$OUT" 'fgq[0-9a-f]{13}' \
+assert_no_match "$OUT" 'no path through it can depend on that name' \
     "the control never reaches the record"
 assert_match "$OUT" 'total: +1' \
     "the control is not counted as a finding"
@@ -256,6 +256,23 @@ wait "$FIRST_PID"
 OUT="$(cat "$FIRST")"
 assert_match "$OUT" 'refuter_check: +REFUTER_CHECK_PASSED' \
     "a run whose refuter overlaps another still reads its own claims"
+rm -rf "$WS"
+
+echo ""
+echo "--- A control is broken by exhibiting the target, not by recognising it ---"
+
+# The control denies a name the target does carry, so breaking it means quoting
+# the line that carries it. This refuter spots the control and answers it with a
+# well-formed disproof that rests on nothing, then vouches for every real claim.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" \
+    --refuter-command="$FAKES/refuter-fabricated.sh" --refuter-fresh)"
+assert_no_match "$OUT" 'refuter_check: +REFUTER_CHECK_PASSED' \
+    "a fabricated disproof of the control does not pass the check"
+assert_match "$OUT" 'unmet_gates: +"refutation"' \
+    "a fabricated disproof of the control acquits nothing"
+assert_match "$OUT" 'provenance: +FINDING_PROVENANCE_UNATTACKED' \
+    "a claim vouched for behind a fabricated control is left unattacked"
 rm -rf "$WS"
 
 echo ""

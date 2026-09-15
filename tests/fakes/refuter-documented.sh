@@ -39,21 +39,28 @@ while IFS= read -r -d '' ref &&
     IFS= read -r -d '' _anchor &&
     IFS= read -r -d '' claim; do
 
-    verdict="$OUTCOME"
-    token="$(grep -oE 'fgq[0-9a-f]{13}' <<<"$claim" || true)"
-    if [[ -n "$token" ]] && ! grep -rqF "$token" --exclude-dir=.grimes . 2>/dev/null; then
-        verdict=refuted
+    # An honest attack on a claim that denies a name is to look for the name.
+    term="$(sed -n 's/^nothing at this anchor mentions \(.*\), so no path through it can depend on that name$/\1/p' <<<"$claim")"
+    hit=""
+    if [[ -n "$term" ]]; then
+        hit="$(grep -rhF --exclude-dir=.grimes -- "$term" . 2>/dev/null || true)"
     fi
 
-    case "$verdict" in
+    if [[ -n "$hit" ]]; then
+        grimes-contract refute add --ref="$ref" --refuted \
+            --action="grep -rF <name> ." --cwd="." --exit-code=0 --output="$hit"
+        continue
+    fi
+
+    case "$OUTCOME" in
         unavailable)
             grimes-contract refute add --ref="$ref" \
                 --unavailable="no runtime available to exercise this claim"
             ;;
         refuted)
             grimes-contract refute add --ref="$ref" --refuted \
-                --action="grep -rF <identifier> ." --cwd="." --exit-code=1 \
-                --output="no such identifier in the target"
+                --action="sh -c false" --cwd="." --exit-code=1 \
+                --output="the claim does not hold against the artifact"
             ;;
         *)
             grimes-contract refute add --ref="$ref" --upheld \
