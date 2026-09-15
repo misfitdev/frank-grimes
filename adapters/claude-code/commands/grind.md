@@ -166,6 +166,22 @@ Applies only when `mode=fix`. The rules are in the skill's "Fix Mode and the Com
 
 Record the command, working directory, exit code, and bounded output. Commit only when fix mode, `--commit`, and a zero exit all hold; otherwise leave edits uncommitted and say so.
 
+### Refutation
+
+Required before a finding can raise confidence, per the skill's Phase 6. This adapter supplies the attacking context: delegate to the **grimey-refuter** subagent via the Agent tool, once per surviving finding, passing exactly this and nothing else:
+
+```text
+Claim: <handle>
+Category: <three-letter code>
+Anchor: <repository-relative path, document section, argument step, or source URI>
+Claim text: <the claim, as written>
+Artifact: <repository-relative path or scope>
+```
+
+Do NOT include the severity, the grime ID, the evidence you cited, your disproof attempt, the reporter, or your verdict tuple. The refuter's value is that it is judging the claim rather than your case for it.
+
+Relay each outcome to the engine as the claim's refutation result. If the refuter cannot run, record the claim as unattacked; do not record it as upheld.
+
 ### Independent adjudication
 
 Required before any `pass`, per the skill's "Independent Adjudication" section. This adapter supplies the second context: delegate to the **grimey-verifier** subagent via the Agent tool, passing exactly this and nothing else:

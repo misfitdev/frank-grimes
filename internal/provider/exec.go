@@ -113,11 +113,6 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	return &engine.ProviderOutput{Raw: out}, nil
 }
 
-// requestEnv renders a request as environment variables.
-//
-// An adjudicator is given the target's identity and the claimed tuple and
-// nothing else: a reviewer that sees the findings is not an independent
-// reviewer.
 // boundedBuffer keeps the first limit bytes and counts the rest.
 type boundedBuffer struct {
 	limit   int
@@ -168,6 +163,16 @@ func requestEnv(req engine.Request) []string {
 	// to the adjudicator beforehand.
 	if req.Role == engine.RoleAdjudicator {
 		return append(env, "GRIMES_ROLE=adjudicator")
+	}
+	// A refuter gets the claims and the run it must answer under. It is given no
+	// inventory and no categories: it is not reviewing the target, and a
+	// coverage denominator would invite it to.
+	if req.Role == engine.RoleRefuter {
+		return append(env,
+			"GRIMES_ROLE=refuter",
+			"GRIMES_RUN_ID="+req.RunID,
+			"GRIMES_CLAIMS="+req.ClaimsPath,
+		)
 	}
 	return append(env,
 		"GRIMES_ROLE=primary",

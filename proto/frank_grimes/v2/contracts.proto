@@ -553,6 +553,97 @@ message AdjudicationReport {
   google.protobuf.Timestamp completed_at = 7 [(buf.validate.field).required = true];
 }
 
+// One claim put to a context that did not form it.
+//
+// The claim, its anchor, and the artifact are the whole of what a refuter is
+// given. Severity, reporter, and the evidence narrative are withheld: each is
+// part of the case for the claim, and a reviewer shown the case examines the
+// case rather than the claim.
+//
+// The ref is opaque so that the handle itself carries none of what the fields
+// withhold. The engine issues it and maps it back.
+message ClaimUnderTest {
+  string ref = 1 [(buf.validate.field).string.min_len = 1];
+  Category category = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  Anchor anchor = 3 [(buf.validate.field).required = true];
+  string claim = 4 [(buf.validate.field).string.min_len = 1];
+}
+
+// What a refuter is handed: the claims, and the target they are about.
+message RefutationTask {
+  uint32 schema_major = 1 [(buf.validate.field).uint32.const = 2];
+  uint32 schema_minor = 2;
+  string run_id = 3 [(buf.validate.field).string.min_len = 1];
+  Target target = 4 [(buf.validate.field).required = true];
+  uint32 iteration = 5 [(buf.validate.field).uint32.gt = 0];
+  repeated ClaimUnderTest claims = 6;
+}
+
+// What came of one attempt on one claim.
+//
+// An upheld claim carries the attack that failed to break it, for the same
+// reason a disproof records what was performed: an attempt nobody made and an
+// attempt that came back empty read identically once only the conclusion is
+// kept.
+message ClaimOutcome {
+  string ref = 1 [(buf.validate.field).string.min_len = 1];
+  oneof outcome {
+    option (buf.validate.oneof).required = true;
+    Reproduction refuted = 2;
+    Reproduction upheld = 3;
+    string unavailable = 4 [(buf.validate.field).string.min_len = 1];
+  }
+}
+
+// What a refutation pass hands back: one outcome per claim it was given.
+//
+// There is no finding here and no verdict. A refuter that could report either
+// would be reviewing, and its report would be the first review rather than an
+// attack on one.
+message RefutationReport {
+  uint32 schema_major = 1 [(buf.validate.field).uint32.const = 2];
+  uint32 schema_minor = 2;
+  string run_id = 3 [(buf.validate.field).string.min_len = 1];
+  string refuter_id = 4 [(buf.validate.field).string.min_len = 1];
+  bytes target_fingerprint_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  repeated ClaimOutcome outcomes = 6;
+  google.protobuf.Timestamp completed_at = 7 [(buf.validate.field).required = true];
+}
+
+// One recorded attempt on a finding by a context that did not raise it.
+//
+// The context origin is kept alongside the outcome because an attack from a
+// context that may have formed the claim is the claim agreeing with itself.
+message RefutationAttempt {
+  string refuter_id = 1 [(buf.validate.field).string.min_len = 1];
+  ContextOrigin context_origin = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  oneof outcome {
+    option (buf.validate.oneof).required = true;
+    Reproduction refuted = 3;
+    Reproduction upheld = 4;
+    string unavailable = 5 [(buf.validate.field).string.min_len = 1];
+  }
+  google.protobuf.Timestamp completed_at = 6 [(buf.validate.field).required = true];
+}
+
+// How much a finding's standing was earned rather than asserted.
+//
+// Ordered strongest first, like every other graded enum here. UNATTACKED is
+// where a finding nobody put to an independent attack sits: not discredited,
+// but holding nothing more than the word of the context that raised it.
+enum FindingProvenance {
+  FINDING_PROVENANCE_UNSPECIFIED = 0;
+  FINDING_PROVENANCE_UPHELD = 1;
+  FINDING_PROVENANCE_UNATTACKED = 2;
+  FINDING_PROVENANCE_REFUTED = 3;
+}
+
 // ---------------------------------------------------------------------------
 // Findings and the ledger
 // ---------------------------------------------------------------------------
@@ -604,6 +695,9 @@ message Finding {
   google.protobuf.Timestamp first_seen = 10 [(buf.validate.field).required = true];
   google.protobuf.Timestamp last_seen = 11 [(buf.validate.field).required = true];
   repeated FindingEvent history = 12 [(buf.validate.field).repeated.min_items = 1];
+  // Written by the engine from refutation passes, never by the context that
+  // raised the finding.
+  repeated RefutationAttempt refutation = 13;
 }
 
 message Ledger {
@@ -832,6 +926,12 @@ message FindingSnapshot {
     not_in: [0]
   }];
   bytes evidence_sha256 = 5 [(buf.validate.field).bytes.len = 32];
+  // What an independent attack on this claim came to. Every other field here
+  // is the reporting context describing its own finding.
+  FindingProvenance provenance = 6 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
 }
 
 message LedgerRef {

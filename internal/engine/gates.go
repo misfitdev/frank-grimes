@@ -10,6 +10,7 @@ const (
 	GateCompleteness       = "review_completeness"
 	GateAdjudication       = "adjudication"
 	GateIndependentContext = "independent_context"
+	GateRefutation         = "refutation"
 	GateOscillation        = "oscillation"
 	GateCoverage           = "coverage"
 )
@@ -36,6 +37,12 @@ func unmetGates(v *pb.Verdict, in DeriveInput) []string {
 	// Named separately from confidence so the record says why it was capped.
 	if in.IndependentContextUnknown {
 		gates = append(gates, GateIndependentContext)
+	}
+	// Likewise: a finding nobody attacked and a finding somebody broke both cap
+	// confidence, and the record should not read as though the review simply
+	// lacked evidence.
+	if unrefuted(in.Candidates) {
+		gates = append(gates, GateRefutation)
 	}
 	if in.CoverageIncomplete {
 		gates = append(gates, GateCoverage)

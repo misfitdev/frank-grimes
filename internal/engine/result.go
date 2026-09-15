@@ -66,6 +66,7 @@ func snapshots(ledger *pb.Ledger) []*pb.FindingSnapshot {
 			Risk:           f.GetRisk(),
 			EvidenceTier:   f.GetEvidence().GetTier(),
 			EvidenceSha256: f.GetEvidenceSha256(),
+			Provenance:     provenanceOf(f),
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].GetId() < out[j].GetId() })

@@ -139,6 +139,20 @@ func FindingID(category pb.Category, fingerprint []byte, wide bool) string {
 	return fmt.Sprintf("FG-%s-%s", CategoryName(category), hex.EncodeToString(fingerprint)[:width])
 }
 
+// ClaimRef is the opaque handle a claim is put to a refuter under.
+//
+// A finding ID would carry its category and stay the same across iterations, so
+// a refuter that saw one twice would know it was looking at a claim it had
+// already judged. Deriving over the run and the iteration keeps the handle
+// meaningless outside the pass that issued it.
+func ClaimRef(runID string, iteration uint32, findingID string) string {
+	h := sha256.New()
+	writeComponent(h, runID)
+	writeComponent(h, strconv.FormatUint(uint64(iteration), 10))
+	writeComponent(h, findingID)
+	return hex.EncodeToString(h.Sum(nil))[:16]
+}
+
 // CategoryName maps the enum to the three-letter code used in IDs and reports.
 func CategoryName(c pb.Category) string {
 	name := c.String() // CATEGORY_SEC

@@ -99,6 +99,10 @@ func cmdRun(args []string) (int, error) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// One identity for the whole run. Derived twice, it can differ across a
+	// second boundary, and the refuter's report is bound to the run it answers.
+	run := runID()
+
 	e := &engine.Engine{
 		Collector: engine.TargetCollector{Stdin: os.Stdin},
 		Provider: &provider.Exec{
@@ -106,15 +110,17 @@ func cmdRun(args []string) (int, error) {
 			MaxOutputBytes: cfg.MaxOutputBytes, Timeout: cfg.ProviderTimeout,
 		},
 		Broker:        engine.StrictBroker{},
-		Adjudicator:   adjudicatorFor(cfg),
+		Adjudicator:   adjudicatorFor(cfg, run),
+		Refuter:       refuterFor(cfg, run),
 		Gate:          engine.NotApplicableGate{},
 		Inventory:     store.NewFileInventoryStore(cfg.Dir),
 		Content:       store.NewFileContentStore(cfg.Dir),
+		Claims:        store.NewFileClaimStore(cfg.Dir),
 		Ledger:        store.NewFileLedger(cfg.Dir),
 		Results:       store.NewFileResultStore(cfg.Dir),
 		State:         store.NewFileStateStore(cfg.Dir),
 		Clock:         engine.SystemClock,
-		RunID:         runID(),
+		RunID:         run,
 		AutoLoop:      cfg.AutoLoop,
 		MaxIterations: uint32(cfg.MaxIterations),
 		Research:      cfg.Research,
@@ -135,7 +141,7 @@ func cmdRun(args []string) (int, error) {
 	return codeFor(result.GetVerdict().GetDecision()), nil
 }
 
-func adjudicatorFor(cfg *config) engine.Adjudicator {
+func adjudicatorFor(cfg *config, run string) engine.Adjudicator {
 	if len(cfg.AdjudicatorCommand) == 0 {
 		return nil
 	}
@@ -146,8 +152,24 @@ func adjudicatorFor(cfg *config) engine.Adjudicator {
 			MaxOutputBytes: cfg.MaxOutputBytes, Timeout: cfg.ProviderTimeout,
 		},
 		ReviewerID: cfg.AdjudicatorCommand[0],
-		RunID:      runID(),
+		RunID:      run,
 		Clock:      engine.SystemClock,
+	}
+}
+
+func refuterFor(cfg *config, run string) engine.Refuter {
+	if len(cfg.RefuterCommand) == 0 {
+		return nil
+	}
+	return engine.ProviderRefuter{
+		Fresh: cfg.RefuterFresh,
+		Provider: &provider.Exec{
+			Command: cfg.RefuterCommand, Dir: cfg.Dir,
+			MaxOutputBytes: cfg.MaxOutputBytes, Timeout: cfg.ProviderTimeout,
+		},
+		RefuterID: cfg.RefuterCommand[0],
+		RunID:     run,
+		Clock:     engine.SystemClock,
 	}
 }
 

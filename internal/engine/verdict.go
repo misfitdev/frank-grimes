@@ -40,6 +40,9 @@ type Candidate struct {
 	Tags             []string
 	ProbeAttempted   bool
 	EvidenceConflict bool
+	// Provenance is what an independent attack on this claim came to, which is
+	// the one property here no context can establish about its own finding.
+	Provenance pb.FindingProvenance
 }
 
 // DeriveInput is every fact the verdict depends on.

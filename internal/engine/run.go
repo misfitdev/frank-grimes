@@ -19,9 +19,11 @@ type Engine struct {
 	Provider    Provider
 	Broker      EvidenceBroker
 	Adjudicator Adjudicator
+	Refuter     Refuter
 	Gate        GateRunner
 	Inventory   InventoryStore
 	Content     ContentStore
+	Claims      ClaimStore
 	Ledger      Ledger
 	Results     ResultStore
 	State       StateStore
@@ -105,6 +107,13 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	verification, err := e.Gate.Run(ctx, e.Dir)
 	if err != nil {
 		return nil, fmt.Errorf("gate: %w", err)
+	}
+
+	// Before either derivation reads the ledger: both tuples have to be over the
+	// same findings, and a claim's standing under attack is part of the finding
+	// rather than of the verdict that reads it.
+	if err := e.refute(ctx, ledger, target, collected.ContentPath, iteration); err != nil {
+		return nil, err
 	}
 
 	candidates := candidatesOf(ledger)

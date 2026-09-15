@@ -132,13 +132,21 @@ func residualRisk(in DeriveInput) pb.ResidualRisk {
 	}
 }
 
+// confidence reports how much the review's own conclusions were tested.
+//
+// Every other input here is something the reporting context said about its own
+// finding: its tier, whether it probed, whether it saw a conflict. Provenance
+// is the one input it could not write, so it is the one that decides whether
+// confidence can reach the level a pass needs. A claim an independent context
+// broke ranks with a material evidence conflict, because that is what it is:
+// two contexts over one artifact reaching opposite results.
 func confidence(in DeriveInput) pb.ReviewConfidence {
 	if in.CriticalFalsifierUnavailable || !in.AdjudicationAvailable {
 		return pb.ReviewConfidence_REVIEW_CONFIDENCE_LOW
 	}
 	driving := drivingFindings(in.Candidates)
 	for _, c := range driving {
-		if c.EvidenceConflict {
+		if c.EvidenceConflict || c.Provenance == pb.FindingProvenance_FINDING_PROVENANCE_REFUTED {
 			return pb.ReviewConfidence_REVIEW_CONFIDENCE_LOW
 		}
 	}
@@ -155,6 +163,10 @@ func confidence(in DeriveInput) pb.ReviewConfidence {
 		if c.Tier == pb.EvidenceTier_EVIDENCE_TIER_E3 {
 			return pb.ReviewConfidence_REVIEW_CONFIDENCE_MEDIUM
 		}
+		// Nobody but the context that raised this has looked at it.
+		if c.Provenance != pb.FindingProvenance_FINDING_PROVENANCE_UPHELD {
+			return pb.ReviewConfidence_REVIEW_CONFIDENCE_MEDIUM
+		}
 	}
 	return pb.ReviewConfidence_REVIEW_CONFIDENCE_HIGH
 }
@@ -167,6 +179,18 @@ func drivingFindings(cands []Candidate) []Candidate {
 		}
 	}
 	return out
+}
+
+// unrefuted reports whether a finding the verdict rests on has yet to survive
+// an independent attack. A review holding no such finding has nothing left to
+// attack, so it is not short of one.
+func unrefuted(cands []Candidate) bool {
+	for _, c := range drivingFindings(cands) {
+		if c.Provenance != pb.FindingProvenance_FINDING_PROVENANCE_UPHELD {
+			return true
+		}
+	}
+	return false
 }
 
 // criticalUnknown reports whether part of the target may hold a defect nobody
