@@ -34,11 +34,11 @@ fail() {
 }
 
 assert_match() {
-    if echo "$1" | grep -qE "$2"; then pass "$3"; else fail "$3"; fi
+    if grep -qE "$2" <<<"$1"; then pass "$3"; else fail "$3"; fi
 }
 
 assert_no_match() {
-    if echo "$1" | grep -qE "$2"; then fail "$3"; else pass "$3"; fi
+    if grep -qE "$2" <<<"$1"; then fail "$3"; else pass "$3"; fi
 }
 
 if ! command -v go &>/dev/null; then
@@ -165,6 +165,17 @@ assert_match "$OUT" 'total: +1' \
     "the control is not counted as a finding"
 rm -rf "$WS"
 
+# Two answers for one claim would let the order of the report decide what the
+# engine recorded, including whether the control was broken.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" \
+    --refuter-command="$FAKES/refuter-double.sh" --refuter-fresh)"
+assert_match "$OUT" 'unmet_gates: +"refutation"' \
+    "a report answering one claim twice acquits nothing"
+assert_no_match "$OUT" 'refuter_check: +REFUTER_CHECK_PASSED' \
+    "a report answering one claim twice does not pass the control"
+rm -rf "$WS"
+
 # No refutation pass at all is not a failed check; it is no check.
 WS="$(workspace)"
 OUT="$(run_grimes "$WS")"
@@ -237,10 +248,12 @@ assert_match "$(cat "$SKILL")" 'shown capable of failing before its result means
     "the skill holds the attacking context to the rule it holds probes to"
 assert_match "$(cat "$SKILL")" 'is not a finding and is never counted as one' \
     "the skill keeps the control out of the finding set"
-assert_match "$(cat "$GRIND")" 'confirm with Grep that it appears nowhere' \
+assert_match "$(cat "$GRIND")" 'Build the control with Grep' \
     "the adapter establishes the control's falsity rather than asserting it"
-assert_match "$(cat "$GRIND")" 'do not send it first or last' \
-    "the adapter does not let position mark the control"
+assert_match "$(cat "$GRIND")" 'single batch' \
+    "the adapter sends one pass rather than one call per claim"
+assert_match "$(cat "$SKILL")" 'where it sits among them is not fixed' \
+    "the skill does not let position mark the control"
 # A refuter told that one claim is planted can pass the check by hunting for the
 # plant instead of attacking anything.
 assert_no_match "$(cat "$AGENT")" 'control' \

@@ -18,7 +18,7 @@ OUTCOME="$1"
 STAMP="${2:-}"
 
 for leak in GRIMES_FINDING GRIMES_EVIDENCE GRIMES_LEDGER GRIMES_SEVERITY GRIMES_SUMMARY GRIMES_CLAIMED GRIMES_TARGET_INVENTORY GRIMES_CATEGORIES; do
-    if env | grep -q "^${leak}="; then
+    if [[ -n "${!leak+x}" ]]; then
         echo "refuter was told ${leak}" >&2
         exit 1
     fi

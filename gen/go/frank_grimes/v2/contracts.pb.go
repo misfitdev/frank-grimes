@@ -5129,7 +5129,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\arefuted\x18\x02 \x01(\v2\x1d.frank_grimes.v2.ReproductionH\x00R\arefuted\x127\n" +
 	"\x06upheld\x18\x03 \x01(\v2\x1d.frank_grimes.v2.ReproductionH\x00R\x06upheld\x12+\n" +
 	"\vunavailable\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x10\x01H\x00R\vunavailableB\x10\n" +
-	"\aoutcome\x12\x05\xbaH\x02\b\x01\"\xf0\x02\n" +
+	"\aoutcome\x12\x05\xbaH\x02\b\x01\"\x89\x04\n" +
 	"\x10RefutationReport\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
 	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x12\x1e\n" +
@@ -5138,7 +5138,8 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"refuter_id\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\trefuterId\x12C\n" +
 	"\x19target_fingerprint_sha256\x18\x05 \x01(\fB\a\xbaH\x04z\x02h R\x17targetFingerprintSha256\x129\n" +
 	"\boutcomes\x18\x06 \x03(\v2\x1d.frank_grimes.v2.ClaimOutcomeR\boutcomes\x12E\n" +
-	"\fcompleted_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\vcompletedAt\"\x88\x03\n" +
+	"\fcompleted_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\vcompletedAt:\x96\x01\xbaH\x92\x01\x1a\x8f\x01\n" +
+	" refutation.one_outcome_per_claim\x12 a report answers each claim once\x1aIthis.outcomes.all(o, this.outcomes.filter(x, x.ref == o.ref).size() == 1)\"\x88\x03\n" +
 	"\x11RefutationAttempt\x12&\n" +
 	"\n" +
 	"refuter_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\trefuterId\x12Q\n" +

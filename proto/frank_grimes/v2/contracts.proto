@@ -604,6 +604,15 @@ message ClaimOutcome {
 // would be reviewing, and its report would be the first review rather than an
 // attack on one.
 message RefutationReport {
+  // Two answers for one claim let the order of the report decide what the
+  // engine records, which a refuter could use to both break the control and
+  // vouch for it.
+  option (buf.validate.message).cel = {
+    id: "refutation.one_outcome_per_claim"
+    message: "a report answers each claim once"
+    expression: "this.outcomes.all(o, this.outcomes.filter(x, x.ref == o.ref).size() == 1)"
+  };
+
   uint32 schema_major = 1 [(buf.validate.field).uint32.const = 2];
   uint32 schema_minor = 2;
   string run_id = 3 [(buf.validate.field).string.min_len = 1];

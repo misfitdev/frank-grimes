@@ -168,7 +168,7 @@ Record the command, working directory, exit code, and bounded output. Commit onl
 
 ### Refutation
 
-Required before a finding can raise confidence, per the skill's Phase 6. This adapter supplies the attacking context: delegate to the **grimey-refuter** subagent via the Agent tool, once per surviving finding, passing exactly this and nothing else:
+Required before a finding can raise confidence, per the skill's Phase 6. This adapter supplies the attacking context: one delegation to the **grimey-refuter** subagent via the Agent tool, carrying every surviving claim and the control the skill requires in a single batch, each as exactly this and nothing else:
 
 ```text
 Claim: <handle>
@@ -178,11 +178,11 @@ Claim text: <the claim, as written>
 Artifact: <repository-relative path or scope>
 ```
 
-Do NOT include the severity, the grime ID, the evidence you cited, your disproof attempt, the reporter, or your verdict tuple. The refuter's value is that it is judging the claim rather than your case for it.
+Do NOT include the severity, the grime ID, the evidence you cited, your disproof attempt, the reporter, or your verdict tuple.
 
-Relay each outcome to the engine as the claim's refutation result. If the refuter cannot run, record the claim as unattacked; do not record it as upheld.
+Build the control with Grep: choose an identifier of at least twelve characters, confirm it appears nowhere in the artifact, and write it into a claim at the anchor of one of the real ones. Vary where in the batch it goes.
 
-Send one extra claim in the same shape that you have already checked to be false, per the skill's control rule: pick an identifier of at least twelve characters, confirm with Grep that it appears nowhere in the artifact, and claim that it is defined at the anchor of one of the real claims. Do not mark it, and do not send it first or last. If the refuter upholds it or says nothing about it, the whole pass is void: relay every claim in it as unattacked and record that the refuter failed its control. Never relay the control itself as a finding.
+Relay each outcome to the engine against the handle it was issued under. Never relay the control as a finding.
 
 ### Independent adjudication
 

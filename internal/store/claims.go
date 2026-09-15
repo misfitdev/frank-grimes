@@ -34,9 +34,7 @@ func (c *FileClaimStore) Save(ctx context.Context, task *pb.RefutationTask) (str
 	if err := contracts.WriteAtomic(c.path, encoded); err != nil {
 		return "", err
 	}
-	abs, err := filepath.Abs(c.path)
-	if err != nil {
-		return c.path, nil
-	}
-	return abs, nil
+	// The refuter runs with its own working directory, so a relative path here
+	// would resolve against the wrong root and read as a missing file.
+	return filepath.Abs(c.path)
 }
