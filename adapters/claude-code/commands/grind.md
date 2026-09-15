@@ -186,20 +186,34 @@ Relay each outcome to the engine against the handle it was issued under. Never r
 
 ### Independent adjudication
 
-Required before any `pass`, per the skill's "Independent Adjudication" section. This adapter supplies the second context: delegate to the **grimey-verifier** subagent via the Agent tool, passing exactly this and nothing else:
+Required before any `pass`, per the skill's "Independent Adjudication" section. The engine runs the pass and resolves the two verdicts. This adapter supplies only the command that starts the second context, on the same `grimes run` invocation that seals the report:
+
+```bash
+  --adjudicator-command="claude" \
+  --adjudicator-arg="-p" \
+  --adjudicator-arg="<the adjudicator prompt>" \
+  --adjudicator-fresh \
+```
+
+`claude -p` is Claude Code's own non-interactive invocation. `--adjudicator-fresh` is you asserting that it begins a new context; without it the second review is recorded as unknown-origin, which can still make the verdict worse but never better.
+
+The prompt is the body of `agents/grimey-verifier.md`. The engine exports the request to that process, so the prompt names no target and carries no digest:
 
 ```text
-Target: <repository-relative path or scope>
-Target digest: <git rev-parse HEAD, or a content hash of the reviewed scope>
+You are adjudicating a target another reviewer has already judged.
+Review $GRIMES_TARGET_CONTENT under the skill and reach your own tuple.
+End your turn by running, and nothing else:
+
+grimes-contract adjudicate --decision=<d> --residual-risk=<r> \
+    --review-confidence=<c> --review-completeness=<x>
 ```
 
 Do NOT include your verdict tuple, findings, evidence, severities, grime IDs,
 proposed fixes, the report, or your reasoning. The verifier's value is that it
 has not seen them; contaminating the prompt destroys the only thing it provides.
 Your tuple least of all — it is the answer it was asked to reach on its own.
-Resolve the two afterwards, which needs nothing sent beforehand.
 
-Resolve the two verdicts by the skill's table: the stricter decision wins, and an independent pass never upgrades your own `block` or `conditional`. If the verifier cannot run, record `Independent adjudication: not available`, set `review_confidence=low`, and cap at `conditional`/YELLOW.
+If the adjudicator cannot run, the engine records the absence itself and the verdict caps accordingly. Do not write that outcome by hand.
 
 ---
 
@@ -298,6 +312,10 @@ grimes run --dir=. \
   --provider-arg="--examined=<N>" \
   --provider-arg="--disproved=<K>" \
   --provider-arg="--summary=<one-sentence BLUF>" \
+  --adjudicator-command="claude" \
+  --adjudicator-arg="-p" \
+  --adjudicator-arg="<the adjudicator prompt>" \
+  --adjudicator-fresh \
   <target>
 ```
 
