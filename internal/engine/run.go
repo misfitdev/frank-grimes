@@ -3,7 +3,9 @@ package engine
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"os"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
@@ -140,6 +142,10 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		Oscillation:             oscillation,
 	})
 
+	if err := e.recheck(ctx, spec, collected); err != nil {
+		return nil, err
+	}
+
 	digest, err := e.Ledger.Save(ctx, ledger)
 	if err != nil {
 		return nil, fmt.Errorf("ledger: %w", err)
@@ -154,6 +160,37 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		return nil, err
 	}
 	return result, nil
+}
+
+// recheck confirms the target still hashes to what collection recorded.
+//
+// Evidence is checked against the digests collection took, so a line a provider
+// planted cannot be quoted. An edit nobody quotes reaches no check at all: the
+// run would persist a ledger and a verdict bound to a fingerprint over bytes
+// that are no longer there.
+func (e *Engine) recheck(ctx context.Context, spec TargetSpec, collected *Collected) error {
+	want := collected.Target.GetFingerprintSha256()
+	if len(collected.ContentBytes) > 0 {
+		// A pasted argument has no source to collect from twice. The engine's
+		// own copy is the only artifact a provider could have reached.
+		content, err := os.ReadFile(collected.ContentPath)
+		if err != nil {
+			return fmt.Errorf("rechecking the target: %w", err)
+		}
+		sum := sha256.Sum256(content)
+		if !bytes.Equal(sum[:], want) {
+			return fmt.Errorf("%w: %q changed during the review", ErrTargetChanged, collected.Target.GetScope())
+		}
+		return nil
+	}
+	again, err := e.Collector.Collect(ctx, spec)
+	if err != nil {
+		return fmt.Errorf("rechecking the target: %w", err)
+	}
+	if !bytes.Equal(again.Target.GetFingerprintSha256(), want) {
+		return fmt.Errorf("%w: %q changed during the review", ErrTargetChanged, collected.Target.GetScope())
+	}
+	return nil
 }
 
 // adoptLedger binds an empty ledger to this target and refuses one raised

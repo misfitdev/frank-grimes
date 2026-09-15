@@ -58,8 +58,12 @@ func decide(in DeriveInput, counts *pb.FindingCounts) pb.Decision {
 	if !in.AdjudicationAvailable {
 		return pb.Decision_DECISION_CONDITIONAL
 	}
-	// A verdict over part of a target is not a verdict over the target.
-	if in.CoverageIncomplete {
+	// A verdict over part of a target is not a verdict over the target. A unit
+	// nobody accounted for, a skip the provider called material, and a category
+	// that stopped for want of evidence all leave part of the target holding a
+	// defect nobody looked for; ranking the confessed two below the silent one
+	// would pay for staying quiet.
+	if in.CoverageIncomplete || in.CriticalUnknownRemains {
 		return pb.Decision_DECISION_CONDITIONAL
 	}
 	// A severe finding nobody tested carries no verdict weight, so it cannot

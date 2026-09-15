@@ -1,6 +1,6 @@
 # Non-Code Target Mappings
 
-Read only the target type selected in the review contract. These mappings define what the ten categories mean for that target; the routed attack card still supplies the probes. Evidence rules are the same tier table the main procedure defines, read for a prose artifact: an exhibited counterexample is E1, a quote at a section, clause, or numbered step is E2, and an assumption with a named falsifier is E3. A category may be excluded only under Phase 2's P0-routing rule.
+Read only the target type selected in the review contract. These mappings define what the ten categories mean for that target; the routed attack card still supplies the probes. Evidence rules are the same tier table the main procedure defines, read for a prose artifact: an exhibited counterexample is E1, a quote at a section, clause, or numbered step is E2, and an assumption with a named falsifier is E3. Each attack card states what its E1 is on a prose target; read that line rather than the executable one. A category may be excluded only under Phase 2's P0-routing rule.
 
 ## Architecture
 

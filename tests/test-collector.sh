@@ -267,6 +267,25 @@ else
 fi
 rm -rf "$WS"
 
+# An edit the provider never cites reaches no evidence check, so only a recheck
+# before persistence can catch it. The ledger and result must not be written
+# against a fingerprint the target no longer has.
+WS="$(mktemp -d)"
+mkdir -p "$WS/src"
+printf 'echo one\n' >"$WS/src/a.sh"
+printf 'echo two\n' >"$WS/src/b.sh"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-edits-unquoted.sh" src 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" != "0" ]] && grep -qF "changed during the review" <<<"$OUT" &&
+    [[ ! -f "$WS/.grimes/ledger.pb" ]]; then
+    pass "an uncited edit to the target is caught before anything is persisted"
+else
+    fail "a run persisted over a target edited mid-review (exit $CODE): $OUT"
+fi
+rm -rf "$WS"
+
 # The same, for a target fingerprinted over the whole of its content. One
 # heading, so the planted line lands in the section the finding anchors to and
 # only the fingerprint can refuse it.
@@ -791,8 +810,8 @@ rm -rf "$WS"
 
 # A material skip is an admission that part of the target went unreviewed. Two
 # units, so the skip can be held out of the examined set and the two still cover
-# the inventory between them: the run has to succeed for the assertion to mean
-# anything, and a bare "not sufficient" would also be satisfied by a crash.
+# the inventory between them: the run has to reach a verdict for the assertion to
+# mean anything, and a bare "not sufficient" would also be satisfied by a crash.
 WS="$(mktemp -d)"
 mkdir -p "$WS/src"
 printf 'echo one\n' >"$WS/src/a.sh"
@@ -803,10 +822,10 @@ OUT="$(cd "$WS" && "$GRIMES" run --dir=. --format=prototext \
     --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh src 2>&1)"
 CODE=$?
 set -e
-if [[ "$CODE" == "0" ]]; then
-    pass "a material skip completes the run"
+if [[ "$CODE" == "3" ]]; then
+    pass "a material skip completes the run and reports conditional"
 else
-    fail "material-skip run exited $CODE, wanted 0: $OUT"
+    fail "material-skip run exited $CODE, wanted 3: $OUT"
 fi
 if echo "$OUT" | grep -qE 'unmet_gates: +"coverage"'; then
     fail "a skipped unit was counted as unaccounted rather than as a skip"
@@ -817,6 +836,11 @@ if echo "$OUT" | grep -qE 'review_completeness: +REVIEW_COMPLETENESS_LIMITED'; t
     pass "a material skip holds completeness at limited"
 else
     fail "a material skip did not hold completeness at limited"
+fi
+if echo "$OUT" | grep -qE 'decision: +DECISION_CONDITIONAL'; then
+    pass "a material skip decides conditional rather than pass"
+else
+    fail "a material skip still reached a pass: $OUT"
 fi
 rm -rf "$WS"
 
@@ -830,15 +854,20 @@ OUT="$(cd "$WS" && "$GRIMES" run --dir=. --format=prototext \
     --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh src 2>&1)"
 CODE=$?
 set -e
-if [[ "$CODE" == "0" ]]; then
-    pass "a blocked category completes the run"
+if [[ "$CODE" == "3" ]]; then
+    pass "a blocked category completes the run and reports conditional"
 else
-    fail "blocked-category run exited $CODE, wanted 0: $OUT"
+    fail "blocked-category run exited $CODE, wanted 3: $OUT"
 fi
 if echo "$OUT" | grep -qE 'legacy_color: +LEGACY_COLOR_GREEN'; then
     fail "a blocked category still reached GREEN"
 else
     pass "a category blocked for want of evidence does not reach GREEN"
+fi
+if echo "$OUT" | grep -qE 'decision: +DECISION_CONDITIONAL'; then
+    pass "a blocked category decides conditional rather than pass"
+else
+    fail "a blocked category still reached a pass: $OUT"
 fi
 rm -rf "$WS"
 
