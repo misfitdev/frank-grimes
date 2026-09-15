@@ -249,7 +249,16 @@ func testTarget(t *testing.T) *pb.Target {
 	return out.Target
 }
 
-func testSpec() TargetSpec { return TargetSpec{Root: seedRoot(), Scope: "."} }
+// testSpec routes the two categories reportAt stops. A report that answers
+// fewer categories than the run asked about leaves the rest unprobed, which is
+// a coverage limit rather than the clean run most of these cases are about.
+func testSpec() TargetSpec {
+	return TargetSpec{
+		Root:       seedRoot(),
+		Scope:      ".",
+		Categories: []pb.Category{pb.Category_CATEGORY_SEC, pb.Category_CATEGORY_COR},
+	}
+}
 
 // report renders provider output carrying the given candidates, answering the
 // first iteration.

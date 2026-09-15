@@ -15,6 +15,8 @@ Read only the cards routed by Phase 2. A probe is an action plus a recorded resu
 
 **E1 here:** a focused test, executable, or recorded deterministic trace produces an output or state transition that violates the named invariant.
 
+**E1 on a prose target:** a concrete case carried step by step through the artifact's own stated rules reaches a result the artifact elsewhere forbids or leaves undefined; record the case, the steps taken, and the outcome.
+
 **False-accusation trap:** treating a surprising implementation as incorrect without first establishing the contract, reachable path, and required result.
 
 ## INT: Interfaces, input handling, and data integrity
@@ -29,6 +31,8 @@ Read only the cards routed by Phase 2. A probe is an action plus a recorded resu
 4. Round-trip one representative record through the existing serializer/parser or writer/reader and compare the observable fields.
 
 **E1 here:** an executed request, fixture, or round trip is accepted, rejected, corrupted, truncated, or reinterpreted contrary to the stated interface contract.
+
+**E1 on a prose target:** a concrete record, message, or handoff carried through the boundaries the artifact describes arrives somewhere the artifact's own text loses, rejects, or reinterprets it; record the value, the crossings, and where it changed meaning.
 
 **False-accusation trap:** calling absence of validation at one layer a defect when an enforced upstream boundary is both in scope and demonstrably unavoidable.
 
@@ -46,6 +50,8 @@ Read only the cards routed by Phase 2. A probe is an action plus a recorded resu
 
 **E1 here:** an executed local test demonstrates unauthorized access, injection, secret disclosure, tenant crossing, missing audit behavior, or a security control rejecting the attack.
 
+**E1 on a prose target:** a named actor walked through the approvals, roles, and boundaries the artifact states reaches a capability, record, or bypass the artifact claims is closed; record the actor, the path taken, and what it obtained.
+
 **False-accusation trap:** asserting exploitability from a dangerous-looking sink without proving attacker control, reachability, missing mediation, and relevant deployment conditions.
 
 ## REL: Reliability, error handling, concurrency, and resource lifecycle
@@ -62,6 +68,8 @@ Read only the cards routed by Phase 2. A probe is an action plus a recorded resu
 
 **E1 here:** an executed failure, cancellation, repeated operation, or concurrent run demonstrates a crash, hang, leak, corruption, duplicate effect, or successful containment.
 
+**E1 on a prose target:** a concrete failure, absence, or partial completion carried through the recovery path the artifact describes ends in a state the artifact never returns from; record the injected condition, the path followed, and where it terminated.
+
 **False-accusation trap:** treating a language pattern as universally unsafe without demonstrating ownership, lifetime, concurrency, and an actual bad path.
 
 ## OPS: Operability, observability, deployment, and recovery
@@ -76,6 +84,8 @@ Read only the cards routed by Phase 2. A probe is an action plus a recorded resu
 4. Execute an existing dry-run, status, restore, or migration verification command; record status and output without mutating production state.
 
 **E1 here:** a local build/smoke/dry-run or failure fixture demonstrates deploy failure, invisible failure, non-reversible state, broken recovery, or a working operational control.
+
+**E1 on a prose target:** the documented steps followed literally against a stated situation leave the operator unable to detect, roll back, or restore; record the situation, the steps as written, and the point at which they run out.
 
 **False-accusation trap:** imposing service-level observability or rollback requirements on a target whose review contract has no deployed runtime or mutable operational state.
 
@@ -92,6 +102,8 @@ Read only the cards routed by Phase 2. A probe is an action plus a recorded resu
 
 **E1 here:** an executed benchmark or measured local run shows a reproducible resource curve, limit breach, unbounded fan-out, or stable behavior at a contract-relevant size.
 
+**E1 on a prose target:** the artifact's own stated figures carried through its own stated mechanism produce a number that breaches a limit, budget, or schedule the artifact also states; record the inputs used, the arithmetic performed, and the result.
+
 **False-accusation trap:** declaring a bottleneck or cost crisis from big-O intuition alone without a relevant workload, measured behavior, or a reachable unbounded path.
 
 ## VER: Verification and testability
@@ -106,6 +118,8 @@ Read only the cards routed by Phase 2. A probe is an action plus a recorded resu
 4. Run the narrow test twice under the same checked-in conditions and record inconsistent results, hidden prerequisites, or stable completion.
 
 **E1 here:** an executed test fails on current behavior, survives a falsifying perturbation, flakes under identical conditions, or correctly detects the injected fault.
+
+**E1 on a prose target:** the artifact's stated success criterion applied to two outcomes it is meant to separate returns the same verdict, or a stated criterion applied to an outcome the artifact calls a failure passes; record both outcomes and the criterion as applied.
 
 **False-accusation trap:** equating test count, file presence, or coverage percentage with verification of the actual critical invariant.
 
@@ -122,6 +136,8 @@ Read only the cards routed by Phase 2. A probe is an action plus a recorded resu
 
 **E1 here:** an existing checker reports drift/structural failure, or a controlled consistency check demonstrates that one required change leaves another authoritative artifact stale.
 
+**E1 on a prose target:** one stated change carried through the artifact leaves a second passage still asserting the superseded rule; record the change, both passages, and the contradiction between them.
+
 **False-accusation trap:** reporting duplication, a hard-coded value, or non-idiomatic style without showing divergent ownership, a real change hazard, or an enforced repository rule. Trace precedence before accusing: a caller deliberately overriding a default leaves one effective value and is not split ownership without contrary contract evidence.
 
 ## DEP: Dependencies, supply chain, and external contracts
@@ -137,6 +153,8 @@ Read only the cards routed by Phase 2. A probe is an action plus a recorded resu
 
 **E1 here:** an executed offline check or local failure fixture demonstrates unresolved/pinned drift, incompatible contract use, compromised metadata, broken fallback, or a clean dependency state.
 
+**E1 on a prose target:** a stated external failure or version change carried through the fallback the artifact describes ends with no remaining path, or two passages depend on incompatible behavior from the same dependency; record the assumed behavior and where the artifact runs out of options.
+
 **False-accusation trap:** claiming a version, API, license, or vulnerability fact from memory when it is not established by the scoped local artifacts and available offline data.
 
 ## HUM: Human factors, misuse, and operational process
@@ -151,5 +169,7 @@ Read only the cards routed by Phase 2. A probe is an action plus a recorded resu
 4. Run an existing dry-run or rollback path after a plausible operator mistake and record whether the actor can detect and recover from it.
 
 **E1 here:** an executed interaction or dry-run demonstrates an unsafe default, silent misuse, bypassed approval, unrecoverable operator error, or an effective guardrail.
+
+**E1 on a prose target:** a named person acting on the artifact's own instructions under a condition the artifact states takes the damaging action or cannot undo it; record the actor, the instructions as followed, and the outcome.
 
 **False-accusation trap:** substituting reviewer preference for evidence about the named actor, task, consequence, and observed interaction path.

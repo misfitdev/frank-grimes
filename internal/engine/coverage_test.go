@@ -225,6 +225,9 @@ func TestMeasureCountsCategoriesTheReportOmits(t *testing.T) {
 	if cov.CategoriesStopped {
 		t.Error("a routed category the report never mentioned counted as stopped")
 	}
+	if !cov.UnknownRemains {
+		t.Error("a routed category the report never mentioned left no unknown standing")
+	}
 }
 
 // Two accounts of how one category's grind ended, and nothing can say which
