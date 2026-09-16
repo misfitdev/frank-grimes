@@ -12,6 +12,7 @@ import (
 	"time"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
+	"github.com/misfitdev/frank-grimes/internal/confine"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
 	"github.com/misfitdev/frank-grimes/internal/engine"
 	"github.com/misfitdev/frank-grimes/internal/envelope"
@@ -103,15 +104,20 @@ func cmdRun(args []string) (int, error) {
 	// second boundary, and the refuter's report is bound to the run it answers.
 	run := runID()
 
+	mech, err := mechanismFor(ctx, cfg)
+	if err != nil {
+		return 0, err
+	}
+
 	e := &engine.Engine{
 		Collector: engine.TargetCollector{Stdin: os.Stdin},
 		Provider: &provider.Exec{
-			Command: cfg.ProviderCommand, Dir: cfg.Dir,
+			Command: cfg.ProviderCommand, Dir: cfg.Dir, Confine: mech,
 			MaxOutputBytes: cfg.MaxOutputBytes, Timeout: cfg.ProviderTimeout,
 		},
 		Broker:        engine.StrictBroker{},
-		Adjudicator:   adjudicatorFor(cfg, run),
-		Refuter:       refuterFor(cfg, run),
+		Adjudicator:   adjudicatorFor(cfg, run, mech),
+		Refuter:       refuterFor(cfg, run, mech),
 		Gate:          engine.NotApplicableGate{},
 		Inventory:     store.NewFileInventoryStore(cfg.Dir),
 		Content:       store.NewFileContentStore(cfg.Dir),
@@ -124,6 +130,8 @@ func cmdRun(args []string) (int, error) {
 		AutoLoop:      cfg.AutoLoop,
 		MaxIterations: uint32(cfg.MaxIterations),
 		Research:      cfg.Research,
+		Confinement:   mech.Name(),
+		Unconfined:    cfg.Unsafe,
 		Dir:           cfg.Dir,
 	}
 
@@ -141,14 +149,49 @@ func cmdRun(args []string) (int, error) {
 	return codeFor(result.GetVerdict().GetDecision()), nil
 }
 
-func adjudicatorFor(cfg *config, run string) engine.Adjudicator {
+// mechanismFor resolves how each role will be confined, and proves it before
+// any role runs.
+//
+// The probe is not a formality for the operator-supplied case alone. A policy
+// that was applied and one that was silently ignored produce the same
+// successful run, so neither the built-in mechanism nor a wrapper is taken on
+// faith. The run fails here rather than reporting findings gathered under a
+// boundary that was not there.
+func mechanismFor(ctx context.Context, cfg *config) (confine.Mechanism, error) {
+	mech, err := resolveMechanism(cfg)
+	if err != nil {
+		return nil, err
+	}
+	if err := confine.Verify(ctx, mech, cfg.Dir); err != nil {
+		return nil, err
+	}
+	return mech, nil
+}
+
+func resolveMechanism(cfg *config) (confine.Mechanism, error) {
+	switch {
+	case cfg.Unsafe:
+		return confine.Unsafe{}, nil
+	case len(cfg.SandboxCommand) > 0:
+		return confine.External{Command: cfg.SandboxCommand}, nil
+	}
+	mech, err := confine.Default()
+	if err != nil {
+		// Refused rather than downgraded: a run that quietly stopped confining
+		// would report the same findings as one that did not.
+		return nil, fmt.Errorf("%w; supply --sandbox-command, or --unsafe to accept an unconfined run", err)
+	}
+	return mech, nil
+}
+
+func adjudicatorFor(cfg *config, run string, mech confine.Mechanism) engine.Adjudicator {
 	if len(cfg.AdjudicatorCommand) == 0 {
 		return nil
 	}
 	return engine.ProviderAdjudicator{
 		Fresh: cfg.AdjudicatorFresh,
 		Provider: &provider.Exec{
-			Command: cfg.AdjudicatorCommand, Dir: cfg.Dir,
+			Command: cfg.AdjudicatorCommand, Dir: cfg.Dir, Confine: mech,
 			MaxOutputBytes: cfg.MaxOutputBytes, Timeout: cfg.ProviderTimeout,
 		},
 		ReviewerID: cfg.AdjudicatorCommand[0],
@@ -157,14 +200,14 @@ func adjudicatorFor(cfg *config, run string) engine.Adjudicator {
 	}
 }
 
-func refuterFor(cfg *config, run string) engine.Refuter {
+func refuterFor(cfg *config, run string, mech confine.Mechanism) engine.Refuter {
 	if len(cfg.RefuterCommand) == 0 {
 		return nil
 	}
 	return engine.ProviderRefuter{
 		Fresh: cfg.RefuterFresh,
 		Provider: &provider.Exec{
-			Command: cfg.RefuterCommand, Dir: cfg.Dir,
+			Command: cfg.RefuterCommand, Dir: cfg.Dir, Confine: mech,
 			MaxOutputBytes: cfg.MaxOutputBytes, Timeout: cfg.ProviderTimeout,
 		},
 		RefuterID: cfg.RefuterCommand[0],

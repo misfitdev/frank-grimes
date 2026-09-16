@@ -482,6 +482,7 @@ func resultFrom(d Derived, in DeriveInput) *pb.GrimesResult {
 	}
 
 	r := &pb.GrimesResult{
+		Confinement:   "sandbox-exec",
 		SchemaMajor:   2,
 		RunId:         "run-derive",
 		ProducerRole:  pb.ProducerRole_PRODUCER_ROLE_ORCHESTRATOR,

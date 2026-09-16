@@ -156,6 +156,12 @@ func confidence(in DeriveInput) pb.ReviewConfidence {
 	if in.IndependentContextUnknown {
 		return pb.ReviewConfidence_REVIEW_CONFIDENCE_MEDIUM
 	}
+	// Nothing stopped a role from editing the target between the pass that found
+	// something and the pass that checked it, so no conclusion here rests on
+	// bytes the engine can say were the ones reviewed.
+	if in.Unconfined {
+		return pb.ReviewConfidence_REVIEW_CONFIDENCE_MEDIUM
+	}
 	for _, c := range driving {
 		if !c.ProbeAttempted {
 			return pb.ReviewConfidence_REVIEW_CONFIDENCE_MEDIUM

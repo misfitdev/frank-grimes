@@ -343,7 +343,8 @@ func seedCandidate() *pb.CandidateFinding {
 
 func newEngine(p Provider, l Ledger, s StateStore, a Adjudicator) *Engine {
 	return &Engine{
-		Collector: stubCollector{}, Provider: p, Broker: StrictBroker{},
+		Confinement: "sandbox-exec",
+		Collector:   stubCollector{}, Provider: p, Broker: StrictBroker{},
 		Adjudicator: a, Gate: NotApplicableGate{}, Ledger: l,
 		Results: &memResults{}, State: s,
 		Clock: func() time.Time { return testTime() },

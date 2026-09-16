@@ -26,7 +26,7 @@ func (r *repeatedArg) Set(v string) error {
 
 // argTakingFlags are the options whose value is an opaque argument, so a bare
 // option name following one of them is almost certainly a mistake.
-var argTakingFlags = []string{"provider-arg", "adjudicator-arg", "refuter-arg"}
+var argTakingFlags = []string{"provider-arg", "adjudicator-arg", "refuter-arg", "sandbox-arg"}
 
 // rejectSwallowedFlags refuses `--provider-arg --auto-loop`, where the flag
 // package would consume --auto-loop as the argument and leave the engine's own
@@ -87,6 +87,8 @@ type config struct {
 	Snapshot           string
 	AdjudicatorFresh   bool
 	RefuterFresh       bool
+	SandboxCommand     []string
+	Unsafe             bool
 }
 
 // Root is the repository root a code target is taken from. Only a code target
@@ -116,10 +118,13 @@ func parseRun(args []string) (*config, error) {
 	adjudicatorFresh := fs.Bool("adjudicator-fresh", false, "assert the adjudicator command begins a new context; without it the review is recorded as unknown-origin and cannot raise confidence")
 	refuterCmd := fs.String("refuter-command", "", "command that attacks the surviving findings; split on whitespace")
 	refuterFresh := fs.Bool("refuter-fresh", false, "assert the refuter command begins a new context; without it nothing it upholds can raise confidence")
-	var providerArgs, adjudicatorArgs, refuterArgs repeatedArg
+	sandboxCmd := fs.String("sandbox-command", "", "wrapper that confines each role in place of the built-in one; split on whitespace")
+	unsafe := fs.Bool("unsafe", false, "run each role unconfined; recorded as an unmet gate and caps confidence")
+	var providerArgs, adjudicatorArgs, refuterArgs, sandboxArgs repeatedArg
 	fs.Var(&providerArgs, "provider-arg", "one argument for the provider command; repeatable, not split")
 	fs.Var(&adjudicatorArgs, "adjudicator-arg", "one argument for the adjudicator command; repeatable, not split")
 	fs.Var(&refuterArgs, "refuter-arg", "one argument for the refuter command; repeatable, not split")
+	fs.Var(&sandboxArgs, "sandbox-arg", "one argument for the sandbox command; repeatable, not split")
 	timeout := fs.Duration("provider-timeout", 10*time.Minute, "per-invocation provider timeout")
 	maxBytes := fs.Int64("max-output-bytes", 1<<20, "maximum bytes accepted from a provider")
 	format := fs.String("format", "envelope", "envelope or prototext")
@@ -153,6 +158,7 @@ func parseRun(args []string) (*config, error) {
 		Snapshot:         *snapshot,
 		AdjudicatorFresh: *adjudicatorFresh,
 		RefuterFresh:     *refuterFresh,
+		Unsafe:           *unsafe,
 	}
 
 	var err error
@@ -174,11 +180,20 @@ func parseRun(args []string) (*config, error) {
 		return nil, fmt.Errorf("--adjudicator-fresh needs --adjudicator-command")
 	}
 	c.RefuterCommand = append(strings.Fields(*refuterCmd), refuterArgs...)
+	c.SandboxCommand = append(strings.Fields(*sandboxCmd), sandboxArgs...)
 	if *refuterCmd == "" && len(refuterArgs) > 0 {
 		return nil, fmt.Errorf("--refuter-arg needs --refuter-command")
 	}
 	if *refuterCmd == "" && *refuterFresh {
 		return nil, fmt.Errorf("--refuter-fresh needs --refuter-command")
+	}
+	// Both would leave it ambiguous which one the run record should report, and
+	// an operator who supplied a wrapper is not asking to skip it.
+	if len(c.SandboxCommand) > 0 && c.Unsafe {
+		return nil, fmt.Errorf("--unsafe and --sandbox-command are alternatives")
+	}
+	if len(c.SandboxCommand) == 0 && len(sandboxArgs) > 0 {
+		return nil, fmt.Errorf("--sandbox-arg needs --sandbox-command")
 	}
 
 	return c, c.validate()

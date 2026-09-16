@@ -269,6 +269,7 @@ func timeZero() time.Time { return time.Unix(1780000000, 0).UTC() }
 func sampleResult() *pb.GrimesResult {
 	digest := digest32()
 	return &pb.GrimesResult{
+		Confinement:     "sandbox-exec",
 		SchemaMajor:     2,
 		RunId:           "run-001",
 		ProducerRole:    pb.ProducerRole_PRODUCER_ROLE_ORCHESTRATOR,

@@ -12,6 +12,7 @@ const (
 	GateIndependentContext = "independent_context"
 	GateRefutation         = "refutation"
 	GateOscillation        = "oscillation"
+	GateConfinement        = "confinement"
 	GateCoverage           = "coverage"
 )
 
@@ -52,6 +53,12 @@ func unmetGates(v *pb.Verdict, in DeriveInput) []string {
 	}
 	if in.Oscillation {
 		gates = append(gates, GateOscillation)
+	}
+	// A role that could have rewritten the target it was reviewing, or read the
+	// ledger it was meant to be blind to, was not held to the boundary the rest
+	// of these gates assume.
+	if in.Unconfined {
+		gates = append(gates, GateConfinement)
 	}
 	return gates
 }

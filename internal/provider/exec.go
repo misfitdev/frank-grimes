@@ -19,8 +19,10 @@ import (
 	"time"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
+	"github.com/misfitdev/frank-grimes/internal/confine"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
 	"github.com/misfitdev/frank-grimes/internal/engine"
+	"github.com/misfitdev/frank-grimes/internal/store"
 )
 
 // DefaultMaxOutputBytes bounds a single provider's stdout.
@@ -34,20 +36,65 @@ const stderrLimit = 8 << 10
 
 // Exec invokes Command with the request supplied through the environment.
 type Exec struct {
-	Command        []string
-	Dir            string
-	Env            []string
+	Command []string
+	Dir     string
+	Env     []string
+	// Confine bounds what the spawned role can reach. A nil mechanism is not a
+	// default: the engine resolves one, or records that the operator asked for
+	// none, before it builds this.
+	Confine        confine.Mechanism
 	MaxOutputBytes int64
 	Timeout        time.Duration
 }
 
-// ErrOutputTooLarge reports a provider that wrote past the byte bound.
+// confined returns the argv to spawn in place of the provider's own.
+//
+// The policy is built from the request, never from the command: what a role may
+// read is what the engine handed it, so a provider shipping next year needs no
+// entry here and no flag of its own.
+func (e *Exec) confined(req engine.Request) ([]string, error) {
+	root, err := filepath.Abs(e.Dir)
+	if err != nil {
+		return nil, err
+	}
+	p := confine.Policy{Root: root}
+	for _, path := range []string{req.ContentPath, req.InventoryPath, req.ClaimsPath} {
+		if path != "" {
+			p.ReadPaths = append(p.ReadPaths, path)
+		}
+	}
+	if req.Role == engine.RoleRefuter {
+		// The refuting pass records its outcomes through the contract CLI, which
+		// writes them here. Created by the engine because creating it is itself a
+		// write into the review directory the pass is not allowed to make.
+		p.WriteDir = filepath.Join(root, store.RunDir(req.RunID))
+		if err := os.MkdirAll(p.WriteDir, 0o755); err != nil {
+			return nil, err
+		}
+	}
+	return e.Confine.Wrap(p, e.Command)
+}
+
 var ErrOutputTooLarge = engine.ErrOutputTooLarge
 
 // Review runs the subprocess and returns its stdout.
 func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.ProviderOutput, error) {
 	if len(e.Command) == 0 {
 		return nil, errors.New("no provider command configured")
+	}
+	if e.Confine == nil {
+		return nil, errors.New("no confinement mechanism configured")
+	}
+	// Resolved here rather than at spawn, because a wrapper makes the argv the
+	// kernel sees the wrapper's own: a missing provider would surface as that
+	// wrapper's failure, or as nothing at all.
+	if _, err := exec.LookPath(e.Command[0]); err != nil {
+		return nil, fmt.Errorf("%w: %v", engine.ErrProviderFailed, err)
+	}
+
+	argv, err := e.confined(req)
+	if err != nil {
+		return nil, err
 	}
 
 	timeout := e.Timeout
@@ -62,9 +109,13 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 		limit = DefaultMaxOutputBytes
 	}
 
-	cmd := exec.CommandContext(ctx, e.Command[0], e.Command[1:]...)
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = e.Dir
 	cmd.Env = append(baseEnv(e.Env), requestEnv(req)...)
+	// A role is given a request, not a conversation. Left inherited, a provider
+	// that decided to prompt would hold the operator's terminal until the
+	// timeout, and read whatever was typed at it in the meantime.
+	cmd.Stdin = nil
 	setProcessGroup(cmd)
 	// CommandContext kills only the direct child; a shell provider leaves its
 	// own children holding the pipe open and Wait blocks past the deadline.

@@ -62,3 +62,10 @@ func RunSlug(runID string) string {
 	sum := sha256.Sum256([]byte(runID))
 	return hex.EncodeToString(sum[:8])
 }
+
+// RunDir, relative to the review directory, is the only place a refuting pass
+// may write. It is a directory rather than the report itself because the report
+// is written through a temporary file and a rename.
+func RunDir(runID string) string {
+	return filepath.Join(".grimes", RunSlug(runID))
+}
