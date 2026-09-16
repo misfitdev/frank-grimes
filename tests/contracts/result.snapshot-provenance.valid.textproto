@@ -25,3 +25,4 @@ ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678
 unmet_gates: "decision"
 unmet_gates: "residual_risk"
 summary: "Caller-controlled deletion path and unauthenticated remote code execution."
+confinement: "sandbox-exec"

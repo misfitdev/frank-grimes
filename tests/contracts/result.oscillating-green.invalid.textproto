@@ -21,3 +21,4 @@ independent_review {
 }
 ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678901" oscillation_detected: true }
 summary: "Clean this time."
+confinement: "sandbox-exec"

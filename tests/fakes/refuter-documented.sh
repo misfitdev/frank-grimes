@@ -19,15 +19,17 @@ fi
 case "${OUTCOME}" in
     probe)
         # Refusals a refuter has to be able to act on. The engine buffers this
-        # child's stderr, so they are captured where a test can read them.
-        : >./refute.err
+        # child's stderr, so they are captured where a test can read them. A
+        # pass may only write the directory the engine handed it.
+        ERRLOG=".grimes/work/refute.err"
+        : >"$ERRLOG"
         grimes-contract refute add --ref="not-a-ref" --upheld \
-            --action="sh -c true" --cwd="." --exit-code=0 --output="x" 2>>./refute.err || true
+            --action="sh -c true" --cwd="." --exit-code=0 --output="x" 2>>"$ERRLOG" || true
         first="$(grimes-contract refute claims | head -1 | cut -f1)"
         grimes-contract refute add --ref="$first" --upheld \
             --action="sh -c true" --cwd="." --exit-code=0 --output="x"
         grimes-contract refute add --ref="$first" --upheld \
-            --action="sh -c true" --cwd="." --exit-code=0 --output="x" 2>>./refute.err || true
+            --action="sh -c true" --cwd="." --exit-code=0 --output="x" 2>>"$ERRLOG" || true
         # The answers above stand in for a pass that died before sealing. The loop
         # below answers every claim again, which only succeeds if they were dropped.
         OUTCOME=upheld

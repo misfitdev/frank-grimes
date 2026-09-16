@@ -36,7 +36,18 @@ func Verify(ctx context.Context, m Mechanism, root string) error {
 		return nil
 	}
 
-	dir, err := os.MkdirTemp(filepath.Join(root, GrimesDir), "probe-")
+	root, err := filepath.Abs(root)
+	if err != nil {
+		return fmt.Errorf("confine: staging the probe: %w", err)
+	}
+	// The probe runs before the first role, which is before anything else has
+	// had reason to create this, and the policy it is testing is expressed in
+	// terms of it.
+	grimes := filepath.Join(root, GrimesDir)
+	if err := os.MkdirAll(grimes, 0o755); err != nil {
+		return fmt.Errorf("confine: staging the probe: %w", err)
+	}
+	dir, err := os.MkdirTemp(grimes, "probe-")
 	if err != nil {
 		return fmt.Errorf("confine: staging the probe: %w", err)
 	}

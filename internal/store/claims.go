@@ -63,9 +63,12 @@ func RunSlug(runID string) string {
 	return hex.EncodeToString(sum[:8])
 }
 
-// RunDir, relative to the review directory, is the only place a refuting pass
-// may write. It is a directory rather than the report itself because the report
-// is written through a temporary file and a rename.
-func RunDir(runID string) string {
-	return filepath.Join(".grimes", RunSlug(runID))
-}
+// WorkDir, relative to the review directory, is the only place a spawned role
+// may write. It holds what a role is building — its report, its refutation —
+// and nothing the engine relies on: the ledger, the result, the loop state and
+// the staged copies all sit outside it and stay unreadable.
+//
+// Static rather than derived from the run, because a report can be started
+// before the run that carries it exists, and both halves have to name the same
+// file without an agreement passed between them.
+const WorkDir = ".grimes/work"

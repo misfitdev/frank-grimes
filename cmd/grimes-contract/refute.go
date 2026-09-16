@@ -20,7 +20,7 @@ import (
 // One file per run: two passes in a directory would otherwise answer from each
 // other's outcomes, and the pass that sealed second would deliver both.
 func defaultRefutationPath() string {
-	return filepath.Join(store.RunDir(os.Getenv("GRIMES_RUN_ID")), "refutation.textproto")
+	return filepath.Join(store.WorkDir, "refutation-"+store.RunSlug(os.Getenv("GRIMES_RUN_ID"))+".textproto")
 }
 
 const refuteUsage = `grimes-contract refute claims|add|seal ...

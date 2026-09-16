@@ -63,14 +63,12 @@ func (e *Exec) confined(req engine.Request) ([]string, error) {
 			p.ReadPaths = append(p.ReadPaths, path)
 		}
 	}
-	if req.Role == engine.RoleRefuter {
-		// The refuting pass records its outcomes through the contract CLI, which
-		// writes them here. Created by the engine because creating it is itself a
-		// write into the review directory the pass is not allowed to make.
-		p.WriteDir = filepath.Join(root, store.RunDir(req.RunID))
-		if err := os.MkdirAll(p.WriteDir, 0o755); err != nil {
-			return nil, err
-		}
+	// Every role records what it produced through the contract CLI, which writes
+	// it here. Created by the engine because creating it is itself a write into
+	// the review directory the role is not allowed to make.
+	p.WriteDir = filepath.Join(root, store.WorkDir)
+	if err := os.MkdirAll(p.WriteDir, 0o755); err != nil {
+		return nil, err
 	}
 	return e.Confine.Wrap(p, e.Command)
 }

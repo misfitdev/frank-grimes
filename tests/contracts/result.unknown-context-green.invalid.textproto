@@ -26,3 +26,4 @@ independent_review {
 }
 ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678901" }
 summary: "Every routed category reached its stop with nothing surviving."
+confinement: "sandbox-exec"
