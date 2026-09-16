@@ -217,6 +217,36 @@ else
 fi
 
 echo ""
+echo "--- A result recorded before provenance existed still reads ---"
+# Recorded by an earlier build of schema major 2, which had no field 6 on
+# FindingSnapshot. The bytes cannot be produced by any current writer, so the
+# fixture is committed rather than generated here.
+ARCHIVED="$FIXTURES/result.pre-provenance.bin"
+
+if "$BIN" validate --type=GrimesResult --format=binary "$ARCHIVED" &>/dev/null; then
+    pass "an archived result validates"
+else
+    fail "an archived result no longer validates"
+fi
+
+if "$BIN" decode --type=GrimesResult "$ARCHIVED" | grep -qE 'provenance: *FINDING_PROVENANCE_UNATTACKED'; then
+    pass "a finding nobody attacked reads as unattacked"
+else
+    fail "an absent provenance did not read as unattacked"
+fi
+
+# Filling the field on read must not let a writer omit it: silence from a
+# current producer is a defect, not a record of when it was written.
+NO_PROVENANCE="$(mktemp)"
+grep -v 'provenance:' "$FIXTURES/result.snapshot-provenance.valid.textproto" >"$NO_PROVENANCE"
+if "$BIN" encode-result --raw "$NO_PROVENANCE" &>/dev/null; then
+    fail "a result written without provenance was encoded"
+else
+    pass "a result written without provenance is rejected"
+fi
+rm -f "$NO_PROVENANCE"
+
+echo ""
 echo "--- Report and result envelopes stay distinct ---"
 VALID_REPORT="$FIXTURES/report.p0-with-citation.valid.textproto"
 REPORT_ENV="$(mktemp)"

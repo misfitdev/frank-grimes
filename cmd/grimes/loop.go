@@ -39,17 +39,9 @@ func cmdLoop(args []string) (int, error) {
 		return exitAllowExit, nil
 	}
 
-	result, resultErr := results.Load(ctx)
+	result, digest, resultErr := results.Load(ctx)
 	if resultErr != nil {
 		return unverified(*dir, fmt.Sprintf("result rejected: %v", resultErr), *quiet)
-	}
-
-	var digest []byte
-	if result != nil {
-		var err error
-		if digest, err = contracts.Digest(result); err != nil {
-			return unverified(*dir, fmt.Sprintf("result could not be digested: %v", err), *quiet)
-		}
 	}
 
 	decision := engine.DecideLoop(state, result, digest)
