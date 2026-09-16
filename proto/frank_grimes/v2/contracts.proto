@@ -756,10 +756,11 @@ message Ledger {
   // predecessor described is lost rather than carried forward.
   option (buf.validate.message).cel = {
     id: "ledger.supersession_is_linked"
-    message: "a superseding finding must name a finding in this ledger that is marked superseded"
+    message: "a superseding finding must name another finding in this ledger that is marked superseded"
     expression:
       "this.findings.all(k, this.findings[k].supersedes == '' || "
-      "(this.findings[k].supersedes in this.findings && "
+      "(this.findings[k].supersedes != k && "
+      "this.findings[k].supersedes in this.findings && "
       "this.findings[this.findings[k].supersedes].status == 7))"
   };
 
