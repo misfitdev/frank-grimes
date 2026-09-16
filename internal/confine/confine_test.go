@@ -190,6 +190,50 @@ func TestTheProbeAcceptsAnExplicitlyUnconfinedRun(t *testing.T) {
 	}
 }
 
+// A wrapper that exits without reaching what it was handed leaves neither
+// forbidden effect behind, which is indistinguishable from a wrapper that
+// stopped both unless the canary is made to say it ran.
+func TestTheProbeRefusesAWrapperThatNeverRanTheCanary(t *testing.T) {
+	root, _, _, _ := target(t)
+	wrapper := filepath.Join(t.TempDir(), "wrapper.sh")
+	write(t, wrapper, "#!/bin/sh\nexit 0\n")
+	if err := os.Chmod(wrapper, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	err := Verify(context.Background(), External{Command: []string{wrapper}}, root)
+
+	if err == nil {
+		t.Fatal("Verify accepted a wrapper that never ran the probe")
+	}
+	if !strings.Contains(err.Error(), "did not run the probe") {
+		t.Errorf("the refusal does not say the probe never ran: %v", err)
+	}
+}
+
+// The probe writes into the directory it is testing, so it names that file
+// after its own staging directory. A fixed name would collide with whatever the
+// repository already holds: the probe would read someone else's file as its own
+// result, refuse the mechanism, and then delete the file.
+func TestTheProbeLeavesTheReviewDirectoryAsItFoundIt(t *testing.T) {
+	m := builtin(t)
+	root, _, _, _ := target(t)
+	bystander := filepath.Join(root, "grimes-probe-written")
+	write(t, bystander, "a file this repository already had")
+
+	if err := Verify(context.Background(), m, root); err != nil {
+		t.Fatalf("the probe refused over a file it did not write: %v", err)
+	}
+
+	got, err := os.ReadFile(bystander)
+	if err != nil {
+		t.Fatalf("the probe removed a file it did not write: %v", err)
+	}
+	if string(got) != "a file this repository already had" {
+		t.Errorf("the probe rewrote a file it did not write; got %q", got)
+	}
+}
+
 // A relative path that happens to resolve would produce a rule the kernel
 // never matches, so it is refused for being relative rather than for being
 // unresolvable.

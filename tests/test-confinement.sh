@@ -75,7 +75,8 @@ fi
 
 workspace() {
     local dir
-    dir="$(mktemp -d)"
+    # Under BINDIR, so the EXIT trap reaches it when an assertion exits early.
+    dir="$(mktemp -d "$BINDIR/ws.XXXXXX")"
     mkdir -p "$dir/src"
     # shellcheck disable=SC2016  # the text is the target's content, not an expansion
     printf 'rm -rf ./build/*\neval "$UNTRUSTED"\n' >"$dir/src/app.sh"
@@ -221,6 +222,18 @@ assert_match "$OUT" 'could not run' \
     "a wrapper that cannot start is refused as a startup failure"
 assert_no_match "$OUT" 'confinement blocked nothing' \
     "a wrapper that never ran is not reported as one that blocked nothing"
+rm -rf "$WS"
+
+# A command naming a directory is resolved against the directory the role is
+# given, so the engine's own is the wrong one to check it against.
+WS="$(workspace)"
+printf '#!/usr/bin/env bash\nexec "%s/provider-p2.sh"\n' "$FAKES" >"$WS/provider.sh"
+chmod +x "$WS/provider.sh"
+OUT="$(cd "$BINDIR" && "$GRIMES" run --dir="$WS" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --provider-command="./provider.sh" --format=prototext src 2>&1 || true)"
+assert_match "$OUT" 'legacy_color: +LEGACY_COLOR_' \
+    "a provider named relative to the review directory is found there"
 rm -rf "$WS"
 
 echo ""

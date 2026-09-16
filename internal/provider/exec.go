@@ -66,11 +66,34 @@ func (e *Exec) confined(req engine.Request) ([]string, error) {
 	// Every role records what it produced through the contract CLI, which writes
 	// it here. Created by the engine because creating it is itself a write into
 	// the review directory the role is not allowed to make.
+	//
 	p.WriteDir = filepath.Join(root, store.WorkDir)
 	if err := os.MkdirAll(p.WriteDir, 0o755); err != nil {
 		return nil, err
 	}
 	return e.Confine.Wrap(p, e.Command)
+}
+
+// lookup reports where the role's command will be found, resolving it the way
+// the spawned process will.
+//
+// A command naming a directory is resolved against the working directory the
+// child is given, not the one the engine happens to be in, so checking it here
+// against the engine's would reject a provider the child could have run.
+func (e *Exec) lookup() error {
+	name := e.Command[0]
+	if strings.ContainsRune(name, filepath.Separator) && !filepath.IsAbs(name) {
+		dir, err := filepath.Abs(e.Dir)
+		if err != nil {
+			return err
+		}
+		// Absolute rather than joined: joining against a relative directory can
+		// drop the leading "./", which turns a path into a bare name and sends
+		// the lookup to $PATH instead of the directory it names.
+		name = filepath.Join(dir, name)
+	}
+	_, err := exec.LookPath(name)
+	return err
 }
 
 var ErrOutputTooLarge = engine.ErrOutputTooLarge
@@ -86,7 +109,7 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	// Resolved here rather than at spawn, because a wrapper makes the argv the
 	// kernel sees the wrapper's own: a missing provider would surface as that
 	// wrapper's failure, or as nothing at all.
-	if _, err := exec.LookPath(e.Command[0]); err != nil {
+	if err := e.lookup(); err != nil {
 		return nil, fmt.Errorf("%w: %v", engine.ErrProviderFailed, err)
 	}
 

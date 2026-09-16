@@ -5282,7 +5282,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tB\x18\xbaH\x15r\x13\n" +
 	"\x11.grimes/ledger.pbR\x04path\x12,\n" +
 	"\rdigest_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\fdigestSha256\x121\n" +
-	"\x14oscillation_detected\x18\x03 \x01(\bR\x13oscillationDetected\"\xc6\x18\n" +
+	"\x14oscillation_detected\x18\x03 \x01(\bR\x13oscillationDetected\"\xee\x19\n" +
 	"\fGrimesResult\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
 	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x12\x1e\n" +
@@ -5310,14 +5310,15 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"unmetGates\x12!\n" +
 	"\asummary\x18\x13 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\asummary\x12L\n" +
 	"\rrefuter_check\x18\x14 \x01(\x0e2\x1d.frank_grimes.v2.RefuterCheckB\b\xbaH\x05\x82\x01\x02\x10\x01R\frefuterCheck\x12)\n" +
-	"\vconfinement\x18\x15 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\vconfinement:\xd9\x0e\xbaH\xd5\x0e\x1ad\n" +
+	"\vconfinement\x18\x15 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\vconfinement:\x81\x10\xbaH\xfd\x0f\x1ad\n" +
 	"\x18result.orchestrator_only\x12/only the orchestrator may emit the final result\x1a\x17this.producer_role == 3\x1a\x88\x01\n" +
 	"!result.report_has_no_verification\x122report mode records verification as not applicable\x1a/this.mode != 1 || this.verification.status == 4\x1a\x94\x03\n" +
 	"#result.report_completion_is_derived\x12hthe completion state must be the one the colour, iteration, bound, exhaustion, and new P0/P1 count imply\x1a\x82\x02this.mode != 1 || this.completion_state == (this.legacy_color == 1 ? 2 : this.iteration >= this.max_iterations ? 4 : (this.iteration > 1 && this.marginal_yield.new_p0_p1 == 0u) ? (this.unmet_gates.exists(g, g == 'coverage' || g == 'refutation') ? 6 : 2) : 1)\x1a\xf0\x03\n" +
 	"(result.green_is_independent_and_verified\x12xGREEN requires an independent matching pass from a context the engine spawned, no oscillation, and required verification\x1a\xc9\x02this.legacy_color != 1 || (has(this.independent_review) && this.independent_review.verdict.decision == 3 && this.independent_review.context_origin == 1 && this.independent_review.target_fingerprint_sha256 == this.target.fingerprint_sha256 && !this.ledger.oscillation_detected && (this.mode == 1 || this.verification.status == 1))\x1a\xa9\x02\n" +
 	" result.green_requires_pass_tuple\x12YGREEN requires decision=pass, low residual risk, high confidence, sufficient completeness\x1a\xa9\x01this.legacy_color != 1 || (this.verdict.decision == 3 && this.verdict.residual_risk == 4 && this.verdict.review_confidence == 1 && this.verdict.review_completeness == 1)\x1aw\n" +
 	"\x18result.red_matches_block\x12!RED and decision=block must agree\x1a8(this.legacy_color == 3) == (this.verdict.decision == 1)\x1a\xbc\x01\n" +
-	"\"result.unconfined_is_an_unmet_gate\x12Fa run recorded as unconfined must report the confinement gate as unmet\x1aNthis.confinement != 'unsafe' || this.unmet_gates.exists(g, g == 'confinement')\x1at\n" +
+	"\"result.unconfined_is_an_unmet_gate\x12Fa run recorded as unconfined must report the confinement gate as unmet\x1aNthis.confinement != 'unsafe' || this.unmet_gates.exists(g, g == 'confinement')\x1a\xa5\x01\n" +
+	"!result.unconfined_caps_confidence\x12;a run recorded as unconfined must not claim high confidence\x1aCthis.confinement != 'unsafe' || this.verdict.review_confidence != 1\x1at\n" +
 	"\x15result.open_p0_blocks\x12\"an open P0 requires decision=block\x1a7this.counts.open_p0 == 0u || this.verdict.decision == 1\"\xa7\x04\n" +
 	"\tLoopState\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +

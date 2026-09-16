@@ -395,6 +395,12 @@ func TestFileResultStoreLegacyDigestIsOverStoredBytes(t *testing.T) {
 	if string(filled) == string(digest) {
 		t.Fatal("the fixture does not exercise filling: it digests the same either way")
 	}
+	// A record from before roles were confined cannot say how they were, and the
+	// field it is missing is required. Quarantining it would lose the loop's
+	// history over a question that build was never asked.
+	if got.GetConfinement() != "unknown" {
+		t.Errorf("an archived result reports confinement %q, want unknown", got.GetConfinement())
+	}
 }
 
 func TestFileResultStoreRejectsInvalidOnSave(t *testing.T) {

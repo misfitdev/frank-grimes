@@ -60,14 +60,23 @@ func Verify(ctx context.Context, m Mechanism, root string) error {
 	if err := os.WriteFile(readable, []byte(secret), 0o600); err != nil {
 		return fmt.Errorf("confine: staging the probe: %w", err)
 	}
-	written := filepath.Join(root, "grimes-probe-written")
+	// Named after the staging directory, which is unique to this probe: a fixed
+	// name that the repository happened to already carry would be read as this
+	// probe's own output, failing the mechanism and deleting the file.
+	written := filepath.Join(root, filepath.Base(dir)+"-written")
+
+	// Proof that the canary ran at all. A wrapper can start and then fail before
+	// reaching the shell, and neither forbidden effect happens on a run that
+	// never happened.
+	const ran = "grimes-probe-ran"
 
 	// The probe is confined by a policy that hands it nothing: no readable
 	// path, no writable directory. Every mechanism that works at all must stop
 	// both of these.
 	argv, err := m.Wrap(Policy{Root: root}, []string{
 		"/bin/sh", "-c",
-		fmt.Sprintf("cat %s 2>/dev/null; : >%s 2>/dev/null; exit 0", shellQuote(readable), shellQuote(written)),
+		fmt.Sprintf("echo %s; cat %s 2>/dev/null; : >%s 2>/dev/null; exit 0",
+			shellQuote(ran), shellQuote(readable), shellQuote(written)),
 	})
 	if err != nil {
 		return err
@@ -87,6 +96,15 @@ func Verify(ctx context.Context, m Mechanism, root string) error {
 	}
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return fmt.Errorf("confine: %s did not finish: %w", m.Name(), ctxErr)
+	}
+	// An exit code belongs to whatever the mechanism chose to report, so the
+	// marker is what says the canary reached the shell. Without it a wrapper
+	// that fails after starting is graded on effects that nothing attempted.
+	if !strings.Contains(string(out), ran) {
+		if runErr == nil {
+			runErr = errors.New("no error reported")
+		}
+		return fmt.Errorf("confine: %s did not run the probe: %w", m.Name(), runErr)
 	}
 
 	var leaked []string

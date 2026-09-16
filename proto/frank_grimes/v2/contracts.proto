@@ -1045,6 +1045,11 @@ message GrimesResult {
     expression: "this.confinement != 'unsafe' || this.unmet_gates.exists(g, g == 'confinement')"
   };
   option (buf.validate.message).cel = {
+    id: "result.unconfined_caps_confidence"
+    message: "a run recorded as unconfined must not claim high confidence"
+    expression: "this.confinement != 'unsafe' || this.verdict.review_confidence != 1"
+  };
+  option (buf.validate.message).cel = {
     id: "result.open_p0_blocks"
     message: "an open P0 requires decision=block"
     expression: "this.counts.open_p0 == 0u || this.verdict.decision == 1"
