@@ -49,6 +49,9 @@ type TransitionOpts struct {
 	Actor          string
 	NewEvidenceSum []byte
 	Owner          *pb.HumanOwner
+	// VerifiedBySum is the output digest of the gate that passed over this
+	// finding's fix. Required to reach verified and refused anywhere else.
+	VerifiedBySum []byte
 }
 
 // Transition applies one lifecycle change to one finding.
@@ -100,12 +103,13 @@ func Transition(l *pb.Ledger, id string, to pb.FindingStatus, opts TransitionOpt
 	}
 	f.Status = to
 	f.History = append(f.History, &pb.FindingEvent{
-		Iteration:      opts.Iteration,
-		From:           from,
-		To:             to,
-		EvidenceSha256: f.GetEvidenceSha256(),
-		At:             nowTimestamp(),
-		Actor:          opts.Actor,
+		Iteration:        opts.Iteration,
+		From:             from,
+		To:               to,
+		EvidenceSha256:   f.GetEvidenceSha256(),
+		At:               nowTimestamp(),
+		Actor:            opts.Actor,
+		VerifiedBySha256: opts.VerifiedBySum,
 	})
 
 	if err := Validate(l); err != nil {

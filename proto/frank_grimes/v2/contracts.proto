@@ -674,6 +674,19 @@ enum RefuterCheck {
 // ---------------------------------------------------------------------------
 
 message FindingEvent {
+  // A move to verified is the one transition a context cannot assert: it is a
+  // claim about a gate, so the gate's own output digest is what carries it.
+  option (buf.validate.message).cel = {
+    id: "finding_event.verified_carries_its_gate"
+    message: "a move to verified must carry the digest of the gate that passed"
+    expression: "this.to != 3 || size(this.verified_by_sha256) == 32"
+  };
+  option (buf.validate.message).cel = {
+    id: "finding_event.only_verified_carries_a_gate"
+    message: "only a move to verified carries a gate digest"
+    expression: "this.to == 3 || size(this.verified_by_sha256) == 0"
+  };
+
   uint32 iteration = 1 [(buf.validate.field).uint32.gt = 0];
   FindingStatus from = 2 [(buf.validate.field).enum.defined_only = true];
   FindingStatus to = 3 [(buf.validate.field).enum = {
@@ -683,6 +696,11 @@ message FindingEvent {
   bytes evidence_sha256 = 4 [(buf.validate.field).bytes.len = 32];
   google.protobuf.Timestamp at = 5 [(buf.validate.field).required = true];
   string actor = 6 [(buf.validate.field).string.min_len = 1];
+  // The output digest of the verification that passed over this finding's fix.
+  bytes verified_by_sha256 = 7 [
+    (buf.validate.field).bytes.len = 32,
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
 }
 
 message Finding {

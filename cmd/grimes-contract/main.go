@@ -47,7 +47,7 @@ Usage:
   grimes-contract decode-result [file]
       Read an envelope or raw binary, validate, emit TextProto.
 
-  grimes-contract ledger transition --ledger=<f> --id=<id> --to=<state>
+  grimes-contract ledger transition --ledger=<f> --id=<id> --to=<state> [--verified-by-sha256=<hex>]
       [--iteration=N] [--actor=<s>] [--evidence-sha256=<hex>]
       Apply one lifecycle transition and rewrite the ledger atomically.
 
@@ -508,6 +508,7 @@ func cmdLedger(args []string) error {
 	iteration := fs.Uint("iteration", 1, "iteration number")
 	actor := fs.String("actor", "grimes", "who is making the change")
 	evSum := fs.String("evidence-sha256", "", "hex evidence digest, required to reopen")
+	gateSum := fs.String("verified-by-sha256", "", "hex output digest of the gate that passed, required to verify")
 	ownerID := fs.String("owner", "", "human owner ID, required to accept")
 	rationale := fs.String("rationale", "", "why the risk is accepted")
 	if err := fs.Parse(args[1:]); err != nil {
@@ -537,6 +538,13 @@ func cmdLedger(args []string) error {
 	opts := contracts.TransitionOpts{
 		Iteration: uint32(*iteration),
 		Actor:     *actor,
+	}
+	if *gateSum != "" {
+		sum, err := hex.DecodeString(*gateSum)
+		if err != nil {
+			return fmt.Errorf("--verified-by-sha256: %w", err)
+		}
+		opts.VerifiedBySum = sum
 	}
 	if *evSum != "" {
 		b, err := hex.DecodeString(*evSum)

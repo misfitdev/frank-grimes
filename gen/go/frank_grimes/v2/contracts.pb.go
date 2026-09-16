@@ -3786,8 +3786,10 @@ type FindingEvent struct {
 	EvidenceSha256 []byte                 `protobuf:"bytes,4,opt,name=evidence_sha256,json=evidenceSha256,proto3" json:"evidence_sha256,omitempty"`
 	At             *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=at,proto3" json:"at,omitempty"`
 	Actor          string                 `protobuf:"bytes,6,opt,name=actor,proto3" json:"actor,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// The output digest of the verification that passed over this finding's fix.
+	VerifiedBySha256 []byte `protobuf:"bytes,7,opt,name=verified_by_sha256,json=verifiedBySha256,proto3" json:"verified_by_sha256,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *FindingEvent) Reset() {
@@ -3860,6 +3862,13 @@ func (x *FindingEvent) GetActor() string {
 		return x.Actor
 	}
 	return ""
+}
+
+func (x *FindingEvent) GetVerifiedBySha256() []byte {
+	if x != nil {
+		return x.VerifiedBySha256
+	}
+	return nil
 }
 
 type Finding struct {
@@ -5273,7 +5282,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x06upheld\x18\x04 \x01(\v2\x1d.frank_grimes.v2.ReproductionH\x00R\x06upheld\x12+\n" +
 	"\vunavailable\x18\x05 \x01(\tB\a\xbaH\x04r\x02\x10\x01H\x00R\vunavailable\x12E\n" +
 	"\fcompleted_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\vcompletedAtB\x10\n" +
-	"\aoutcome\x12\x05\xbaH\x02\b\x01\"\xb4\x02\n" +
+	"\aoutcome\x12\x05\xbaH\x02\b\x01\"\xaa\x05\n" +
 	"\fFindingEvent\x12%\n" +
 	"\titeration\x18\x01 \x01(\rB\a\xbaH\x04*\x02 \x00R\titeration\x12<\n" +
 	"\x04from\x18\x02 \x01(\x0e2\x1e.frank_grimes.v2.FindingStatusB\b\xbaH\x05\x82\x01\x02\x10\x01R\x04from\x12:\n" +
@@ -5281,7 +5290,11 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x02to\x120\n" +
 	"\x0fevidence_sha256\x18\x04 \x01(\fB\a\xbaH\x04z\x02h R\x0eevidenceSha256\x122\n" +
 	"\x02at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\x02at\x12\x1d\n" +
-	"\x05actor\x18\x06 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05actor\"\xba\n" +
+	"\x05actor\x18\x06 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05actor\x128\n" +
+	"\x12verified_by_sha256\x18\a \x01(\fB\n" +
+	"\xbaH\a\xd8\x01\x01z\x02h R\x10verifiedBySha256:\xb9\x02\xbaH\xb5\x02\x1a\xa0\x01\n" +
+	"'finding_event.verified_carries_its_gate\x12@a move to verified must carry the digest of the gate that passed\x1a3this.to != 3 || size(this.verified_by_sha256) == 32\x1a\x8f\x01\n" +
+	"*finding_event.only_verified_carries_a_gate\x12-only a move to verified carries a gate digest\x1a2this.to == 3 || size(this.verified_by_sha256) == 0\"\xba\n" +
 	"\n" +
 	"\aFinding\x12`\n" +
 	"\x02id\x18\x01 \x01(\tBP\xbaHMrK2I^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$R\x02id\x126\n" +
