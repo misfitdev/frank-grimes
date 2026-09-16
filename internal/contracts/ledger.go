@@ -14,18 +14,25 @@ var allowedTransitions = map[pb.FindingStatus][]pb.FindingStatus{
 		pb.FindingStatus_FINDING_STATUS_FIXED,
 		pb.FindingStatus_FINDING_STATUS_ACCEPTED,
 		pb.FindingStatus_FINDING_STATUS_FALSE_POSITIVE,
+		pb.FindingStatus_FINDING_STATUS_SUPERSEDED,
 	},
 	pb.FindingStatus_FINDING_STATUS_FIXED: {
 		pb.FindingStatus_FINDING_STATUS_VERIFIED,
 		pb.FindingStatus_FINDING_STATUS_REGRESSED,
+		pb.FindingStatus_FINDING_STATUS_SUPERSEDED,
 	},
 	pb.FindingStatus_FINDING_STATUS_VERIFIED: {
 		pb.FindingStatus_FINDING_STATUS_REGRESSED,
+		pb.FindingStatus_FINDING_STATUS_SUPERSEDED,
 	},
 	pb.FindingStatus_FINDING_STATUS_REGRESSED: {
 		pb.FindingStatus_FINDING_STATUS_FIXED,
 		pb.FindingStatus_FINDING_STATUS_ACCEPTED,
+		pb.FindingStatus_FINDING_STATUS_SUPERSEDED,
 	},
+	// Terminal. The record is kept for its successor to point at, and a defect
+	// that comes back does so under the successor's identity.
+	pb.FindingStatus_FINDING_STATUS_SUPERSEDED: nil,
 	// Reopening a closed finding requires the evidence to have changed;
 	// TransitionOpts enforces that, since the state pair alone cannot.
 	pb.FindingStatus_FINDING_STATUS_ACCEPTED: {

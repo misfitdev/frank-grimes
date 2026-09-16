@@ -278,6 +278,9 @@ const (
 	FindingStatus_FINDING_STATUS_ACCEPTED       FindingStatus = 4
 	FindingStatus_FINDING_STATUS_FALSE_POSITIVE FindingStatus = 5
 	FindingStatus_FINDING_STATUS_REGRESSED      FindingStatus = 6
+	// Replaced by a finding that restates the same defect at the same place. The
+	// record stays so the successor has something to point at.
+	FindingStatus_FINDING_STATUS_SUPERSEDED FindingStatus = 7
 )
 
 // Enum value maps for FindingStatus.
@@ -290,6 +293,7 @@ var (
 		4: "FINDING_STATUS_ACCEPTED",
 		5: "FINDING_STATUS_FALSE_POSITIVE",
 		6: "FINDING_STATUS_REGRESSED",
+		7: "FINDING_STATUS_SUPERSEDED",
 	}
 	FindingStatus_value = map[string]int32{
 		"FINDING_STATUS_UNSPECIFIED":    0,
@@ -299,6 +303,7 @@ var (
 		"FINDING_STATUS_ACCEPTED":       4,
 		"FINDING_STATUS_FALSE_POSITIVE": 5,
 		"FINDING_STATUS_REGRESSED":      6,
+		"FINDING_STATUS_SUPERSEDED":     7,
 	}
 )
 
@@ -3873,7 +3878,12 @@ type Finding struct {
 	History           []*FindingEvent        `protobuf:"bytes,12,rep,name=history,proto3" json:"history,omitempty"`
 	// Written by the engine from refutation passes, never by the context that
 	// raised the finding.
-	Refutation    []*RefutationAttempt `protobuf:"bytes,13,rep,name=refutation,proto3" json:"refutation,omitempty"`
+	Refutation []*RefutationAttempt `protobuf:"bytes,13,rep,name=refutation,proto3" json:"refutation,omitempty"`
+	// The finding this one replaces, when it restates a defect the ledger already
+	// held at this anchor under a different wording. Derived by the engine: a
+	// context that could choose it could merge two defects into one, or split one
+	// into two, and the loop reads both as progress.
+	Supersedes    string `protobuf:"bytes,14,opt,name=supersedes,proto3" json:"supersedes,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3997,6 +4007,13 @@ func (x *Finding) GetRefutation() []*RefutationAttempt {
 		return x.Refutation
 	}
 	return nil
+}
+
+func (x *Finding) GetSupersedes() string {
+	if x != nil {
+		return x.Supersedes
+	}
+	return ""
 }
 
 type Ledger struct {
@@ -5157,7 +5174,8 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x02to\x120\n" +
 	"\x0fevidence_sha256\x18\x04 \x01(\fB\a\xbaH\x04z\x02h R\x0eevidenceSha256\x122\n" +
 	"\x02at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x06\xbaH\x03\xc8\x01\x01R\x02at\x12\x1d\n" +
-	"\x05actor\x18\x06 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05actor\"\xc5\t\n" +
+	"\x05actor\x18\x06 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05actor\"\xba\n" +
+	"\n" +
 	"\aFinding\x12`\n" +
 	"\x02id\x18\x01 \x01(\tBP\xbaHMrK2I^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$R\x02id\x126\n" +
 	"\x12fingerprint_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x11fingerprintSha256\x12A\n" +
@@ -5177,10 +5195,13 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\ahistory\x18\f \x03(\v2\x1d.frank_grimes.v2.FindingEventB\b\xbaH\x05\x92\x01\x02\b\x01R\ahistory\x12B\n" +
 	"\n" +
 	"refutation\x18\r \x03(\v2\".frank_grimes.v2.RefutationAttemptR\n" +
-	"refutation:\xf7\x02\xbaH\xf3\x02\x1au\n" +
+	"refutation\x12s\n" +
+	"\n" +
+	"supersedes\x18\x0e \x01(\tBS\xbaHP\xd8\x01\x01rK2I^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$R\n" +
+	"supersedes:\xf7\x02\xbaH\xf3\x02\x1au\n" +
 	"%finding.accepted_requires_human_owner\x12'accepted findings require a human owner\x1a#this.status != 4 || has(this.owner)\x1av\n" +
 	"\x1cfinding.p0_requires_e1_or_e2\x12\x1dP0 requires E1 or E2 evidence\x1a7this.risk.severity != 1 || this.evidence.tier in [1, 2]\x1a\x81\x01\n" +
-	"\x15finding.e3_caps_at_p1\x124inferred evidence cannot support a severity above P1\x1a2this.evidence.tier != 3 || this.risk.severity != 1\"\xce\x05\n" +
+	"\x15finding.e3_caps_at_p1\x124inferred evidence cannot support a severity above P1\x1a2this.evidence.tier != 3 || this.risk.severity != 1\"\xea\a\n" +
 	"\x06Ledger\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
 	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x127\n" +
@@ -5188,8 +5209,9 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\bfindings\x18\x04 \x03(\v2%.frank_grimes.v2.Ledger.FindingsEntryR\bfindings\x1aU\n" +
 	"\rFindingsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12.\n" +
-	"\x05value\x18\x02 \x01(\v2\x18.frank_grimes.v2.FindingR\x05value:\x028\x01:\xa1\x03\xbaH\x9d\x03\x1a\x9a\x03\n" +
-	"!ledger.anchor_kind_matches_target\x12@each finding must be anchored in the kind of target under review\x1a\xb2\x02this.findings.all(k, this.target.kind == 1 ? has(this.findings[k].location.anchor.repo_line) : this.target.kind == 2 ? has(this.findings[k].location.anchor.document_part) : this.target.kind == 3 ? has(this.findings[k].location.anchor.argument_step) : has(this.findings[k].location.anchor.retrieved_source))\"\xda\x02\n" +
+	"\x05value\x18\x02 \x01(\v2\x18.frank_grimes.v2.FindingR\x05value:\x028\x01:\xbd\x05\xbaH\xb9\x05\x1a\x9a\x03\n" +
+	"!ledger.anchor_kind_matches_target\x12@each finding must be anchored in the kind of target under review\x1a\xb2\x02this.findings.all(k, this.target.kind == 1 ? has(this.findings[k].location.anchor.repo_line) : this.target.kind == 2 ? has(this.findings[k].location.anchor.document_part) : this.target.kind == 3 ? has(this.findings[k].location.anchor.argument_step) : has(this.findings[k].location.anchor.retrieved_source))\x1a\x99\x02\n" +
+	"\x1dledger.supersession_is_linked\x12Ra superseding finding must name a finding in this ledger that is marked superseded\x1a\xa3\x01this.findings.all(k, this.findings[k].supersedes == '' || (this.findings[k].supersedes in this.findings && this.findings[this.findings[k].supersedes].status == 7))\"\xda\x02\n" +
 	"\aVerdict\x12A\n" +
 	"\bdecision\x18\x01 \x01(\x0e2\x19.frank_grimes.v2.DecisionB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\bdecision\x12N\n" +
@@ -5327,7 +5349,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x18BLAST_RADIUS_SINGLE_USER\x10\x01\x12 \n" +
 	"\x1cBLAST_RADIUS_LOCAL_COMPONENT\x10\x02\x12\x18\n" +
 	"\x14BLAST_RADIUS_SERVICE\x10\x03\x12\x19\n" +
-	"\x15BLAST_RADIUS_SYSTEMIC\x10\x04*\xdd\x01\n" +
+	"\x15BLAST_RADIUS_SYSTEMIC\x10\x04*\xfc\x01\n" +
 	"\rFindingStatus\x12\x1e\n" +
 	"\x1aFINDING_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13FINDING_STATUS_OPEN\x10\x01\x12\x18\n" +
@@ -5335,7 +5357,8 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x17FINDING_STATUS_VERIFIED\x10\x03\x12\x1b\n" +
 	"\x17FINDING_STATUS_ACCEPTED\x10\x04\x12!\n" +
 	"\x1dFINDING_STATUS_FALSE_POSITIVE\x10\x05\x12\x1c\n" +
-	"\x18FINDING_STATUS_REGRESSED\x10\x06*o\n" +
+	"\x18FINDING_STATUS_REGRESSED\x10\x06\x12\x1d\n" +
+	"\x19FINDING_STATUS_SUPERSEDED\x10\a*o\n" +
 	"\fEvidenceTier\x12\x1d\n" +
 	"\x19EVIDENCE_TIER_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10EVIDENCE_TIER_E1\x10\x01\x12\x14\n" +

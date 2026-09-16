@@ -139,6 +139,8 @@ Finding identity is content-addressed, so the same defect in the same place with
 
 Normalization is UTF-8, LF line endings, trailing whitespace removed per line, and no leading or trailing blank lines. For code, leading indentation is preserved, because indentation changes what code means. For prose, leading indentation is removed, because re-nesting a list does not change what it says.
 
+Evidence is text, and text is reworded far more readily than code is moved, so the same defect restated in different words derives a different ID. A finding whose ID is not yet held, at an anchor and in a category where the ledger holds exactly one record this iteration did not report, is that record's successor: it names it in `supersedes`, and that record becomes `superseded`. Two such records are two defects nothing here can tell apart, and neither is linked. An `accepted` or `false positive` record never stands aside, because retiring it on a rewording would undo a person's decision. A successor is not a new finding and does not count toward the iteration's yield; one that replaces a record already `fixed` or `verified` is the same news as a regression and sets the oscillation flag.
+
 Do not invent a second ID or lifecycle scheme. The machine contract defines `Finding`, `Evidence`, `Verdict`, `GrimesResult`, and the lifecycle `open → fixed → verified`, with `accepted` requiring a named human owner and a review deadline. A fingerprint that was already `fixed` or `verified` reappearing is `regressed`, which sets the run-level oscillation flag and makes a pass unreachable: a loop that keeps re-breaking what it fixed does not get to declare success on the iteration where the damage is invisible.
 
 ### Phase 6: Grimey Grinds Grimey (Self-Falsification)

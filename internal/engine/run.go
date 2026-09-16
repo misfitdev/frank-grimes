@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
@@ -342,7 +343,11 @@ func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, report *pb.Provid
 	if ledger.Findings == nil {
 		ledger.Findings = map[string]*pb.Finding{}
 	}
-	named := map[string]bool{}
+	// Admitted before anything is recorded: whether a finding is new or a
+	// reworded restatement of one already held depends on what else this
+	// iteration reported, which is not known partway through the list.
+	admitted := make([]*pb.Finding, 0, len(report.GetCandidates()))
+	reported := map[string]bool{}
 	for _, candidate := range report.GetCandidates() {
 		if err := ctx.Err(); err != nil {
 			return nil, false, err
@@ -351,11 +356,29 @@ func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, report *pb.Provid
 		if err != nil {
 			return nil, false, err
 		}
+		admitted = append(admitted, finding)
+		reported[finding.GetId()] = true
+	}
+
+	named := map[string]bool{}
+	for _, finding := range admitted {
 		id := finding.GetId()
 		known, present := ledger.GetFindings()[id]
 		switch {
 		case !present:
+			replaced, err := supersede(ledger, finding, reported, iteration)
+			if err != nil {
+				return nil, false, fmt.Errorf("ledger: %w", err)
+			}
 			ledger.Findings[id] = finding
+			if replaced != pb.FindingStatus_FINDING_STATUS_UNSPECIFIED {
+				// Restating a defect the ledger had recorded as gone is the same
+				// news as that defect coming back under its own identity, and a
+				// successor is not a fresh discovery either way.
+				oscillation = oscillation || replaced == pb.FindingStatus_FINDING_STATUS_FIXED ||
+					replaced == pb.FindingStatus_FINDING_STATUS_VERIFIED
+				id = ""
+			}
 		case finding.GetRisk().GetSeverity() < known.GetRisk().GetSeverity():
 			escalate(known, finding, iteration)
 		default:
@@ -372,6 +395,68 @@ func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, report *pb.Provid
 		oscillation = oscillation || osc
 	}
 	return surfaced, oscillation, nil
+}
+
+// supersede links a finding to the one it restates, and reports what status
+// that one held. It reports UNSPECIFIED when this finding replaces nothing.
+//
+// A claim is prose, and prose is reworded far more readily than code is moved.
+// The same defect described in different words derives a different identity, so
+// without this the ledger holds two findings where there is one: the first
+// never closes and the second reads as news.
+//
+// What makes the two the same is structural rather than textual, because
+// nothing here can judge whether two sentences mean the same thing: one record
+// at this anchor, in this category, that this iteration did not report. Two
+// such records are two defects the engine cannot tell apart, and it links
+// neither rather than guessing which was replaced.
+// supersedable reports whether a record may stand aside for a restatement.
+//
+// An accepted risk and a dismissed one are human decisions with a name against
+// them. Retiring either on a rewording would let a provider undo a person's
+// call by restating the claim.
+func supersedable(s pb.FindingStatus) bool {
+	switch s {
+	case pb.FindingStatus_FINDING_STATUS_OPEN,
+		pb.FindingStatus_FINDING_STATUS_FIXED,
+		pb.FindingStatus_FINDING_STATUS_VERIFIED,
+		pb.FindingStatus_FINDING_STATUS_REGRESSED:
+		return true
+	default:
+		return false
+	}
+}
+
+func supersede(ledger *pb.Ledger, finding *pb.Finding, reported map[string]bool, iteration uint32) (pb.FindingStatus, error) {
+	kind, parts := contracts.AnchorKey(finding.GetLocation().GetAnchor())
+	var replaced *pb.Finding
+	for id, held := range ledger.GetFindings() {
+		if reported[id] || held.GetCategory() != finding.GetCategory() {
+			continue
+		}
+		if !supersedable(held.GetStatus()) {
+			continue
+		}
+		heldKind, heldParts := contracts.AnchorKey(held.GetLocation().GetAnchor())
+		if heldKind != kind || !slices.Equal(heldParts, parts) {
+			continue
+		}
+		if replaced != nil {
+			return pb.FindingStatus_FINDING_STATUS_UNSPECIFIED, nil
+		}
+		replaced = held
+	}
+	if replaced == nil {
+		return pb.FindingStatus_FINDING_STATUS_UNSPECIFIED, nil
+	}
+
+	was := replaced.GetStatus()
+	if _, err := contracts.Transition(ledger, replaced.GetId(), pb.FindingStatus_FINDING_STATUS_SUPERSEDED,
+		contracts.TransitionOpts{Iteration: iteration, Actor: actorName}); err != nil {
+		return pb.FindingStatus_FINDING_STATUS_UNSPECIFIED, err
+	}
+	finding.Supersedes = replaced.GetId()
+	return was, nil
 }
 
 // escalate adopts a re-report's stricter risk and the evidence that earned it.
@@ -516,6 +601,11 @@ func marginalYield(report *pb.ProviderReport, ledger *pb.Ledger, surfaced []stri
 func candidatesOf(ledger *pb.Ledger) []Candidate {
 	out := make([]Candidate, 0, len(ledger.GetFindings()))
 	for _, f := range ledger.GetFindings() {
+		// A superseded record is history its successor points at. Weighing both
+		// would count one defect twice, in the totals and in the residual risk.
+		if f.GetStatus() == pb.FindingStatus_FINDING_STATUS_SUPERSEDED {
+			continue
+		}
 		out = append(out, weigh(f))
 	}
 	return out
