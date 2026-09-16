@@ -22,6 +22,7 @@ import (
 	"github.com/misfitdev/frank-grimes/internal/confine"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
 	"github.com/misfitdev/frank-grimes/internal/engine"
+	"github.com/misfitdev/frank-grimes/internal/proc"
 	"github.com/misfitdev/frank-grimes/internal/store"
 )
 
@@ -137,10 +138,10 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	// that decided to prompt would hold the operator's terminal until the
 	// timeout, and read whatever was typed at it in the meantime.
 	cmd.Stdin = nil
-	setProcessGroup(cmd)
+	proc.SetGroup(cmd)
 	// CommandContext kills only the direct child; a shell provider leaves its
 	// own children holding the pipe open and Wait blocks past the deadline.
-	cmd.Cancel = func() error { return killGroup(cmd) }
+	cmd.Cancel = func() error { return proc.KillGroup(cmd) }
 	cmd.WaitDelay = 5 * time.Second
 
 	stdout, err := cmd.StdoutPipe()
@@ -161,7 +162,7 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	out, readErr := io.ReadAll(io.LimitReader(stdout, limit+1))
 	overrun := int64(len(out)) > limit
 	if overrun {
-		_ = killGroup(cmd)
+		_ = proc.KillGroup(cmd)
 		// Closed rather than drained: a descendant that left the process group
 		// survives the kill, and draining its output would wait on a writer
 		// that has no reason to stop.
