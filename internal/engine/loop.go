@@ -78,12 +78,12 @@ func (o LoopOutcome) CompletionState() pb.CompletionState {
 func fixCompletion(o LoopOutcome, v *pb.Verification) pb.CompletionState {
 	passed := v.GetStatus() == pb.VerificationStatus_VERIFICATION_STATUS_PASSED
 	switch o {
-	case OutcomeConfirmedPass:
-		return pb.CompletionState_COMPLETION_STATE_FIX_COMPLETE
-	case OutcomeYieldExhausted:
+	case OutcomeConfirmedPass, OutcomeYieldExhausted:
 		if passed {
 			return pb.CompletionState_COMPLETION_STATE_FIX_COMPLETE
 		}
+		// Whatever else it was, it was not a finished fix: nothing here has
+		// been tested.
 		return pb.CompletionState_COMPLETION_STATE_BOUNDED
 	default:
 		return o.CompletionState()

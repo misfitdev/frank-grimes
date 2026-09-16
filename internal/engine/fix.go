@@ -52,9 +52,14 @@ func (e *Engine) prepareFix(ctx context.Context, scope string) (*fixRun, error) 
 	dir := filepath.Join(e.Dir, contracts.FixDir)
 
 	// An existing worktree is the last iteration's, and its edits are what this
-	// one reviews.
+	// one reviews. Its branch is whatever that iteration left checked out, not
+	// a name derived from this run's own identity.
 	if _, err := os.Stat(dir); err == nil {
-		return &fixRun{repo: repo, tree: git.OpenWorktree(repo, dir, fixBranch(e.RunID)), scope: scope}, nil
+		tree, err := git.OpenWorktree(ctx, repo, dir)
+		if err != nil {
+			return nil, err
+		}
+		return &fixRun{repo: repo, tree: tree, scope: scope}, nil
 	}
 
 	// .grimes is the review's own, not the operator's work.

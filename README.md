@@ -123,6 +123,7 @@ When your provider supports arguments, you can skip the interactive prompts:
 | `--mode report\|fix` | `report` documents only and edits nothing (default); `fix` applies fixes, then verifies |
 | `--verify-command <cmd>` | Gate run once over a fix batch; without a usable gate nothing is committed |
 | `--commit` | Authorizes one commit of the verified batch; requires `--mode fix` and a passing gate |
+| `--repository-check` | Authorizes running the repository's own `check` recipe as the gate |
 | `--max-iterations N` | Maximum iterations (default: 5) |
 | `--auto-loop` | Continue while iterations still change the verdict |
 | `--research online\|offline\|frozen:<path>` | Use bounded current-landscape research, disable network research, or load a pinned research bundle |
@@ -133,7 +134,7 @@ When your provider supports arguments, you can skip the interactive prompts:
 
 `--mode fix` reviews and repairs in one pass, inside a git worktree the engine creates off HEAD. Your own working tree is never written, and it has to be clean to start: a worktree off HEAD would otherwise review something other than what you are looking at.
 
-A finding whose file the batch touched is recorded as `fixed`. It becomes `verified` only when the gate passed after the edit — `--verify-command`, or a `check` recipe in a checked-in `justfile` or `Makefile`, whichever the record says selected it. A gate that fails or cannot run verifies nothing, and the worktree is left on disk with its path in the run record so you can read or cherry-pick it.
+A finding whose file the batch touched is recorded as `fixed`. It becomes `verified` only when the gate passed after the edit. The gate is `--verify-command`, or — with `--repository-check` — a `check` recipe in a checked-in `justfile` or `Makefile`. That second one is a command from inside the target, so the flag is you saying you have read it; without the flag it is found and not run. A gate that fails or cannot run verifies nothing, and the worktree is left on disk with its path in the run record so you can read or cherry-pick it.
 
 `--commit` is authorized separately from `--mode fix`, and makes at most one commit per verified batch, on the worktree's own branch, naming the findings it closes. A batch that edited outside the reviewed scope is refused whole.
 

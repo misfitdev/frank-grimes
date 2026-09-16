@@ -149,6 +149,35 @@ func TestAGateDigestOfTheWrongSizeIsRefused(t *testing.T) {
 	}
 }
 
+// A refused transition has to leave the finding alone. Validation runs over the
+// ledger this already changed, so a caller that retries with a gate digest
+// would otherwise be refused for the state the first attempt left behind.
+func TestARefusedTransitionChangesNothing(t *testing.T) {
+	l, id := ledgerWith(pb.FindingStatus_FINDING_STATUS_FIXED)
+	before := l.GetFindings()[id]
+	events := len(before.GetHistory())
+
+	if _, err := Transition(l, id, pb.FindingStatus_FINDING_STATUS_VERIFIED,
+		TransitionOpts{Iteration: 2, Actor: "test"}); err == nil {
+		t.Fatal("a verification with no gate was allowed")
+	}
+
+	after := l.GetFindings()[id]
+	if after.GetStatus() != pb.FindingStatus_FINDING_STATUS_FIXED {
+		t.Errorf("status = %v after a refusal, want fixed", after.GetStatus())
+	}
+	if len(after.GetHistory()) != events {
+		t.Errorf("history grew by %d on a refused transition", len(after.GetHistory())-events)
+	}
+
+	// The retry is the point: it has to be refused or allowed on its own merits.
+	if _, err := Transition(l, id, pb.FindingStatus_FINDING_STATUS_VERIFIED, TransitionOpts{
+		Iteration: 2, Actor: "test", VerifiedBySum: bytes.Repeat([]byte{9}, 32),
+	}); err != nil {
+		t.Errorf("the retry with a gate was refused: %v", err)
+	}
+}
+
 func permitted(from, to pb.FindingStatus) bool {
 	for _, cand := range allowedTransitions[from] {
 		if cand == to {

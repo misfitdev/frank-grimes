@@ -139,7 +139,7 @@ func TestASuppliedCommandOutranksTheRepositorysOwn(t *testing.T) {
 	root := t.TempDir()
 	write(t, filepath.Join(root, "justfile"), "check:\n\techo hi\n")
 
-	g := SelectGate("my-own-check", root)
+	g := SelectGate("my-own-check", root, true)
 
 	if g.Command != "my-own-check" {
 		t.Errorf("selected %q", g.Command)
@@ -156,7 +156,7 @@ func TestACheckedInCheckIsFoundWhenNothingWasSupplied(t *testing.T) {
 	root := t.TempDir()
 	write(t, filepath.Join(root, "Makefile"), "build:\n\ttrue\ncheck:\n\ttrue\n")
 
-	g := SelectGate("", root)
+	g := SelectGate("", root, true)
 
 	if g.Command != "make check" {
 		t.Errorf("selected %q, want make check", g.Command)
@@ -173,7 +173,34 @@ func TestARunnerWithNoCheckRecipeSelectsNothing(t *testing.T) {
 	root := t.TempDir()
 	write(t, filepath.Join(root, "Makefile"), "build:\n\ttrue\n")
 
-	g := SelectGate("", root)
+	g := SelectGate("", root, true)
+
+	if g.Selected != pb.GateSelection_GATE_SELECTION_UNAVAILABLE {
+		t.Errorf("selected %q by %v", g.Command, g.Selected)
+	}
+}
+
+// The recipe is a command out of a file inside the target, which the skill
+// says is inspected before it runs. Nothing here can inspect it, so the
+// operator saying they have is what selects it.
+func TestACheckedInCheckIsNotRunWithoutAuthorization(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "Makefile"), "check:\n\ttrue\n")
+
+	g := SelectGate("", root, false)
+
+	if g.Selected != pb.GateSelection_GATE_SELECTION_UNAVAILABLE || g.Command != "" {
+		t.Errorf("an unauthorized repository check was selected: %q by %v", g.Command, g.Selected)
+	}
+}
+
+// check-ci is not check. Selecting it would run a target the file does not
+// have, and a gate that cannot run reads as a batch that failed.
+func TestARecipeThatMerelyStartsWithCheckIsNotIt(t *testing.T) {
+	root := t.TempDir()
+	write(t, filepath.Join(root, "Makefile"), "check-ci:\n\ttrue\ncheckout:\n\ttrue\n")
+
+	g := SelectGate("", root, true)
 
 	if g.Selected != pb.GateSelection_GATE_SELECTION_UNAVAILABLE {
 		t.Errorf("selected %q by %v", g.Command, g.Selected)
@@ -181,7 +208,7 @@ func TestARunnerWithNoCheckRecipeSelectsNothing(t *testing.T) {
 }
 
 func TestARepositoryWithNoCheckLeavesTheGateUnavailable(t *testing.T) {
-	g := SelectGate("", t.TempDir())
+	g := SelectGate("", t.TempDir(), true)
 
 	if g.Selected != pb.GateSelection_GATE_SELECTION_UNAVAILABLE || g.Command != "" {
 		t.Errorf("selected %q by %v", g.Command, g.Selected)

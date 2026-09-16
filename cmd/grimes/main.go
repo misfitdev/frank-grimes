@@ -158,7 +158,7 @@ func gateFor(cfg *config) engine.GateRunner {
 	if cfg.Mode != pb.Mode_MODE_FIX {
 		return engine.NotApplicableGate{}
 	}
-	return engine.SelectGate(cfg.VerifyCommand, cfg.Dir)
+	return engine.SelectGate(cfg.VerifyCommand, cfg.Dir, cfg.RepositoryCheck)
 }
 
 // mechanismFor resolves how each role will be confined, and proves it before

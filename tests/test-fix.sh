@@ -186,21 +186,22 @@ assert_no_match "$OUT" 'commit_sha1' \
 rm -rf "$REPO"
 
 REPO="$(repository)"
+# Captured before the run: every branch here already holds the first commit, so
+# "the branch has commits" would pass whether or not anything was committed.
+MAIN_BEFORE="$(git -C "$REPO" rev-parse main)"
 OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true" --commit)"
 assert_match "$OUT" 'commit_sha1' \
     "an authorized batch over a passing gate is committed"
 assert_match "$OUT" 'closed_finding_ids: +"FG-' \
     "and the record names what the commit closed"
 BRANCH="$(sed -nE 's/^ *branch: +"(.*)"$/\1/p' <<<"$OUT" | head -1)"
-# Captured rather than piped into grep: pipefail plus a reader that exits early
-# makes git's SIGPIPE the pipeline's exit status, which reads as no commit.
-ONBRANCH="$(git -C "$REPO" log --oneline "$BRANCH" 2>/dev/null || true)"
-if [[ -n "$ONBRANCH" ]]; then
-    pass "the commit is on the branch the record names"
+TIP="$(git -C "$REPO" rev-parse "$BRANCH" 2>/dev/null || true)"
+if [[ -n "$TIP" && "$TIP" != "$MAIN_BEFORE" ]]; then
+    pass "the branch the record names carries a commit the run made"
 else
-    fail "the commit is on the branch the record names ($BRANCH)"
+    fail "the branch the record names carries a commit the run made ($BRANCH at ${TIP:-nothing})"
 fi
-if [[ "$(git -C "$REPO" rev-parse main)" == "$(git -C "$REPO" rev-parse HEAD)" ]]; then
+if [[ "$(git -C "$REPO" rev-parse main)" == "$MAIN_BEFORE" ]]; then
     pass "the branch the operator is on did not move"
 else
     fail "the branch the operator is on did not move"
@@ -251,6 +252,43 @@ OUT="$(run_fix "$REPO" --auto-loop --max-iterations=2 \
     --provider-command="$FAKES/provider-green.sh" --verify-command="true")"
 assert_match "$OUT" 'holds findings for|state holds' \
     "a target that moved outside the run is still refused"
+rm -rf "$REPO"
+
+# A later iteration reuses the worktree the first one made, and the branch it
+# reports has to be the one that is there: this run's identity is not the one
+# that named it.
+REPO="$(repository)"
+run_fix "$REPO" --auto-loop --max-iterations=3 \
+    --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true" --commit >/dev/null
+OUT="$(run_fix "$REPO" --auto-loop --max-iterations=3 \
+    --provider-command="$FAKES/provider-green.sh" --verify-command="true" --commit)"
+BRANCH="$(sed -nE 's/^ *branch: +"(.*)"$/\1/p' <<<"$OUT" | head -1)"
+if [[ -n "$BRANCH" ]] && git -C "$REPO" rev-parse --verify --quiet "$BRANCH" >/dev/null; then
+    pass "a continued run names the branch its worktree is actually on"
+else
+    fail "a continued run names the branch its worktree is actually on ($BRANCH)"
+fi
+rm -rf "$REPO"
+
+echo ""
+echo "--- The repository's own check is a command from inside the target ---"
+
+REPO="$(repository)"
+printf 'check:\n\ttrue\n' >"$REPO/Makefile"
+git -C "$REPO" add -A
+git -C "$REPO" commit --quiet --message "add a check"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh")"
+assert_match "$OUT" 'status: +VERIFICATION_STATUS_UNAVAILABLE' \
+    "a checked-in check is not run on its own say-so"
+rm -rf "$REPO"
+
+REPO="$(repository)"
+printf 'check:\n\ttrue\n' >"$REPO/Makefile"
+git -C "$REPO" add -A
+git -C "$REPO" commit --quiet --message "add a check"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" --repository-check)"
+assert_match "$OUT" 'selected_by: +GATE_SELECTION_REPOSITORY_CHECK' \
+    "and runs once the operator says they have read it"
 rm -rf "$REPO"
 
 echo ""

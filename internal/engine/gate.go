@@ -70,6 +70,10 @@ func (g ExecGate) Run(ctx context.Context, cwd string) (*pb.Verification, error)
 	cmd.Stderr = sink
 	proc.SetGroup(cmd)
 	cmd.Cancel = func() error { return proc.KillGroup(cmd) }
+	// A descendant that left the process group keeps the pipe open, and Run
+	// waits on the copy rather than on the process. Same bound the provider
+	// path uses, for the same reason.
+	cmd.WaitDelay = 5 * time.Second
 
 	runErr := cmd.Run()
 	digest := sha256.Sum256(out.Bytes())
@@ -123,16 +127,23 @@ func exitCode(err error) int {
 // SelectGate chooses the gate once, in the order the skill sets out, and says
 // which rule chose it.
 //
+// Rule 2, the repository's own check, runs a recipe out of a file inside the
+// target, and the skill requires that command to be inspected before it runs.
+// The engine cannot inspect it, so authorized is the operator saying they did:
+// without that, a checked-in check is found and not run.
+//
 // Rule 3, a command documented in the repository, is resolved by whoever read
 // that documentation and reaches this as a supplied command. Prose is not a
 // command, and an engine guessing at one would be running something nobody
 // chose, out of a file the target controls.
-func SelectGate(supplied, root string) ExecGate {
+func SelectGate(supplied, root string, authorized bool) ExecGate {
 	if strings.TrimSpace(supplied) != "" {
 		return ExecGate{Command: supplied, Selected: pb.GateSelection_GATE_SELECTION_USER_SUPPLIED}
 	}
-	if cmd := repositoryCheck(root); cmd != "" {
-		return ExecGate{Command: cmd, Selected: pb.GateSelection_GATE_SELECTION_REPOSITORY_CHECK}
+	if authorized {
+		if cmd := repositoryCheck(root); cmd != "" {
+			return ExecGate{Command: cmd, Selected: pb.GateSelection_GATE_SELECTION_REPOSITORY_CHECK}
+		}
 	}
 	return ExecGate{Selected: pb.GateSelection_GATE_SELECTION_UNAVAILABLE}
 }
@@ -149,11 +160,16 @@ var runners = []struct {
 	command string
 	recipe  *regexp.Regexp
 }{
-	{"justfile", "just check", regexp.MustCompile(`(?m)^check[^:=]*:`)},
-	{"Justfile", "just check", regexp.MustCompile(`(?m)^check[^:=]*:`)},
-	{"Makefile", "make check", regexp.MustCompile(`(?m)^check[^:=]*:`)},
-	{"makefile", "make check", regexp.MustCompile(`(?m)^check[^:=]*:`)},
+	{"justfile", "just check", checkRecipe},
+	{"Justfile", "just check", checkRecipe},
+	{"Makefile", "make check", checkRecipe},
+	{"makefile", "make check", checkRecipe},
 }
+
+// checkRecipe matches a target named check and nothing that merely starts with
+// it: running "make check" against a file whose only target is check-ci reports
+// a gate that failed, which reads as a batch that is broken.
+var checkRecipe = regexp.MustCompile(`(?m)^check[ \t]*:`)
 
 func repositoryCheck(root string) string {
 	for _, r := range runners {

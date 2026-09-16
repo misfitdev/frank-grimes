@@ -31,6 +31,10 @@ var ErrNotClean = errors.New("the working tree has uncommitted changes")
 // ErrNotRepository reports a directory git does not consider a work tree.
 var ErrNotRepository = errors.New("not a git repository")
 
+// ErrForeignWorktree reports a worktree that belongs to some other repository
+// than the one about to write to it.
+var ErrForeignWorktree = errors.New("the worktree belongs to another repository")
+
 // Repo is a working tree git commands run against.
 type Repo struct {
 	Dir string
@@ -91,6 +95,12 @@ type Worktree struct {
 	Branch string
 
 	repo *Repo
+	// common is the repository this worktree was resolved to belong to, kept
+	// from the moment it was opened. A fixing role may write this directory,
+	// including the .git file that says where its repository is, so what the
+	// engine commits to is the repository it checked, not whatever the path
+	// says by the time it commits.
+	common string
 }
 
 // AddWorktree checks commit out into dir on a new branch.
@@ -106,14 +116,85 @@ func (r *Repo) AddWorktree(ctx context.Context, dir, branch, commit string) (*Wo
 	if _, err := r.run(ctx, "worktree", "add", "--quiet", "-b", branch, abs, commit); err != nil {
 		return nil, fmt.Errorf("creating the worktree: %w", err)
 	}
-	return &Worktree{Dir: abs, Branch: branch, repo: r}, nil
+	return r.openWorktree(ctx, abs)
 }
 
-// OpenWorktree names a worktree that is already there, from a run that made it
-// earlier. Nothing is checked here: what proves it is the right one is that the
-// ledger's own lineage lines up, which the engine does with the bytes.
-func OpenWorktree(r *Repo, dir, branch string) *Worktree {
-	return &Worktree{Dir: dir, Branch: branch, repo: r}
+// OpenWorktree returns a worktree that is already there, from a run that made
+// it earlier.
+//
+// Its branch is read rather than assumed: a later run has its own identity, and
+// a name derived from that would not be the name of the branch the last one
+// left checked out here.
+func OpenWorktree(ctx context.Context, r *Repo, dir string) (*Worktree, error) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, err
+	}
+	return r.openWorktree(ctx, abs)
+}
+
+// openWorktree asks git what is at dir and refuses anything that is not this
+// repository's worktree.
+func (r *Repo) openWorktree(ctx context.Context, dir string) (*Worktree, error) {
+	// EvalSymlinks first: a path that points somewhere else would otherwise be
+	// checked here and used there.
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrNotRepository, dir)
+	}
+	common, err := run(ctx, resolved, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrNotRepository, resolved)
+	}
+	common = strings.TrimSpace(common)
+	mine, err := r.run(ctx, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return nil, err
+	}
+	if !sameDir(common, strings.TrimSpace(mine)) {
+		return nil, fmt.Errorf("%w: %s belongs to %s", ErrForeignWorktree, resolved, common)
+	}
+	branch, err := run(ctx, resolved, "rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		return nil, err
+	}
+	return &Worktree{
+		Dir:    resolved,
+		Branch: strings.TrimSpace(branch),
+		repo:   r,
+		common: common,
+	}, nil
+}
+
+// sameDir compares two directory paths through their links, so a worktree
+// reached by one name is not read as a different repository from the same one
+// reached by another.
+func sameDir(a, b string) bool {
+	if a == b {
+		return true
+	}
+	ra, err := filepath.EvalSymlinks(a)
+	if err != nil {
+		return false
+	}
+	rb, err := filepath.EvalSymlinks(b)
+	if err != nil {
+		return false
+	}
+	return ra == rb
+}
+
+// check confirms the worktree still belongs to the repository it did when it
+// was opened. Called before the operations that write.
+func (w *Worktree) check(ctx context.Context) error {
+	common, err := run(ctx, w.Dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	if err != nil {
+		return fmt.Errorf("%w: %s", ErrNotRepository, w.Dir)
+	}
+	if !sameDir(strings.TrimSpace(common), w.common) {
+		return fmt.Errorf("%w: %s now points at %s", ErrForeignWorktree, w.Dir, strings.TrimSpace(common))
+	}
+	return nil
 }
 
 // Remove deletes the worktree and the branch it was on.
@@ -145,6 +226,11 @@ func (w *Worktree) Changed(ctx context.Context) ([]string, error) {
 // supervisor is running as the operator, and inventing an identity here would
 // put a name in history that nobody can be asked about.
 func (w *Worktree) Commit(ctx context.Context, message string) (string, error) {
+	// The batch has been running in here since this worktree was opened, and a
+	// commit is the one thing that leaves it.
+	if err := w.check(ctx); err != nil {
+		return "", err
+	}
 	if _, err := w.git(ctx, "add", "--all"); err != nil {
 		return "", fmt.Errorf("staging the batch: %w", err)
 	}

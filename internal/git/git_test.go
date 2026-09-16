@@ -187,6 +187,67 @@ func TestCommitRecordsTheBatchAndLeavesTheOriginalBranchAlone(t *testing.T) {
 	}
 }
 
+// A later run opens what an earlier one left, and the branch it reports has to
+// be the one that is actually checked out there: the run that made it had a
+// different identity, and a name derived from this run's would name nothing.
+func TestOpeningAWorktreeReadsTheBranchItIsOn(t *testing.T) {
+	ctx := context.Background()
+	r := repo(t)
+	head, _ := r.Head(ctx)
+	dir := filepath.Join(t.TempDir(), "fix")
+	if _, err := r.AddWorktree(ctx, dir, "grimes/fix-earlier", head); err != nil {
+		t.Fatal(err)
+	}
+
+	again, err := OpenWorktree(ctx, r, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if again.Branch != "grimes/fix-earlier" {
+		t.Errorf("branch = %q, want the one the worktree is on", again.Branch)
+	}
+}
+
+// The fixing role may write this directory, including the .git file that says
+// which repository it belongs to.
+func TestAWorktreeBelongingToAnotherRepositoryIsRefused(t *testing.T) {
+	ctx := context.Background()
+	mine, theirs := repo(t), repo(t)
+	head, _ := theirs.Head(ctx)
+	dir := filepath.Join(t.TempDir(), "fix")
+	if _, err := theirs.AddWorktree(ctx, dir, "grimes/fix-theirs", head); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := OpenWorktree(ctx, mine, dir)
+
+	if !errors.Is(err, ErrForeignWorktree) {
+		t.Fatalf("err = %v, want ErrForeignWorktree", err)
+	}
+}
+
+// Repointed after it was opened, which is the only window a role has.
+func TestACommitIntoARepointedWorktreeIsRefused(t *testing.T) {
+	ctx := context.Background()
+	mine, theirs := repo(t), repo(t)
+	head, _ := mine.Head(ctx)
+	dir := filepath.Join(t.TempDir(), "fix")
+	w, err := mine.AddWorktree(ctx, dir, "grimes/fix-mine", head)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(w.Dir, "app.sh"), "rm -rf ./build\n")
+	// What a role with write access to its own worktree can do to it.
+	write(t, filepath.Join(w.Dir, ".git"), "gitdir: "+filepath.Join(theirs.Dir, ".git")+"\n")
+
+	_, err = w.Commit(ctx, "not in this repository")
+
+	if !errors.Is(err, ErrForeignWorktree) {
+		t.Fatalf("err = %v, want ErrForeignWorktree", err)
+	}
+}
+
 func TestRemoveTakesTheWorktreeAndItsBranch(t *testing.T) {
 	ctx := context.Background()
 	r := repo(t)
