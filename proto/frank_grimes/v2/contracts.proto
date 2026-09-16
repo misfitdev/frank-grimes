@@ -61,6 +61,9 @@ enum FindingStatus {
   FINDING_STATUS_ACCEPTED = 4;
   FINDING_STATUS_FALSE_POSITIVE = 5;
   FINDING_STATUS_REGRESSED = 6;
+  // Replaced by a finding that restates the same defect at the same place. The
+  // record stays so the successor has something to point at.
+  FINDING_STATUS_SUPERSEDED = 7;
 }
 
 enum EvidenceTier {
@@ -720,6 +723,14 @@ message Finding {
   // Written by the engine from refutation passes, never by the context that
   // raised the finding.
   repeated RefutationAttempt refutation = 13;
+  // The finding this one replaces, when it restates a defect the ledger already
+  // held at this anchor under a different wording. Derived by the engine: a
+  // context that could choose it could merge two defects into one, or split one
+  // into two, and the loop reads both as progress.
+  string supersedes = 14 [
+    (buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$",
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
 }
 
 message Ledger {
@@ -738,6 +749,19 @@ message Ledger {
       "this.target.kind == 2 ? has(this.findings[k].location.anchor.document_part) : "
       "this.target.kind == 3 ? has(this.findings[k].location.anchor.argument_step) : "
       "has(this.findings[k].location.anchor.retrieved_source))"
+  };
+
+  // A successor names a record that is still here and has stood aside for it.
+  // Without both halves the chain is a dangling id, and the defect the
+  // predecessor described is lost rather than carried forward.
+  option (buf.validate.message).cel = {
+    id: "ledger.supersession_is_linked"
+    message: "a superseding finding must name another finding in this ledger that is marked superseded"
+    expression:
+      "this.findings.all(k, this.findings[k].supersedes == '' || "
+      "(this.findings[k].supersedes != k && "
+      "this.findings[k].supersedes in this.findings && "
+      "this.findings[this.findings[k].supersedes].status == 7))"
   };
 
   uint32 schema_major = 1 [(buf.validate.field).uint32.const = 2];

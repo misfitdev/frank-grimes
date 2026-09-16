@@ -555,6 +555,70 @@ fi
 rm -rf "$WS"
 
 echo ""
+echo "--- A reworded claim is a successor, not a discovery ---"
+
+ledger_field() {
+    "$BINDIR/grimes-contract" decode --type=Ledger "$1/.grimes/ledger.pb" 2>/dev/null | grep -aE "$2" || true
+}
+
+FIRST="the retention clause contradicts the stated period"
+REWORD="the stated period conflicts with the retention clause"
+
+# The same defect described twice derives two IDs. Without a link the ledger
+# holds two findings where there is one, and the reword reads as news.
+WS="$(workspace)"
+run_grimes "$WS" --provider-command="$FAKES/provider-claim.sh $FIRST" --auto-loop >/dev/null
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-claim.sh $REWORD" --auto-loop --format=prototext)"
+if ledger_field "$WS" 'supersedes: ' | grep -q 'FG-'; then
+    pass "a reworded claim names the finding it replaces"
+else
+    fail "a reworded claim was recorded with no link: $(ledger_field "$WS" 'key:|claim:')"
+fi
+if [[ "$(ledger_field "$WS" 'status: +FINDING_STATUS_SUPERSEDED' | wc -l | tr -d ' ')" == "1" ]]; then
+    pass "the claim it replaces is marked superseded"
+else
+    fail "the replaced claim was left standing"
+fi
+if grep -qE 'total: +1$' <<<"$OUT"; then
+    pass "one defect described twice counts once"
+else
+    fail "a reworded claim was counted as a second finding: $(grep -aE 'total:' <<<"$OUT")"
+fi
+if grep -qE 'new_p2_p3: +[1-9]' <<<"$OUT"; then
+    fail "a successor was counted toward the iteration's yield"
+else
+    pass "a successor is not counted toward the iteration's yield"
+fi
+rm -rf "$WS"
+
+# A defect recorded as fixed, then described again in different words, is the
+# same news as one that came back under its own identity.
+WS="$(workspace)"
+run_grimes "$WS" --provider-command="$FAKES/provider-claim.sh $FIRST" --auto-loop >/dev/null
+FIXED_ID="$(ledger_field "$WS" 'key: ' | head -1 | sed -E 's/.*"(.*)".*/\1/')"
+"$BINDIR/grimes-contract" ledger transition --ledger="$WS/.grimes/ledger.pb" \
+    --id="$FIXED_ID" --to=fixed --iteration=1 --actor=test >/dev/null
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-claim.sh $REWORD" --auto-loop --format=prototext)"
+if grep -qE 'oscillation_detected: +true' <<<"$OUT"; then
+    pass "a fixed finding restated in new words is not a fresh discovery"
+else
+    fail "a fixed-then-reworded finding read as new: $(grep -aE 'oscillation|total:' <<<"$OUT")"
+fi
+rm -rf "$WS"
+
+# Two records at one anchor in one category are two defects nothing here can
+# tell apart, so a third claim links to neither rather than guessing.
+WS="$(workspace)"
+run_grimes "$WS" --provider-command="$FAKES/provider-claim.sh $FIRST -- and another thing entirely" --auto-loop >/dev/null
+run_grimes "$WS" --provider-command="$FAKES/provider-claim.sh $REWORD" --auto-loop >/dev/null
+if ledger_field "$WS" 'supersedes: ' | grep -q 'FG-'; then
+    fail "an ambiguous restatement picked one of two records to replace"
+else
+    pass "an ambiguous restatement replaces nothing"
+fi
+rm -rf "$WS"
+
+echo ""
 echo "========================================"
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"
