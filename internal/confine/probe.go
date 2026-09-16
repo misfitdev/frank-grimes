@@ -104,7 +104,7 @@ func Verify(ctx context.Context, m Mechanism, root string) error {
 		if runErr == nil {
 			runErr = errors.New("no error reported")
 		}
-		return fmt.Errorf("confine: %s did not run the probe: %w", m.Name(), runErr)
+		return fmt.Errorf("confine: %s did not run the probe: %w%s", m.Name(), runErr, complaint(runErr))
 	}
 
 	var leaked []string
@@ -119,6 +119,21 @@ func Verify(ctx context.Context, m Mechanism, root string) error {
 		return fmt.Errorf("%w: under %s a probe %s", ErrNotConfined, m.Name(), strings.Join(leaked, " and "))
 	}
 	return nil
+}
+
+// complaint renders what the mechanism said on the way out, which is the only
+// place a wrapper explains itself: an exit status alone leaves an operator
+// guessing at a policy they did not write.
+func complaint(err error) string {
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || len(exit.Stderr) == 0 {
+		return ""
+	}
+	said := strings.TrimSpace(string(exit.Stderr))
+	if len(said) > 300 {
+		said = said[:300] + "..."
+	}
+	return ": " + said
 }
 
 // shellQuote renders a path for the single sh -c the probe runs.
