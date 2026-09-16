@@ -31,6 +31,18 @@ const (
 	RoleRefuter
 )
 
+// String names a role in a path and in an error.
+func (r Role) String() string {
+	switch r {
+	case RoleAdjudicator:
+		return "adjudicator"
+	case RoleRefuter:
+		return "refuter"
+	default:
+		return "primary"
+	}
+}
+
 // Request is everything a provider is given. An adjudicator request carries
 // Claimed and no findings, evidence, or ledger data.
 type Request struct {
@@ -153,6 +165,8 @@ type InventoryStore interface {
 // provider can be pointed at them.
 type ContentStore interface {
 	Save(ctx context.Context, content []byte) (path string, err error)
+	// Stage writes one role its own copy, at a path of its own.
+	Stage(ctx context.Context, role Role, content []byte) (path string, err error)
 }
 
 // ClaimStore persists the claims a refutation pass was asked to attack, so the

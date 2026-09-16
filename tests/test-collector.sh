@@ -718,6 +718,23 @@ else
 fi
 rm -rf "$WS"
 
+# The primary provider runs with write access to the review directory, so the
+# staged file it was pointed at is not the one a later role can be handed.
+WS="$(mktemp -d)"
+set +e
+OUT="$(cd "$WS" && printf 'Clause 4: retention is 30 days.\n' |
+    "$GRIMES" run --dir=. --kind=idea \
+        --provider-command="$FAKES/provider-rewrites-content.sh" \
+        --adjudicator-command="$FAKES/adjudicator-reads-content.sh" \
+        --format=prototext - 2>&1)"
+set -e
+if echo "$OUT" | grep -qE 'context_origin: +CONTEXT_ORIGIN_'; then
+    pass "an adjudicator reads the fingerprinted bytes, not the provider's rewrite"
+else
+    fail "the adjudicator was handed a rewritten target: $OUT"
+fi
+rm -rf "$WS"
+
 echo ""
 echo "--- A review answers for every unit of the target ---"
 
