@@ -74,7 +74,7 @@ func TestAConfinedRoleReadsTheTargetAndWhatItWasHanded(t *testing.T) {
 	m := builtin(t)
 	root, handed, _, out := target(t)
 
-	got := run(t, m, Policy{Root: root, ReadPaths: []string{handed}, WriteDir: out},
+	got := run(t, m, Policy{Root: root, ReadPaths: []string{handed}, WriteDirs: []string{out}},
 		"cat "+filepath.Join(root, "source.go")+" "+handed+" 2>&1")
 
 	for _, want := range []string{targetText, handedText} {
@@ -88,7 +88,7 @@ func TestAConfinedRoleCannotReadTheLedger(t *testing.T) {
 	m := builtin(t)
 	root, handed, ledger, out := target(t)
 
-	got := run(t, m, Policy{Root: root, ReadPaths: []string{handed}, WriteDir: out},
+	got := run(t, m, Policy{Root: root, ReadPaths: []string{handed}, WriteDirs: []string{out}},
 		"cat "+ledger+" 2>/dev/null; exit 0")
 
 	if strings.Contains(got, ledgerSecret) {
@@ -101,7 +101,7 @@ func TestAConfinedRoleCannotRewriteTheTarget(t *testing.T) {
 	root, handed, _, out := target(t)
 	source := filepath.Join(root, "source.go")
 
-	run(t, m, Policy{Root: root, ReadPaths: []string{handed}, WriteDir: out},
+	run(t, m, Policy{Root: root, ReadPaths: []string{handed}, WriteDirs: []string{out}},
 		"echo tampered >"+source+" 2>/dev/null; exit 0")
 
 	body, err := os.ReadFile(source)
@@ -122,7 +122,7 @@ func TestAConfinedRoleWritesAndReadsBackItsOwnDirectory(t *testing.T) {
 		" && mv " + filepath.Join(out, "report.tmp") + " " + filepath.Join(out, "report") +
 		" && cat " + filepath.Join(out, "report")
 
-	got := run(t, m, Policy{Root: root, ReadPaths: []string{handed}, WriteDir: out}, script+" 2>&1")
+	got := run(t, m, Policy{Root: root, ReadPaths: []string{handed}, WriteDirs: []string{out}}, script+" 2>&1")
 
 	if !strings.Contains(got, "finding") {
 		t.Errorf("a confined role could not stage its own output; got %q", got)
@@ -138,7 +138,7 @@ func TestConfinementLeavesTheRestOfTheMachineAlone(t *testing.T) {
 	root, handed, _, out := target(t)
 	elsewhere := filepath.Join(t.TempDir(), "state")
 
-	got := run(t, m, Policy{Root: root, ReadPaths: []string{handed}, WriteDir: out},
+	got := run(t, m, Policy{Root: root, ReadPaths: []string{handed}, WriteDirs: []string{out}},
 		"echo kept >"+elsewhere+" 2>&1; cat "+elsewhere+" 2>&1")
 
 	if !strings.Contains(got, "kept") {
@@ -155,6 +155,43 @@ func TestTheProbeAcceptsTheBuiltInMechanism(t *testing.T) {
 	}
 }
 
+// The fixing policy hands over the repository and keeps the review's own
+// directory. Proving the first half matters as much as the second: a mechanism
+// that denied the worktree would refuse every fix without saying so.
+func TestTheFixingProbeAcceptsTheBuiltInMechanism(t *testing.T) {
+	m := builtin(t)
+	root, _, _, _ := target(t)
+
+	if err := VerifyFixing(context.Background(), m, root); err != nil {
+		t.Fatalf("the built-in mechanism failed the fixing probe: %v", err)
+	}
+}
+
+// A fixing role may edit the repository and still may not touch the ledger.
+func TestAFixingRoleWritesTheWorktreeAndNotTheLedger(t *testing.T) {
+	m := builtin(t)
+	root, handed, ledger, out := target(t)
+	source := filepath.Join(root, "source.go")
+
+	run(t, m, Policy{Root: root, ReadPaths: []string{handed}, WriteDirs: []string{out, root}},
+		"echo fixed >"+source+" 2>/dev/null; echo tampered >"+ledger+" 2>/dev/null; exit 0")
+
+	after, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(after)) != "fixed" {
+		t.Errorf("a fixing role could not edit the target it was handed; got %q", after)
+	}
+	kept, err := os.ReadFile(ledger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(string(kept)) != ledgerSecret {
+		t.Errorf("a fixing role rewrote the ledger; got %q", kept)
+	}
+}
+
 func TestTheProbeRefusesAWrapperThatConfinesNothing(t *testing.T) {
 	root, _, _, _ := target(t)
 
@@ -167,6 +204,22 @@ func TestTheProbeRefusesAWrapperThatConfinesNothing(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("the refusal does not name %q: %v", want, err)
 		}
+	}
+}
+
+// The fixing probe grants the repository, so the only thing left for it to
+// prove is the part that still holds. A mechanism that lets that through is
+// one a fixing role could rewrite the ledger under.
+func TestTheFixingProbeRefusesAWrapperThatConfinesNothing(t *testing.T) {
+	root, _, _, _ := target(t)
+
+	err := VerifyFixing(context.Background(), External{Command: []string{"/usr/bin/env"}}, root)
+
+	if !errors.Is(err, ErrNotConfined) {
+		t.Fatalf("err = %v, want ErrNotConfined", err)
+	}
+	if !strings.Contains(err.Error(), "review's own directory") {
+		t.Errorf("the refusal does not name the write it caught: %v", err)
 	}
 }
 
@@ -256,7 +309,7 @@ func TestAPolicyPathThatDoesNotExistIsRefused(t *testing.T) {
 	_, err := m.Wrap(Policy{
 		Root:      root,
 		ReadPaths: []string{filepath.Join(root, GrimesDir, "never-staged")},
-		WriteDir:  out,
+		WriteDirs: []string{out},
 	}, []string{"/bin/true"})
 
 	if err == nil {

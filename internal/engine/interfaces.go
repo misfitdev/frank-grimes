@@ -61,6 +61,9 @@ type Request struct {
 	// ClaimsPath is where a refuter reads the claims it is to attack. No other
 	// role receives it.
 	ClaimsPath string
+	// WriteRoot is the worktree a fixing role may change. Empty for every role
+	// that is only reading, which is all of them outside fix mode.
+	WriteRoot  string
 	Mode       pb.Mode
 	Iteration  uint32
 	Categories []pb.Category

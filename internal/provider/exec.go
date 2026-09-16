@@ -68,9 +68,15 @@ func (e *Exec) confined(req engine.Request) ([]string, error) {
 	// it here. Created by the engine because creating it is itself a write into
 	// the review directory the role is not allowed to make.
 	//
-	p.WriteDir = filepath.Join(root, store.WorkDir)
-	if err := os.MkdirAll(p.WriteDir, 0o755); err != nil {
+	work := filepath.Join(root, store.WorkDir)
+	if err := os.MkdirAll(work, 0o755); err != nil {
 		return nil, err
+	}
+	p.WriteDirs = append(p.WriteDirs, work)
+	// A fixing role is handed the worktree as well: the target it is reviewing
+	// stays read-only, and the copy it was authorized to change does not.
+	if req.WriteRoot != "" {
+		p.WriteDirs = append(p.WriteDirs, req.WriteRoot)
 	}
 	return e.Confine.Wrap(p, e.Command)
 }
