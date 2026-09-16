@@ -5,7 +5,6 @@ package confine
 import (
 	"fmt"
 	"os/exec"
-	"path/filepath"
 )
 
 // bubblewrap applies the policy through bwrap.
