@@ -129,6 +129,14 @@ When your provider supports arguments, you can skip the interactive prompts:
 | `--sandbox-command <cmd>` | Confine each role with your own wrapper instead of the built-in mechanism |
 | `--unsafe` | Run the roles unconfined; recorded in the result and caps confidence |
 
+### Fix Mode
+
+`--mode fix` reviews and repairs in one pass, inside a git worktree the engine creates off HEAD. Your own working tree is never written, and it has to be clean to start: a worktree off HEAD would otherwise review something other than what you are looking at.
+
+A finding whose file the batch touched is recorded as `fixed`. It becomes `verified` only when the gate passed after the edit — `--verify-command`, or a `check` recipe in a checked-in `justfile` or `Makefile`, whichever the record says selected it. A gate that fails or cannot run verifies nothing, and the worktree is left on disk with its path in the run record so you can read or cherry-pick it.
+
+`--commit` is authorized separately from `--mode fix`, and makes at most one commit per verified batch, on the worktree's own branch, naming the findings it closes. A batch that edited outside the reviewed scope is refused whole.
+
 ### Confinement
 
 Every role runs inside a boundary the engine builds from the run itself: it may not write anywhere in the review directory except its own scratch path, and it may not read the ledger, the recorded verdict, or a copy staged for another role. Everything else, including `$HOME` and the network, is left alone — this bounds what a role can do to the review, not what it can do to your machine.
