@@ -192,7 +192,7 @@ func parseRun(args []string) (*config, error) {
 	if len(c.SandboxCommand) > 0 && c.Unsafe {
 		return nil, fmt.Errorf("--unsafe and --sandbox-command are alternatives")
 	}
-	if len(c.SandboxCommand) == 0 && len(sandboxArgs) > 0 {
+	if *sandboxCmd == "" && len(sandboxArgs) > 0 {
 		return nil, fmt.Errorf("--sandbox-arg needs --sandbox-command")
 	}
 
