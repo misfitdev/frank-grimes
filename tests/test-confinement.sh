@@ -66,8 +66,10 @@ fi
 # There is no built-in mechanism on every platform, and the whole suite is about
 # what the built-in one does. Where there is none the run is refused by design,
 # which is asserted once below rather than mistaken for a failure everywhere.
+# Keyed on the hint every no-mechanism refusal carries, rather than on one
+# platform's wording: a Linux host without bwrap says something else entirely.
 if ! "$GRIMES" run --dir="$(mktemp -d)" --provider-command=/bin/false x 2>&1 |
-    grep -q 'no built-in confinement'; then
+    grep -q 'supply --sandbox-command'; then
     HAVE_BUILTIN=1
 else
     HAVE_BUILTIN=0

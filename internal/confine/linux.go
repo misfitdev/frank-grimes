@@ -19,7 +19,7 @@ type bubblewrap struct{}
 
 func platformDefault() (Mechanism, error) {
 	if _, err := exec.LookPath("bwrap"); err != nil {
-		return nil, fmt.Errorf("confine: bwrap not available: %w", err)
+		return nil, fmt.Errorf("confine: bwrap not available, install bubblewrap: %w", err)
 	}
 	return bubblewrap{}, nil
 }

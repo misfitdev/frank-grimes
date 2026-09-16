@@ -29,4 +29,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: jdx/mise-action@v4.3.0
+      # The built-in Linux mechanism is bwrap, which the runner image does not
+      # carry. Without it every role is refused, which is the intended
+      # behaviour and not a thing to assert a whole suite against.
+      - name: Install bubblewrap
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
       - run: just check
