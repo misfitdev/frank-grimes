@@ -238,7 +238,7 @@ See `hooks/README.md` for detailed integration instructions.
 ## Dependencies
 
 - `jq`: required for the stop hook to parse state JSON
-- `bubblewrap`: the built-in confinement mechanism on Linux. macOS uses `sandbox-exec`, which ships with the system. Without it every role is refused; see [Confinement](#confinement) for `--sandbox-command` and `--unsafe`.
+- `bubblewrap`: the built-in confinement mechanism on Linux. On Ubuntu 24.04 and later it needs the AppArmor profile the package ships to be loaded, or `kernel.apparmor_restrict_unprivileged_userns=0`; without either, `bwrap` reports `setting up uid map: Permission denied`. macOS uses `sandbox-exec`, which ships with the system. Without it every role is refused; see [Confinement](#confinement) for `--sandbox-command` and `--unsafe`.
 
 Install on macOS: `brew install jq`
 Install on Ubuntu/Debian: `apt-get install jq bubblewrap`
