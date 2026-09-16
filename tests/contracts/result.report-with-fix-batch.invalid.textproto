@@ -1,0 +1,26 @@
+# A report-mode run carrying a fix batch. Report mode edits nothing, so there is
+# no batch for it to be carrying.
+schema_major: 2
+run_id: "run-010"
+producer_role: PRODUCER_ROLE_ORCHESTRATOR
+target { root: "/repo" scope: "bad-script.sh" fingerprint_sha256: "01234567890123456789012345678901" display: "bad-script.sh" kind: TARGET_KIND_CODE }
+mode: MODE_REPORT
+iteration: 1
+max_iterations: 5
+completion_state: COMPLETION_STATE_CONTINUE
+verdict { decision: DECISION_CONDITIONAL residual_risk: RESIDUAL_RISK_MODERATE review_confidence: REVIEW_CONFIDENCE_MEDIUM review_completeness: REVIEW_COMPLETENESS_LIMITED }
+legacy_color: LEGACY_COLOR_YELLOW
+marginal_yield { candidates_examined: 4 candidates_disproved: 3 }
+counts { total: 1 verified: 1 }
+verification {
+  status: VERIFICATION_STATUS_NOT_APPLICABLE
+  selected_by: GATE_SELECTION_UNAVAILABLE
+}
+ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678901" }
+unmet_gates: "coverage"
+summary: "One deletion path fixed and verified."
+confinement: "sandbox-exec"
+fix_batch {
+  worktree: "/tmp/grimes-fix-010"
+  branch: "grimes/fix-010"
+}

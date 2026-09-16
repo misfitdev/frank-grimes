@@ -4017,13 +4017,18 @@ func (x *Finding) GetSupersedes() string {
 }
 
 type Ledger struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SchemaMajor   uint32                 `protobuf:"varint,1,opt,name=schema_major,json=schemaMajor,proto3" json:"schema_major,omitempty"`
-	SchemaMinor   uint32                 `protobuf:"varint,2,opt,name=schema_minor,json=schemaMinor,proto3" json:"schema_minor,omitempty"`
-	Target        *Target                `protobuf:"bytes,3,opt,name=target,proto3" json:"target,omitempty"`
-	Findings      map[string]*Finding    `protobuf:"bytes,4,rep,name=findings,proto3" json:"findings,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	SchemaMajor uint32                 `protobuf:"varint,1,opt,name=schema_major,json=schemaMajor,proto3" json:"schema_major,omitempty"`
+	SchemaMinor uint32                 `protobuf:"varint,2,opt,name=schema_minor,json=schemaMinor,proto3" json:"schema_minor,omitempty"`
+	Target      *Target                `protobuf:"bytes,3,opt,name=target,proto3" json:"target,omitempty"`
+	Findings    map[string]*Finding    `protobuf:"bytes,4,rep,name=findings,proto3" json:"findings,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// The target this ledger's findings were raised against before a fix moved
+	// it. Present only on a ledger that crossed a fingerprint change, and written
+	// by the run that made the change: it is what separates a target the review
+	// edited from one that moved under it.
+	AncestorFingerprintsSha256 [][]byte `protobuf:"bytes,5,rep,name=ancestor_fingerprints_sha256,json=ancestorFingerprintsSha256,proto3" json:"ancestor_fingerprints_sha256,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *Ledger) Reset() {
@@ -4080,6 +4085,13 @@ func (x *Ledger) GetTarget() *Target {
 func (x *Ledger) GetFindings() map[string]*Finding {
 	if x != nil {
 		return x.Findings
+	}
+	return nil
+}
+
+func (x *Ledger) GetAncestorFingerprintsSha256() [][]byte {
+	if x != nil {
+		return x.AncestorFingerprintsSha256
 	}
 	return nil
 }
@@ -4659,7 +4671,10 @@ type GrimesResult struct {
 	// How each spawned role was bounded to the review's own artifacts. Named
 	// rather than flagged, so a record says which mechanism was relied on and a
 	// reader can tell a built-in boundary from an operator's wrapper.
-	Confinement   string `protobuf:"bytes,21,opt,name=confinement,proto3" json:"confinement,omitempty"`
+	Confinement string `protobuf:"bytes,21,opt,name=confinement,proto3" json:"confinement,omitempty"`
+	// What a fix-mode run did with its edits. Absent in report mode, which edits
+	// nothing.
+	FixBatch      *FixBatch `protobuf:"bytes,22,opt,name=fix_batch,json=fixBatch,proto3" json:"fix_batch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4841,6 +4856,87 @@ func (x *GrimesResult) GetConfinement() string {
 	return ""
 }
 
+func (x *GrimesResult) GetFixBatch() *FixBatch {
+	if x != nil {
+		return x.FixBatch
+	}
+	return nil
+}
+
+// Where a fix-mode run put its edits, and what became of them.
+//
+// A batch is the whole iteration's work, not one fix: the gate runs once over
+// all of it, so nothing smaller than the batch has a verification to point at.
+type FixBatch struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Absolute: a worktree is outside the repository it was made from, so this is
+	// not a RepoPath.
+	Worktree         string   `protobuf:"bytes,1,opt,name=worktree,proto3" json:"worktree,omitempty"`
+	Branch           string   `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
+	CommitSha1       []byte   `protobuf:"bytes,3,opt,name=commit_sha1,json=commitSha1,proto3" json:"commit_sha1,omitempty"`
+	ClosedFindingIds []string `protobuf:"bytes,4,rep,name=closed_finding_ids,json=closedFindingIds,proto3" json:"closed_finding_ids,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *FixBatch) Reset() {
+	*x = FixBatch{}
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FixBatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FixBatch) ProtoMessage() {}
+
+func (x *FixBatch) ProtoReflect() protoreflect.Message {
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FixBatch.ProtoReflect.Descriptor instead.
+func (*FixBatch) Descriptor() ([]byte, []int) {
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *FixBatch) GetWorktree() string {
+	if x != nil {
+		return x.Worktree
+	}
+	return ""
+}
+
+func (x *FixBatch) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
+}
+
+func (x *FixBatch) GetCommitSha1() []byte {
+	if x != nil {
+		return x.CommitSha1
+	}
+	return nil
+}
+
+func (x *FixBatch) GetClosedFindingIds() []string {
+	if x != nil {
+		return x.ClosedFindingIds
+	}
+	return nil
+}
+
 type LoopState struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	SchemaMajor        uint32                 `protobuf:"varint,1,opt,name=schema_major,json=schemaMajor,proto3" json:"schema_major,omitempty"`
@@ -4858,7 +4954,7 @@ type LoopState struct {
 
 func (x *LoopState) Reset() {
 	*x = LoopState{}
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[43]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4870,7 +4966,7 @@ func (x *LoopState) String() string {
 func (*LoopState) ProtoMessage() {}
 
 func (x *LoopState) ProtoReflect() protoreflect.Message {
-	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[43]
+	mi := &file_frank_grimes_v2_contracts_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4883,7 +4979,7 @@ func (x *LoopState) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoopState.ProtoReflect.Descriptor instead.
 func (*LoopState) Descriptor() ([]byte, []int) {
-	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{43}
+	return file_frank_grimes_v2_contracts_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *LoopState) GetSchemaMajor() uint32 {
@@ -5212,12 +5308,13 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"supersedes:\xf7\x02\xbaH\xf3\x02\x1au\n" +
 	"%finding.accepted_requires_human_owner\x12'accepted findings require a human owner\x1a#this.status != 4 || has(this.owner)\x1av\n" +
 	"\x1cfinding.p0_requires_e1_or_e2\x12\x1dP0 requires E1 or E2 evidence\x1a7this.risk.severity != 1 || this.evidence.tier in [1, 2]\x1a\x81\x01\n" +
-	"\x15finding.e3_caps_at_p1\x124inferred evidence cannot support a severity above P1\x1a2this.evidence.tier != 3 || this.risk.severity != 1\"\x94\b\n" +
+	"\x15finding.e3_caps_at_p1\x124inferred evidence cannot support a severity above P1\x1a2this.evidence.tier != 3 || this.risk.severity != 1\"\xe4\b\n" +
 	"\x06Ledger\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
 	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x127\n" +
 	"\x06target\x18\x03 \x01(\v2\x17.frank_grimes.v2.TargetB\x06\xbaH\x03\xc8\x01\x01R\x06target\x12A\n" +
-	"\bfindings\x18\x04 \x03(\v2%.frank_grimes.v2.Ledger.FindingsEntryR\bfindings\x1aU\n" +
+	"\bfindings\x18\x04 \x03(\v2%.frank_grimes.v2.Ledger.FindingsEntryR\bfindings\x12N\n" +
+	"\x1cancestor_fingerprints_sha256\x18\x05 \x03(\fB\f\xbaH\t\x92\x01\x06\"\x04z\x02h R\x1aancestorFingerprintsSha256\x1aU\n" +
 	"\rFindingsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12.\n" +
 	"\x05value\x18\x02 \x01(\v2\x18.frank_grimes.v2.FindingR\x05value:\x028\x01:\xe7\x05\xbaH\xe3\x05\x1a\x9a\x03\n" +
@@ -5282,7 +5379,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tB\x18\xbaH\x15r\x13\n" +
 	"\x11.grimes/ledger.pbR\x04path\x12,\n" +
 	"\rdigest_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\fdigestSha256\x121\n" +
-	"\x14oscillation_detected\x18\x03 \x01(\bR\x13oscillationDetected\"\xee\x19\n" +
+	"\x14oscillation_detected\x18\x03 \x01(\bR\x13oscillationDetected\"\x92 \n" +
 	"\fGrimesResult\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
 	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x12\x1e\n" +
@@ -5310,16 +5407,29 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"unmetGates\x12!\n" +
 	"\asummary\x18\x13 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\asummary\x12L\n" +
 	"\rrefuter_check\x18\x14 \x01(\x0e2\x1d.frank_grimes.v2.RefuterCheckB\b\xbaH\x05\x82\x01\x02\x10\x01R\frefuterCheck\x12)\n" +
-	"\vconfinement\x18\x15 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\vconfinement:\x81\x10\xbaH\xfd\x0f\x1ad\n" +
+	"\vconfinement\x18\x15 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\vconfinement\x126\n" +
+	"\tfix_batch\x18\x16 \x01(\v2\x19.frank_grimes.v2.FixBatchR\bfixBatch:\xed\x15\xbaH\xe9\x15\x1ad\n" +
 	"\x18result.orchestrator_only\x12/only the orchestrator may emit the final result\x1a\x17this.producer_role == 3\x1a\x88\x01\n" +
 	"!result.report_has_no_verification\x122report mode records verification as not applicable\x1a/this.mode != 1 || this.verification.status == 4\x1a\x94\x03\n" +
-	"#result.report_completion_is_derived\x12hthe completion state must be the one the colour, iteration, bound, exhaustion, and new P0/P1 count imply\x1a\x82\x02this.mode != 1 || this.completion_state == (this.legacy_color == 1 ? 2 : this.iteration >= this.max_iterations ? 4 : (this.iteration > 1 && this.marginal_yield.new_p0_p1 == 0u) ? (this.unmet_gates.exists(g, g == 'coverage' || g == 'refutation') ? 6 : 2) : 1)\x1a\xf0\x03\n" +
+	"#result.report_completion_is_derived\x12hthe completion state must be the one the colour, iteration, bound, exhaustion, and new P0/P1 count imply\x1a\x82\x02this.mode != 1 || this.completion_state == (this.legacy_color == 1 ? 2 : this.iteration >= this.max_iterations ? 4 : (this.iteration > 1 && this.marginal_yield.new_p0_p1 == 0u) ? (this.unmet_gates.exists(g, g == 'coverage' || g == 'refutation') ? 6 : 2) : 1)\x1a\xac\x03\n" +
+	" result.fix_completion_is_derived\x12]the completion state must be the one the colour, iteration, bound, exhaustion, and gate imply\x1a\xa8\x02this.mode != 2 || this.completion_state == (this.legacy_color == 1 ? 3 : this.iteration >= this.max_iterations ? 4 : (this.iteration > 1 && this.marginal_yield.new_p0_p1 == 0u) ? (this.unmet_gates.exists(g, g == 'coverage' || g == 'refutation') ? 6 : (this.verification.status == 1 ? 3 : 6)) : 1)\x1a\xc1\x01\n" +
+	"$result.commit_requires_a_passed_gate\x129a batch may be committed only when the gate it ran passed\x1a^!has(this.fix_batch) || size(this.fix_batch.commit_sha1) == 0 || this.verification.status == 1\x1aw\n" +
+	"$result.fix_batch_belongs_to_fix_mode\x12'only a fix-mode run records a fix batch\x1a&!has(this.fix_batch) || this.mode == 2\x1a\xf0\x03\n" +
 	"(result.green_is_independent_and_verified\x12xGREEN requires an independent matching pass from a context the engine spawned, no oscillation, and required verification\x1a\xc9\x02this.legacy_color != 1 || (has(this.independent_review) && this.independent_review.verdict.decision == 3 && this.independent_review.context_origin == 1 && this.independent_review.target_fingerprint_sha256 == this.target.fingerprint_sha256 && !this.ledger.oscillation_detected && (this.mode == 1 || this.verification.status == 1))\x1a\xa9\x02\n" +
 	" result.green_requires_pass_tuple\x12YGREEN requires decision=pass, low residual risk, high confidence, sufficient completeness\x1a\xa9\x01this.legacy_color != 1 || (this.verdict.decision == 3 && this.verdict.residual_risk == 4 && this.verdict.review_confidence == 1 && this.verdict.review_completeness == 1)\x1aw\n" +
 	"\x18result.red_matches_block\x12!RED and decision=block must agree\x1a8(this.legacy_color == 3) == (this.verdict.decision == 1)\x1a\xbc\x01\n" +
 	"\"result.unconfined_is_an_unmet_gate\x12Fa run recorded as unconfined must report the confinement gate as unmet\x1aNthis.confinement != 'unsafe' || this.unmet_gates.exists(g, g == 'confinement')\x1a\xa5\x01\n" +
 	"!result.unconfined_caps_confidence\x12;a run recorded as unconfined must not claim high confidence\x1aCthis.confinement != 'unsafe' || this.verdict.review_confidence != 1\x1at\n" +
-	"\x15result.open_p0_blocks\x12\"an open P0 requires decision=block\x1a7this.counts.open_p0 == 0u || this.verdict.decision == 1\"\xa7\x04\n" +
+	"\x15result.open_p0_blocks\x12\"an open P0 requires decision=block\x1a7this.counts.open_p0 == 0u || this.verdict.decision == 1\"\xe8\x03\n" +
+	"\bFixBatch\x12\x1a\n" +
+	"\bworktree\x18\x01 \x01(\tR\bworktree\x12\x16\n" +
+	"\x06branch\x18\x02 \x01(\tR\x06branch\x12+\n" +
+	"\vcommit_sha1\x18\x03 \x01(\fB\n" +
+	"\xbaH\a\xd8\x01\x01z\x02h\x14R\n" +
+	"commitSha1\x12:\n" +
+	"\x12closed_finding_ids\x18\x04 \x03(\tB\f\xbaH\t\x92\x01\x06\"\x04r\x02\x10\x01R\x10closedFindingIds:\xbe\x02\xbaH\xba\x02\x1a\xa7\x01\n" +
+	"&fix_batch.uncommitted_work_has_a_place\x12Ia batch that produced no commit must name the directory holding its edits\x1a2size(this.commit_sha1) != 0 || this.worktree != ''\x1a\x8d\x01\n" +
+	" fix_batch.closed_requires_commit\x12&only a committed batch closes findings\x1aAsize(this.commit_sha1) != 0 || size(this.closed_finding_ids) == 0\"\xa7\x04\n" +
 	"\tLoopState\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
 	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x12\x1e\n" +
@@ -5476,7 +5586,7 @@ func file_frank_grimes_v2_contracts_proto_rawDescGZIP() []byte {
 }
 
 var file_frank_grimes_v2_contracts_proto_enumTypes = make([]protoimpl.EnumInfo, 21)
-var file_frank_grimes_v2_contracts_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
+var file_frank_grimes_v2_contracts_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
 var file_frank_grimes_v2_contracts_proto_goTypes = []any{
 	(Category)(0),                 // 0: frank_grimes.v2.Category
 	(Severity)(0),                 // 1: frank_grimes.v2.Severity
@@ -5542,15 +5652,16 @@ var file_frank_grimes_v2_contracts_proto_goTypes = []any{
 	(*FindingSnapshot)(nil),       // 61: frank_grimes.v2.FindingSnapshot
 	(*LedgerRef)(nil),             // 62: frank_grimes.v2.LedgerRef
 	(*GrimesResult)(nil),          // 63: frank_grimes.v2.GrimesResult
-	(*LoopState)(nil),             // 64: frank_grimes.v2.LoopState
-	nil,                           // 65: frank_grimes.v2.Ledger.FindingsEntry
-	(*timestamppb.Timestamp)(nil), // 66: google.protobuf.Timestamp
+	(*FixBatch)(nil),              // 64: frank_grimes.v2.FixBatch
+	(*LoopState)(nil),             // 65: frank_grimes.v2.LoopState
+	nil,                           // 66: frank_grimes.v2.Ledger.FindingsEntry
+	(*timestamppb.Timestamp)(nil), // 67: google.protobuf.Timestamp
 }
 var file_frank_grimes_v2_contracts_proto_depIdxs = []int32{
 	6,   // 0: frank_grimes.v2.Target.kind:type_name -> frank_grimes.v2.TargetKind
 	22,  // 1: frank_grimes.v2.TargetInventory.units:type_name -> frank_grimes.v2.TargetUnit
 	24,  // 2: frank_grimes.v2.RepoLine.path:type_name -> frank_grimes.v2.RepoPath
-	66,  // 3: frank_grimes.v2.RetrievedSource.retrieved_at:type_name -> google.protobuf.Timestamp
+	67,  // 3: frank_grimes.v2.RetrievedSource.retrieved_at:type_name -> google.protobuf.Timestamp
 	25,  // 4: frank_grimes.v2.Anchor.repo_line:type_name -> frank_grimes.v2.RepoLine
 	26,  // 5: frank_grimes.v2.Anchor.document_part:type_name -> frank_grimes.v2.DocumentPart
 	27,  // 6: frank_grimes.v2.Anchor.argument_step:type_name -> frank_grimes.v2.ArgumentStep
@@ -5559,11 +5670,11 @@ var file_frank_grimes_v2_contracts_proto_depIdxs = []int32{
 	1,   // 9: frank_grimes.v2.Risk.severity:type_name -> frank_grimes.v2.Severity
 	2,   // 10: frank_grimes.v2.Risk.likelihood:type_name -> frank_grimes.v2.Likelihood
 	3,   // 11: frank_grimes.v2.Risk.blast_radius:type_name -> frank_grimes.v2.BlastRadius
-	66,  // 12: frank_grimes.v2.HumanOwner.recorded_at:type_name -> google.protobuf.Timestamp
-	66,  // 13: frank_grimes.v2.HumanOwner.review_by:type_name -> google.protobuf.Timestamp
+	67,  // 12: frank_grimes.v2.HumanOwner.recorded_at:type_name -> google.protobuf.Timestamp
+	67,  // 13: frank_grimes.v2.HumanOwner.review_by:type_name -> google.protobuf.Timestamp
 	24,  // 14: frank_grimes.v2.ExecutedCommand.cwd:type_name -> frank_grimes.v2.RepoPath
 	29,  // 15: frank_grimes.v2.Counterexample.claim_anchor:type_name -> frank_grimes.v2.Anchor
-	66,  // 16: frank_grimes.v2.Reproduction.completed_at:type_name -> google.protobuf.Timestamp
+	67,  // 16: frank_grimes.v2.Reproduction.completed_at:type_name -> google.protobuf.Timestamp
 	33,  // 17: frank_grimes.v2.Reproduction.executed_command:type_name -> frank_grimes.v2.ExecutedCommand
 	34,  // 18: frank_grimes.v2.Reproduction.counterexample:type_name -> frank_grimes.v2.Counterexample
 	29,  // 19: frank_grimes.v2.Citation.anchor:type_name -> frank_grimes.v2.Anchor
@@ -5593,7 +5704,7 @@ var file_frank_grimes_v2_contracts_proto_depIdxs = []int32{
 	41,  // 43: frank_grimes.v2.ProviderReport.category_stops:type_name -> frank_grimes.v2.CategoryStop
 	43,  // 44: frank_grimes.v2.ProviderReport.acquittals:type_name -> frank_grimes.v2.Acquittal
 	56,  // 45: frank_grimes.v2.AdjudicationReport.verdict:type_name -> frank_grimes.v2.Verdict
-	66,  // 46: frank_grimes.v2.AdjudicationReport.completed_at:type_name -> google.protobuf.Timestamp
+	67,  // 46: frank_grimes.v2.AdjudicationReport.completed_at:type_name -> google.protobuf.Timestamp
 	0,   // 47: frank_grimes.v2.ClaimUnderTest.category:type_name -> frank_grimes.v2.Category
 	29,  // 48: frank_grimes.v2.ClaimUnderTest.anchor:type_name -> frank_grimes.v2.Anchor
 	21,  // 49: frank_grimes.v2.RefutationTask.target:type_name -> frank_grimes.v2.Target
@@ -5601,36 +5712,36 @@ var file_frank_grimes_v2_contracts_proto_depIdxs = []int32{
 	35,  // 51: frank_grimes.v2.ClaimOutcome.refuted:type_name -> frank_grimes.v2.Reproduction
 	35,  // 52: frank_grimes.v2.ClaimOutcome.upheld:type_name -> frank_grimes.v2.Reproduction
 	50,  // 53: frank_grimes.v2.RefutationReport.outcomes:type_name -> frank_grimes.v2.ClaimOutcome
-	66,  // 54: frank_grimes.v2.RefutationReport.completed_at:type_name -> google.protobuf.Timestamp
+	67,  // 54: frank_grimes.v2.RefutationReport.completed_at:type_name -> google.protobuf.Timestamp
 	20,  // 55: frank_grimes.v2.RefutationAttempt.context_origin:type_name -> frank_grimes.v2.ContextOrigin
 	35,  // 56: frank_grimes.v2.RefutationAttempt.refuted:type_name -> frank_grimes.v2.Reproduction
 	35,  // 57: frank_grimes.v2.RefutationAttempt.upheld:type_name -> frank_grimes.v2.Reproduction
-	66,  // 58: frank_grimes.v2.RefutationAttempt.completed_at:type_name -> google.protobuf.Timestamp
+	67,  // 58: frank_grimes.v2.RefutationAttempt.completed_at:type_name -> google.protobuf.Timestamp
 	4,   // 59: frank_grimes.v2.FindingEvent.from:type_name -> frank_grimes.v2.FindingStatus
 	4,   // 60: frank_grimes.v2.FindingEvent.to:type_name -> frank_grimes.v2.FindingStatus
-	66,  // 61: frank_grimes.v2.FindingEvent.at:type_name -> google.protobuf.Timestamp
+	67,  // 61: frank_grimes.v2.FindingEvent.at:type_name -> google.protobuf.Timestamp
 	0,   // 62: frank_grimes.v2.Finding.category:type_name -> frank_grimes.v2.Category
 	30,  // 63: frank_grimes.v2.Finding.location:type_name -> frank_grimes.v2.Location
 	31,  // 64: frank_grimes.v2.Finding.risk:type_name -> frank_grimes.v2.Risk
 	39,  // 65: frank_grimes.v2.Finding.evidence:type_name -> frank_grimes.v2.Evidence
 	4,   // 66: frank_grimes.v2.Finding.status:type_name -> frank_grimes.v2.FindingStatus
 	32,  // 67: frank_grimes.v2.Finding.owner:type_name -> frank_grimes.v2.HumanOwner
-	66,  // 68: frank_grimes.v2.Finding.first_seen:type_name -> google.protobuf.Timestamp
-	66,  // 69: frank_grimes.v2.Finding.last_seen:type_name -> google.protobuf.Timestamp
+	67,  // 68: frank_grimes.v2.Finding.first_seen:type_name -> google.protobuf.Timestamp
+	67,  // 69: frank_grimes.v2.Finding.last_seen:type_name -> google.protobuf.Timestamp
 	53,  // 70: frank_grimes.v2.Finding.history:type_name -> frank_grimes.v2.FindingEvent
 	52,  // 71: frank_grimes.v2.Finding.refutation:type_name -> frank_grimes.v2.RefutationAttempt
 	21,  // 72: frank_grimes.v2.Ledger.target:type_name -> frank_grimes.v2.Target
-	65,  // 73: frank_grimes.v2.Ledger.findings:type_name -> frank_grimes.v2.Ledger.FindingsEntry
+	66,  // 73: frank_grimes.v2.Ledger.findings:type_name -> frank_grimes.v2.Ledger.FindingsEntry
 	10,  // 74: frank_grimes.v2.Verdict.decision:type_name -> frank_grimes.v2.Decision
 	11,  // 75: frank_grimes.v2.Verdict.residual_risk:type_name -> frank_grimes.v2.ResidualRisk
 	12,  // 76: frank_grimes.v2.Verdict.review_confidence:type_name -> frank_grimes.v2.ReviewConfidence
 	13,  // 77: frank_grimes.v2.Verdict.review_completeness:type_name -> frank_grimes.v2.ReviewCompleteness
 	18,  // 78: frank_grimes.v2.Verification.status:type_name -> frank_grimes.v2.VerificationStatus
 	24,  // 79: frank_grimes.v2.Verification.cwd:type_name -> frank_grimes.v2.RepoPath
-	66,  // 80: frank_grimes.v2.Verification.completed_at:type_name -> google.protobuf.Timestamp
+	67,  // 80: frank_grimes.v2.Verification.completed_at:type_name -> google.protobuf.Timestamp
 	19,  // 81: frank_grimes.v2.Verification.selected_by:type_name -> frank_grimes.v2.GateSelection
 	56,  // 82: frank_grimes.v2.IndependentReview.verdict:type_name -> frank_grimes.v2.Verdict
-	66,  // 83: frank_grimes.v2.IndependentReview.completed_at:type_name -> google.protobuf.Timestamp
+	67,  // 83: frank_grimes.v2.IndependentReview.completed_at:type_name -> google.protobuf.Timestamp
 	20,  // 84: frank_grimes.v2.IndependentReview.context_origin:type_name -> frank_grimes.v2.ContextOrigin
 	4,   // 85: frank_grimes.v2.FindingSnapshot.status:type_name -> frank_grimes.v2.FindingStatus
 	31,  // 86: frank_grimes.v2.FindingSnapshot.risk:type_name -> frank_grimes.v2.Risk
@@ -5649,14 +5760,15 @@ var file_frank_grimes_v2_contracts_proto_depIdxs = []int32{
 	58,  // 99: frank_grimes.v2.GrimesResult.independent_review:type_name -> frank_grimes.v2.IndependentReview
 	62,  // 100: frank_grimes.v2.GrimesResult.ledger:type_name -> frank_grimes.v2.LedgerRef
 	9,   // 101: frank_grimes.v2.GrimesResult.refuter_check:type_name -> frank_grimes.v2.RefuterCheck
-	21,  // 102: frank_grimes.v2.LoopState.target:type_name -> frank_grimes.v2.Target
-	15,  // 103: frank_grimes.v2.LoopState.mode:type_name -> frank_grimes.v2.Mode
-	54,  // 104: frank_grimes.v2.Ledger.FindingsEntry.value:type_name -> frank_grimes.v2.Finding
-	105, // [105:105] is the sub-list for method output_type
-	105, // [105:105] is the sub-list for method input_type
-	105, // [105:105] is the sub-list for extension type_name
-	105, // [105:105] is the sub-list for extension extendee
-	0,   // [0:105] is the sub-list for field type_name
+	64,  // 102: frank_grimes.v2.GrimesResult.fix_batch:type_name -> frank_grimes.v2.FixBatch
+	21,  // 103: frank_grimes.v2.LoopState.target:type_name -> frank_grimes.v2.Target
+	15,  // 104: frank_grimes.v2.LoopState.mode:type_name -> frank_grimes.v2.Mode
+	54,  // 105: frank_grimes.v2.Ledger.FindingsEntry.value:type_name -> frank_grimes.v2.Finding
+	106, // [106:106] is the sub-list for method output_type
+	106, // [106:106] is the sub-list for method input_type
+	106, // [106:106] is the sub-list for extension type_name
+	106, // [106:106] is the sub-list for extension extendee
+	0,   // [0:106] is the sub-list for field type_name
 }
 
 func init() { file_frank_grimes_v2_contracts_proto_init() }
@@ -5708,7 +5820,7 @@ func file_frank_grimes_v2_contracts_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_frank_grimes_v2_contracts_proto_rawDesc), len(file_frank_grimes_v2_contracts_proto_rawDesc)),
 			NumEnums:      21,
-			NumMessages:   45,
+			NumMessages:   46,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
