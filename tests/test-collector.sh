@@ -257,7 +257,7 @@ WS="$(mktemp -d)"
 mkdir -p "$WS/src"
 printf 'echo one\n' >"$WS/src/a.sh"
 set +e
-OUT="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-edits-target.sh" src 2>&1)"
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --unsafe --provider-command="$FAKES/provider-edits-target.sh" src 2>&1)"
 CODE=$?
 set -e
 if [[ "$CODE" != "0" ]] && grep -qF "changed during the review" <<<"$OUT"; then
@@ -275,7 +275,7 @@ mkdir -p "$WS/src"
 printf 'echo one\n' >"$WS/src/a.sh"
 printf 'echo two\n' >"$WS/src/b.sh"
 set +e
-OUT="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-edits-unquoted.sh" src 2>&1)"
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --unsafe --provider-command="$FAKES/provider-edits-unquoted.sh" src 2>&1)"
 CODE=$?
 set -e
 if [[ "$CODE" != "0" ]] && grep -qF "changed during the review" <<<"$OUT" &&
@@ -292,7 +292,7 @@ rm -rf "$WS"
 WS="$(mktemp -d)"
 printf '# Overview\nThe service accepts requests.\n' >"$WS/spec.md"
 set +e
-OUT="$(cd "$WS" && "$GRIMES" run --dir=. --kind=document \
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --unsafe --kind=document \
     --provider-command="$FAKES/provider-edits-document.sh" spec.md 2>&1)"
 CODE=$?
 set -e
@@ -728,7 +728,7 @@ rm -rf "$WS"
 WS="$(mktemp -d)"
 set +e
 OUT="$(cd "$WS" && printf 'Clause 4: retention is 30 days.\n' |
-    "$GRIMES" run --dir=. --kind=idea \
+    "$GRIMES" run --dir=. --unsafe --kind=idea \
         --provider-command="$FAKES/provider-rewrites-content.sh" \
         --adjudicator-command="$FAKES/adjudicator-reads-content.sh" \
         --format=prototext - 2>&1)"

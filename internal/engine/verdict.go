@@ -73,7 +73,12 @@ type DeriveInput struct {
 	TargetKind pb.TargetKind
 
 	// Run facts
-	Oscillation                  bool
+	Oscillation bool
+	// Unconfined is set when the operator waived the boundary between a role and
+	// the review's own artifacts. It caps confidence and leaves the decision
+	// alone: an unconfined run can still find something real, it just cannot
+	// vouch for the artifacts its conclusions were drawn from.
+	Unconfined                   bool
 	RankingBlocked               bool
 	CriticalFalsifierUnavailable bool
 }

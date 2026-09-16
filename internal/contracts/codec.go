@@ -108,9 +108,15 @@ func UnmarshalRecorded(b []byte, m proto.Message) error {
 //
 // A snapshot written before the refutation pass existed describes a finding
 // nobody attacked, which is exactly what UNATTACKED says.
+//
+// A result written before roles were confined cannot say how they were, and
+// naming the mechanism that is running now would be a claim about a run that
+// already happened. It is not "unsafe" either: that is what a run says when it
+// was offered the boundary and waived it.
 var recordedDefaults = map[protoreflect.FullName]protoreflect.Value{
 	"frank_grimes.v2.FindingSnapshot.provenance": protoreflect.ValueOfEnum(
 		protoreflect.EnumNumber(pb.FindingProvenance_FINDING_PROVENANCE_UNATTACKED)),
+	"frank_grimes.v2.GrimesResult.confinement": protoreflect.ValueOfString("unknown"),
 }
 
 // fillRecordedDefaults walks the message and supplies them wherever they apply.

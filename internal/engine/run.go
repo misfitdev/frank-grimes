@@ -33,6 +33,10 @@ type Engine struct {
 	MaxIterations uint32
 	Research      string
 	Dir           string
+	// Confinement names the mechanism each role ran under, for the run record.
+	Confinement string
+	// Unconfined is set when the operator waived it.
+	Unconfined bool
 }
 
 // Run executes one iteration and returns the result the engine derived.
@@ -129,6 +133,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		CriticalUnknownRemains:       cov.UnknownRemains,
 		CoverageIncomplete:           len(cov.Unaccounted) > 0,
 		Oscillation:                  oscillation,
+		Unconfined:                   e.Unconfined,
 	})
 
 	review, err := e.adjudicate(ctx, spec, collected, primary.Verdict)
@@ -149,6 +154,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		CriticalUnknownRemains:  cov.UnknownRemains,
 		CoverageIncomplete:      len(cov.Unaccounted) > 0,
 		Oscillation:             oscillation,
+		Unconfined:              e.Unconfined,
 	})
 
 	if err := e.recheck(ctx, spec, collected); err != nil {

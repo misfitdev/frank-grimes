@@ -1040,6 +1040,16 @@ message GrimesResult {
     expression: "(this.legacy_color == 3) == (this.verdict.decision == 1)"
   };
   option (buf.validate.message).cel = {
+    id: "result.unconfined_is_an_unmet_gate"
+    message: "a run recorded as unconfined must report the confinement gate as unmet"
+    expression: "this.confinement != 'unsafe' || this.unmet_gates.exists(g, g == 'confinement')"
+  };
+  option (buf.validate.message).cel = {
+    id: "result.unconfined_caps_confidence"
+    message: "a run recorded as unconfined must not claim high confidence"
+    expression: "this.confinement != 'unsafe' || this.verdict.review_confidence != 1"
+  };
+  option (buf.validate.message).cel = {
     id: "result.open_p0_blocks"
     message: "an open P0 requires decision=block"
     expression: "this.counts.open_p0 == 0u || this.verdict.decision == 1"
@@ -1080,6 +1090,10 @@ message GrimesResult {
   ];
   string summary = 19 [(buf.validate.field).string.min_len = 1];
   RefuterCheck refuter_check = 20 [(buf.validate.field).enum.defined_only = true];
+  // How each spawned role was bounded to the review's own artifacts. Named
+  // rather than flagged, so a record says which mechanism was relied on and a
+  // reader can tell a built-in boundary from an operator's wrapper.
+  string confinement = 21 [(buf.validate.field).string.min_len = 1];
 }
 
 message LoopState {

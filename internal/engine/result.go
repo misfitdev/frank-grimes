@@ -43,6 +43,7 @@ func (e *Engine) assemble(
 		Verdict:           d.Verdict,
 		LegacyColor:       d.Color,
 		RefuterCheck:      check,
+		Confinement:       e.Confinement,
 		MarginalYield:     yield,
 		Counts:            d.Counts,
 		Findings:          snapshots(ledger),

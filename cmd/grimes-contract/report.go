@@ -14,11 +14,13 @@ import (
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
 	"github.com/misfitdev/frank-grimes/internal/envelope"
+	"github.com/misfitdev/frank-grimes/internal/store"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// DefaultReportPath is where an in-progress report accumulates.
-const DefaultReportPath = ".grimes/report.textproto"
+// DefaultReportPath is where a report accumulates, inside the one directory a
+// spawned role is allowed to write.
+const DefaultReportPath = store.WorkDir + "/report.textproto"
 
 // cmdReport builds a provider report one candidate at a time.
 //

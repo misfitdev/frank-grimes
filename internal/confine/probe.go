@@ -1,0 +1,148 @@
+package confine
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+// ErrNotConfined reports a mechanism that let the probe through.
+var ErrNotConfined = errors.New("confinement blocked nothing")
+
+// probeTimeout bounds the canary. It runs one shell builtin against two paths;
+// anything slower than this is a mechanism that is not going to work.
+const probeTimeout = 30 * time.Second
+
+// Verify runs a canary under the mechanism and reports whether it was actually
+// confined.
+//
+// A policy that was applied and a policy that was silently ignored produce the
+// same successful run, so the engine does not take either on faith. This is the
+// same rule the refutation pass is held to: a check that cannot be shown to
+// fail distinguishes nothing. It is also what catches the day a platform
+// changes under the built-in backend, which is a likelier end for sandbox-exec
+// than the removal its deprecation notice has been threatening since 2016.
+//
+// The canary is graded on what it did, not on what it returned. A wrapper is
+// free to exit zero while blocking everything, or to eat the exit code of what
+// it ran.
+//
+// What this cannot catch is a wrapper built to pass it: the canary is in the
+// argv the wrapper is handed, so one that recognised the probe could answer it
+// and then let the roles through. The operator chose the wrapper, and can
+// choose --unsafe instead; the probe is here for a mechanism that is broken or
+// inert, which is the one that looks like a working one.
+func Verify(ctx context.Context, m Mechanism, root string) error {
+	if _, ok := m.(Unsafe); ok {
+		return nil
+	}
+
+	root, err := filepath.Abs(root)
+	if err != nil {
+		return fmt.Errorf("confine: staging the probe: %w", err)
+	}
+	// The probe runs before the first role, which is before anything else has
+	// had reason to create this, and the policy it is testing is expressed in
+	// terms of it.
+	grimes := filepath.Join(root, GrimesDir)
+	if err := os.MkdirAll(grimes, 0o755); err != nil {
+		return fmt.Errorf("confine: staging the probe: %w", err)
+	}
+	dir, err := os.MkdirTemp(grimes, "probe-")
+	if err != nil {
+		return fmt.Errorf("confine: staging the probe: %w", err)
+	}
+	defer os.RemoveAll(dir)
+
+	// Named so that neither outcome can be produced by accident: an empty file
+	// and a missing file are both ordinary, a file holding this is not.
+	const secret = "grimes-probe-must-not-be-readable"
+	readable := filepath.Join(dir, "denied")
+	if err := os.WriteFile(readable, []byte(secret), 0o600); err != nil {
+		return fmt.Errorf("confine: staging the probe: %w", err)
+	}
+	// Named after the staging directory, which is unique to this probe: a fixed
+	// name that the repository happened to already carry would be read as this
+	// probe's own output, failing the mechanism and deleting the file.
+	written := filepath.Join(root, filepath.Base(dir)+"-written")
+
+	// Proof that the canary ran at all. A wrapper can start and then fail before
+	// reaching the shell, and neither forbidden effect happens on a run that
+	// never happened.
+	const ran = "grimes-probe-ran"
+
+	// The probe is confined by a policy that hands it nothing: no readable
+	// path, no writable directory. Every mechanism that works at all must stop
+	// both of these.
+	argv, err := m.Wrap(Policy{Root: root}, []string{
+		"/bin/sh", "-c",
+		fmt.Sprintf("echo %s; cat %s 2>/dev/null; : >%s 2>/dev/null; exit 0",
+			shellQuote(ran), shellQuote(readable), shellQuote(written)),
+	})
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, probeTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	cmd.Dir = root
+	out, runErr := cmd.Output()
+	// A mechanism that could not start is not one that confined anything, and
+	// grading it on the probe's effects would report it as a success.
+	var notStarted *exec.Error
+	if errors.As(runErr, &notStarted) {
+		return fmt.Errorf("confine: %s could not run: %w", m.Name(), notStarted)
+	}
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return fmt.Errorf("confine: %s did not finish: %w", m.Name(), ctxErr)
+	}
+	// An exit code belongs to whatever the mechanism chose to report, so the
+	// marker is what says the canary reached the shell. Without it a wrapper
+	// that fails after starting is graded on effects that nothing attempted.
+	if !strings.Contains(string(out), ran) {
+		if runErr == nil {
+			runErr = errors.New("no error reported")
+		}
+		return fmt.Errorf("confine: %s did not run the probe: %w%s", m.Name(), runErr, complaint(runErr))
+	}
+
+	var leaked []string
+	if strings.Contains(string(out), secret) {
+		leaked = append(leaked, "read a file it was not handed")
+	}
+	if _, err := os.Stat(written); err == nil {
+		_ = os.Remove(written)
+		leaked = append(leaked, "wrote inside the target")
+	}
+	if len(leaked) > 0 {
+		return fmt.Errorf("%w: under %s a probe %s", ErrNotConfined, m.Name(), strings.Join(leaked, " and "))
+	}
+	return nil
+}
+
+// complaint renders what the mechanism said on the way out, which is the only
+// place a wrapper explains itself: an exit status alone leaves an operator
+// guessing at a policy they did not write.
+func complaint(err error) string {
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || len(exit.Stderr) == 0 {
+		return ""
+	}
+	said := strings.TrimSpace(string(exit.Stderr))
+	if len(said) > 300 {
+		said = said[:300] + "..."
+	}
+	return ": " + said
+}
+
+// shellQuote renders a path for the single sh -c the probe runs.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}

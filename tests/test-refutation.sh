@@ -208,7 +208,7 @@ WS="$(workspace)"
 OUT="$(run_grimes "$WS" \
     --refuter-command="$FAKES/refuter-documented.sh" \
     --refuter-arg="probe" --refuter-fresh)"
-ERR="$(cat "$WS/refute.err" 2>/dev/null || true)"
+ERR="$(cat "$WS/.grimes/work/refute.err" 2>/dev/null || true)"
 assert_match "$ERR" 'was not issued by this pass' \
     "answering a claim nobody issued is refused by name"
 assert_match "$ERR" 'already been answered' \
@@ -225,9 +225,13 @@ echo "--- Two runs over one directory do not share a pass ---"
 # first seal. Each was issued its own control, so a task that landed on top of
 # another would grade one run's answers against the other's control.
 WS="$(workspace)"
-MARKER="$WS/holding"
-SENTINEL="$WS/go"
-FIRST="$WS/first.txt"
+# Outside the target: a refuting pass is confined to the review's own artifacts,
+# so it cannot leave the handshake for this test inside the repository it is
+# attacking claims about.
+SCRATCH="$(mktemp -d)"
+MARKER="$SCRATCH/holding"
+SENTINEL="$SCRATCH/go"
+FIRST="$SCRATCH/first.txt"
 ("$GRIMES" run --dir="$WS" \
     --provider-command="$FAKES/provider-p2.sh" \
     --refuter-command="$FAKES/refuter-overlapped.sh" \
@@ -256,7 +260,7 @@ wait "$FIRST_PID"
 OUT="$(cat "$FIRST")"
 assert_match "$OUT" 'refuter_check: +REFUTER_CHECK_PASSED' \
     "a run whose refuter overlaps another still reads its own claims"
-rm -rf "$WS"
+rm -rf "$WS" "$SCRATCH"
 
 echo ""
 echo "--- A control is broken by exhibiting the target, not by recognising it ---"

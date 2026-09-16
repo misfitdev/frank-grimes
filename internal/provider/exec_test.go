@@ -10,6 +10,7 @@ import (
 	"time"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
+	"github.com/misfitdev/frank-grimes/internal/confine"
 	"github.com/misfitdev/frank-grimes/internal/engine"
 )
 
@@ -34,7 +35,7 @@ func primaryReq() engine.Request {
 }
 
 func TestExecReturnsStdout(t *testing.T) {
-	e := &Exec{Command: script(t, "echo hello\n")}
+	e := &Exec{Confine: confine.Unsafe{}, Command: script(t, "echo hello\n")}
 	out, err := e.Review(context.Background(), primaryReq())
 	if err != nil {
 		t.Fatalf("Review: %v", err)
@@ -45,7 +46,7 @@ func TestExecReturnsStdout(t *testing.T) {
 }
 
 func TestExecNonZeroExitFailsClosed(t *testing.T) {
-	e := &Exec{Command: script(t, "echo partial\nexit 7\n")}
+	e := &Exec{Confine: confine.Unsafe{}, Command: script(t, "echo partial\nexit 7\n")}
 	out, err := e.Review(context.Background(), primaryReq())
 	if err == nil {
 		t.Fatal("want an error for a non-zero provider exit")
@@ -60,6 +61,7 @@ func TestExecNonZeroExitFailsClosed(t *testing.T) {
 
 func TestExecOutputBoundExceeded(t *testing.T) {
 	e := &Exec{
+		Confine:        confine.Unsafe{},
 		Command:        script(t, "yes 0123456789abcdef\n"),
 		MaxOutputBytes: 4096,
 	}
@@ -78,6 +80,7 @@ func TestExecOutputBoundExceeded(t *testing.T) {
 
 func TestExecOutputExactlyAtBoundSucceeds(t *testing.T) {
 	e := &Exec{
+		Confine:        confine.Unsafe{},
 		Command:        script(t, "printf '%0.sx' {1..64}\n"),
 		MaxOutputBytes: 64,
 	}
@@ -91,7 +94,7 @@ func TestExecOutputExactlyAtBoundSucceeds(t *testing.T) {
 }
 
 func TestExecTimeout(t *testing.T) {
-	e := &Exec{Command: script(t, "sleep 60\n"), Timeout: 500 * time.Millisecond}
+	e := &Exec{Confine: confine.Unsafe{}, Command: script(t, "sleep 60\n"), Timeout: 500 * time.Millisecond}
 	start := time.Now()
 	_, err := e.Review(context.Background(), primaryReq())
 	if err == nil {
@@ -109,6 +112,7 @@ func TestExecTimeoutKillsProcessGroup(t *testing.T) {
 	// really started rather than infer it from the parent's own output.
 	marker := filepath.Join(t.TempDir(), "descendant-started")
 	e := &Exec{
+		Confine: confine.Unsafe{},
 		Command: script(t, "( : >\""+marker+"\"; sleep 60 ) &\necho started\nwait\n"),
 		Timeout: 500 * time.Millisecond,
 	}
@@ -142,7 +146,7 @@ func TestExecTimeoutKillsProcessGroup(t *testing.T) {
 }
 
 func TestExecContextCancel(t *testing.T) {
-	e := &Exec{Command: script(t, "sleep 60\n")}
+	e := &Exec{Confine: confine.Unsafe{}, Command: script(t, "sleep 60\n")}
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
 		time.Sleep(200 * time.Millisecond)
@@ -158,13 +162,13 @@ func TestExecContextCancel(t *testing.T) {
 }
 
 func TestExecMissingCommand(t *testing.T) {
-	if _, err := (&Exec{}).Review(context.Background(), primaryReq()); err == nil {
+	if _, err := (&Exec{Confine: confine.Unsafe{}}).Review(context.Background(), primaryReq()); err == nil {
 		t.Fatal("want an error when no provider command is configured")
 	}
 }
 
 func TestExecPrimaryRequestEnv(t *testing.T) {
-	e := &Exec{Command: script(t, "env\n")}
+	e := &Exec{Confine: confine.Unsafe{}, Command: script(t, "env\n")}
 	out, err := e.Review(context.Background(), primaryReq())
 	if err != nil {
 		t.Fatalf("Review: %v", err)
@@ -189,7 +193,7 @@ func TestExecPrimaryRequestEnv(t *testing.T) {
 // The claimed verdict is the sharpest leak of the set: a reviewer shown the
 // conclusion it was asked to reach independently is anchored before it starts.
 func TestExecAdjudicatorIsNotToldTheVerdict(t *testing.T) {
-	e := &Exec{Command: script(t, "env\n")}
+	e := &Exec{Confine: confine.Unsafe{}, Command: script(t, "env\n")}
 	req := primaryReq()
 	req.Role = engine.RoleAdjudicator
 	req.Claimed = &pb.Verdict{

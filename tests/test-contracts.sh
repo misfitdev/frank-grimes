@@ -366,7 +366,7 @@ mkdir -p "$WORK/.grimes"
         --routed=SEC --examined=1 --disproved=0 --summary="s" >/dev/null
 ) || fail "the seal sequence failed"
 
-if [[ -f "$WORK/.grimes/report.textproto" ]]; then
+if [[ -f "$WORK/.grimes/work/report.textproto" ]]; then
     fail "the working report survived its own sealing"
 else
     pass "sealing clears the candidates it sealed"
@@ -395,7 +395,7 @@ HOSTILE='https://example.com/policy,v2
 second line'
 SKIPPED="$(cd "$WORK" && "$BIN" report cover --skip="$HOSTILE" \
     --skip-reason="the publisher withdrew it" --skip-material >/dev/null &&
-    "$BIN" report show --file="$WORK/.grimes/report.textproto")"
+    "$BIN" report show --file="$WORK/.grimes/work/report.textproto")"
 if [[ "$(grep -c 'unit_id' <<<"$SKIPPED")" == "1" ]] &&
     grep -qF 'https://example.com/policy,v2' <<<"$SKIPPED"; then
     pass "a unit id holding a colon, a comma, and a newline is skipped whole"

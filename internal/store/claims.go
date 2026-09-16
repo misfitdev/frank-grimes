@@ -62,3 +62,13 @@ func RunSlug(runID string) string {
 	sum := sha256.Sum256([]byte(runID))
 	return hex.EncodeToString(sum[:8])
 }
+
+// WorkDir, relative to the review directory, is the only place a spawned role
+// may write. It holds what a role is building — its report, its refutation —
+// and nothing the engine relies on: the ledger, the result, the loop state and
+// the staged copies all sit outside it and stay unreadable.
+//
+// Static rather than derived from the run, because a report can be started
+// before the run that carries it exists, and both halves have to name the same
+// file without an agreement passed between them.
+const WorkDir = ".grimes/work"

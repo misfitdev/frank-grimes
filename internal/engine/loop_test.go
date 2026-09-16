@@ -30,6 +30,7 @@ func loopState(t *testing.T, mutate func(*pb.LoopState)) *pb.LoopState {
 func loopResult(t *testing.T, mutate func(*pb.GrimesResult)) *pb.GrimesResult {
 	t.Helper()
 	r := &pb.GrimesResult{
+		Confinement:     "sandbox-exec",
 		SchemaMajor:     2,
 		RunId:           "run-001",
 		ProducerRole:    pb.ProducerRole_PRODUCER_ROLE_ORCHESTRATOR,

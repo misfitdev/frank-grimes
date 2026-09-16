@@ -29,4 +29,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: jdx/mise-action@v4.3.0
+      # The built-in Linux mechanism is bwrap, which the runner image does not
+      # carry. Without it every role is refused, which is the intended
+      # behaviour and not a thing to assert a whole suite against.
+      - name: Install bubblewrap
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update && sudo apt-get install -y bubblewrap
+          # Ubuntu 24.04 gives an unprivileged user namespace no capabilities
+          # unless the program has an AppArmor profile granting them. The
+          # package ships one; the runner image does not load it.
+          sudo systemctl reload apparmor || true
+          bwrap --unshare-user-try --dev-bind / / /bin/true ||
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          bwrap --unshare-user-try --dev-bind / / /bin/echo "bwrap: ok"
       - run: just check

@@ -269,6 +269,7 @@ func timeZero() time.Time { return time.Unix(1780000000, 0).UTC() }
 func sampleResult() *pb.GrimesResult {
 	digest := digest32()
 	return &pb.GrimesResult{
+		Confinement:     "sandbox-exec",
 		SchemaMajor:     2,
 		RunId:           "run-001",
 		ProducerRole:    pb.ProducerRole_PRODUCER_ROLE_ORCHESTRATOR,
@@ -393,6 +394,12 @@ func TestFileResultStoreLegacyDigestIsOverStoredBytes(t *testing.T) {
 	}
 	if string(filled) == string(digest) {
 		t.Fatal("the fixture does not exercise filling: it digests the same either way")
+	}
+	// A record from before roles were confined cannot say how they were, and the
+	// field it is missing is required. Quarantining it would lose the loop's
+	// history over a question that build was never asked.
+	if got.GetConfinement() != "unknown" {
+		t.Errorf("an archived result reports confinement %q, want unknown", got.GetConfinement())
 	}
 }
 
