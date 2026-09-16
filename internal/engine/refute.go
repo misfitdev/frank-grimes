@@ -100,7 +100,7 @@ func (r ProviderRefuter) Refute(ctx context.Context, target *pb.Target, contentP
 // pass that vouches for everything raises no finding above unattacked. The
 // control itself never reaches the ledger: it is dropped with every other ref
 // the engine did not issue against a real finding.
-func (e *Engine) refute(ctx context.Context, ledger *pb.Ledger, target *pb.Target, contentPath string, iteration uint32) (pb.RefuterCheck, error) {
+func (e *Engine) refute(ctx context.Context, ledger *pb.Ledger, spec TargetSpec, collected *Collected, iteration uint32) (pb.RefuterCheck, error) {
 	none := pb.RefuterCheck_REFUTER_CHECK_UNSPECIFIED
 	if e.Refuter == nil || e.Claims == nil {
 		return none, nil
@@ -108,6 +108,14 @@ func (e *Engine) refute(ctx context.Context, ledger *pb.Ledger, target *pb.Targe
 	claims, refs := claimsOf(ledger, e.RunID, iteration)
 	if len(claims) == 0 {
 		return none, nil
+	}
+	target := collected.Target
+
+	// Staged only once there is a pass to hand it to: a run with no refuter has
+	// no reason to recollect the target or to leave a copy behind.
+	contentPath, err := e.handoff(ctx, spec, collected, RoleRefuter)
+	if err != nil {
+		return none, err
 	}
 
 	ctrl, err := controlFor(e.Dir, contentPath, claims, e.RunID, iteration)

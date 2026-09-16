@@ -3,8 +3,10 @@ package store
 import (
 	"context"
 	"path/filepath"
+	"strings"
 
 	"github.com/misfitdev/frank-grimes/internal/contracts"
+	"github.com/misfitdev/frank-grimes/internal/engine"
 )
 
 // ContentPath holds a target that arrived with no path of its own, beside the
@@ -32,4 +34,17 @@ func (c *FileContentStore) Save(ctx context.Context, content []byte) (string, er
 	// Absolute: the provider resolves this from the review directory, which is
 	// not necessarily the one this path was built against.
 	return filepath.Abs(c.Path)
+}
+
+// Stage writes a copy for one role beside the collected content and returns
+// where that role can read it.
+func (c *FileContentStore) Stage(ctx context.Context, role engine.Role, content []byte) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	path := strings.TrimSuffix(c.Path, ".bin") + "-" + role.String() + ".bin"
+	if err := contracts.WriteAtomic(path, content); err != nil {
+		return "", err
+	}
+	return filepath.Abs(path)
 }

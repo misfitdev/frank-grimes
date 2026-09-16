@@ -650,6 +650,11 @@ if [[ -f "$WS/.grimes/target.bin" ]]; then
 else
     fail "a pasted argument was never written down"
 fi
+if compgen -G "$WS/.grimes/target-*.bin" >/dev/null; then
+    fail "a copy was staged for a role this run does not have"
+else
+    pass "no copy is staged for a role this run does not have"
+fi
 rm -rf "$WS"
 
 # An external target: the snapshot is the artifact, and it already has a path.
@@ -715,6 +720,23 @@ if echo "$OUT" | grep -qE 'context_origin: +CONTEXT_ORIGIN_'; then
     pass "an adjudicator that read the artifact still records an independent review"
 else
     fail "the adjudicator could not read the artifact: $OUT"
+fi
+rm -rf "$WS"
+
+# The primary provider runs with write access to the review directory, so the
+# staged file it was pointed at is not the one a later role can be handed.
+WS="$(mktemp -d)"
+set +e
+OUT="$(cd "$WS" && printf 'Clause 4: retention is 30 days.\n' |
+    "$GRIMES" run --dir=. --kind=idea \
+        --provider-command="$FAKES/provider-rewrites-content.sh" \
+        --adjudicator-command="$FAKES/adjudicator-reads-content.sh" \
+        --format=prototext - 2>&1)"
+set -e
+if echo "$OUT" | grep -qE 'context_origin: +CONTEXT_ORIGIN_'; then
+    pass "an adjudicator reads the fingerprinted bytes, not the provider's rewrite"
+else
+    fail "the adjudicator was handed a rewritten target: $OUT"
 fi
 rm -rf "$WS"
 

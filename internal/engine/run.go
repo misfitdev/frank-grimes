@@ -3,9 +3,7 @@ package engine
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"fmt"
-	"os"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
@@ -112,7 +110,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	// Before either derivation reads the ledger: both tuples have to be over the
 	// same findings, and a claim's standing under attack is part of the finding
 	// rather than of the verdict that reads it.
-	check, err := e.refute(ctx, ledger, target, collected.ContentPath, iteration)
+	check, err := e.refute(ctx, ledger, spec, collected, iteration)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +130,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		Oscillation:                  oscillation,
 	})
 
-	review, err := e.adjudicate(ctx, target, collected.ContentPath, primary.Verdict)
+	review, err := e.adjudicate(ctx, spec, collected, primary.Verdict)
 	if err != nil {
 		return nil, err
 	}
@@ -172,6 +170,30 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	return result, nil
 }
 
+// handoff returns the path a later role reads the target at.
+//
+// The primary provider runs with write access to the review directory, so the
+// file it was pointed at is not the file a role after it should read. A target
+// with no path of its own is written out again from the bytes collection
+// fingerprinted, once per role. One with a path of its own cannot be copied
+// that way, so it is recollected and the run refused if its fingerprint moved.
+//
+// This does not confine the provider, and a process it left behind can still
+// reach a staged copy between the write and the read. Closing that is
+// fg-64y.7.
+func (e *Engine) handoff(ctx context.Context, spec TargetSpec, collected *Collected, role Role) (string, error) {
+	if len(collected.ContentBytes) == 0 {
+		if err := e.recheck(ctx, spec, collected); err != nil {
+			return "", err
+		}
+		return collected.ContentPath, nil
+	}
+	if e.Content == nil {
+		return "", fmt.Errorf("%w: no store for a target with no path of its own", ErrProviderOutput)
+	}
+	return e.Content.Stage(ctx, role, collected.ContentBytes)
+}
+
 // recheck confirms the target still hashes to what collection recorded.
 //
 // Evidence is checked against the digests collection took, so a line a provider
@@ -181,16 +203,9 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 func (e *Engine) recheck(ctx context.Context, spec TargetSpec, collected *Collected) error {
 	want := collected.Target.GetFingerprintSha256()
 	if len(collected.ContentBytes) > 0 {
-		// A pasted argument has no source to collect from twice. The engine's
-		// own copy is the only artifact a provider could have reached.
-		content, err := os.ReadFile(collected.ContentPath)
-		if err != nil {
-			return fmt.Errorf("rechecking the target: %w", err)
-		}
-		sum := sha256.Sum256(content)
-		if !bytes.Equal(sum[:], want) {
-			return fmt.Errorf("%w: %q changed during the review", ErrTargetChanged, collected.Target.GetScope())
-		}
+		// A pasted argument has no source to collect from twice, and the engine
+		// holds it rather than reading it back: the staged file is a copy handed
+		// to a provider, not the target. Nothing downstream reads it.
 		return nil
 	}
 	again, err := e.Collector.Collect(ctx, spec)
@@ -430,11 +445,17 @@ func verifyIdentity(f *pb.Finding) error {
 	return nil
 }
 
-func (e *Engine) adjudicate(ctx context.Context, target *pb.Target, contentPath string, claimed *pb.Verdict) (*pb.IndependentReview, error) {
+func (e *Engine) adjudicate(ctx context.Context, spec TargetSpec, collected *Collected, claimed *pb.Verdict) (*pb.IndependentReview, error) {
 	if e.Adjudicator == nil {
 		return nil, nil
 	}
-	review, err := e.Adjudicator.Adjudicate(ctx, target, contentPath, claimed)
+	// Staged only once there is a second opinion to hand it to, for the same
+	// reason refutation stages only when a pass will run.
+	contentPath, err := e.handoff(ctx, spec, collected, RoleAdjudicator)
+	if err != nil {
+		return nil, err
+	}
+	review, err := e.Adjudicator.Adjudicate(ctx, collected.Target, contentPath, claimed)
 	if err != nil {
 		// Absence of a second opinion is not agreement, but it is also not a
 		// run failure: the verdict caps itself instead.
