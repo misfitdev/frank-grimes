@@ -40,7 +40,7 @@ sync-github:
     python3 scripts/sync-beads-github.py
 
 # Lint, format-check, validate, and run contract tests
-check: lint fmt-check proto-lint proto-breaking vet test-go validate test-fix-gate test-adjudication test-refutation test-stop-hook test-contracts test-collector test-orchestrator test-adapter-seam test-confinement
+check: lint fmt-check proto-lint proto-breaking vet test-go validate test-fix-gate test-adjudication test-refutation test-stop-hook test-contracts test-collector test-orchestrator test-adapter-seam test-confinement test-fix
 
 # Vet the Go packages
 vet:
@@ -69,6 +69,10 @@ test-stop-hook:
 # Run the execution-boundary tests
 test-confinement:
     ./tests/test-confinement.sh
+
+# Run the fix-mode supervisor tests
+test-fix:
+    ./tests/test-fix.sh
 
 # Regenerate protobuf bindings from the contract
 gen:

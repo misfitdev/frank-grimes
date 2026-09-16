@@ -3,6 +3,7 @@ package contracts
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -20,6 +21,22 @@ import (
 // LedgerPath is the authoritative ledger location. The JSON projection beside
 // it is for reading only and is never accepted as control input.
 const LedgerPath = ".grimes/ledger.pb"
+
+// GrimesDir is the review's own directory inside the target, and FixDir is the
+// worktree a fix run edits in. Named here because more than one package builds
+// paths under them and only one of those may know how they are spelled.
+const (
+	GrimesDir = ".grimes"
+	FixDir    = GrimesDir + "/fix"
+)
+
+// RunSlug names a run in a path. A run identity is not constrained to the
+// characters a filename admits, so it is digested rather than sanitized: two
+// distinct runs that sanitize alike would collide on the file this names.
+func RunSlug(runID string) string {
+	sum := sha256.Sum256([]byte(runID))
+	return hex.EncodeToString(sum[:8])
+}
 
 var validator protovalidate.Validator
 

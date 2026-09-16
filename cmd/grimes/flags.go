@@ -10,7 +10,6 @@ import (
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
-	"github.com/misfitdev/frank-grimes/internal/engine"
 )
 
 // repeatedArg collects one flag occurrence per argument, so an argument
@@ -237,8 +236,10 @@ func (c *config) validate() error {
 	if c.Commit && c.VerifyCommand == "" {
 		return fmt.Errorf("--commit requires --verify-command")
 	}
-	if c.Mode == pb.Mode_MODE_FIX {
-		return engine.ErrFixModeUnsupported
+	// A fix run edits a checkout and commits from one. Every other kind of
+	// target is bytes with no history to put a worktree on.
+	if c.Mode == pb.Mode_MODE_FIX && c.Kind != pb.TargetKind_TARGET_KIND_CODE {
+		return fmt.Errorf("--mode fix applies only to --kind code")
 	}
 	if len(c.ProviderCommand) == 0 {
 		return fmt.Errorf("--provider-command is required")

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
-	"github.com/misfitdev/frank-grimes/internal/engine"
 )
 
 func baseArgs(extra ...string) []string {
@@ -49,12 +48,21 @@ func TestParseRunRequiresProviderCommand(t *testing.T) {
 	}
 }
 
-// Fix mode is a separately authorized privilege that this engine does not
-// implement; accepting the flag silently would imply it does.
-func TestParseRunRejectsFixMode(t *testing.T) {
-	_, err := parseRun(baseArgs("--mode", "fix"))
-	if !errors.Is(err, engine.ErrFixModeUnsupported) {
-		t.Errorf("error = %v, want ErrFixModeUnsupported", err)
+// A fix run edits a checkout and commits from one. Every other kind of target
+// is bytes with no history to put a worktree on.
+func TestParseRunRejectsFixModeForTargetsWithoutARepository(t *testing.T) {
+	_, err := parseRun(baseArgs("--mode", "fix", "--kind=document"))
+	if err == nil {
+		t.Fatal("want an error for a document fix run")
+	}
+	if !strings.Contains(err.Error(), "--kind code") {
+		t.Errorf("error = %v, want it to name --kind code", err)
+	}
+}
+
+func TestParseRunAcceptsFixModeForCode(t *testing.T) {
+	if _, err := parseRun(baseArgs("--mode", "fix")); err != nil {
+		t.Errorf("parseRun(--mode fix) = %v", err)
 	}
 }
 

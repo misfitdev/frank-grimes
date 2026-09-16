@@ -70,8 +70,12 @@ func (r *Repo) Head(ctx context.Context) (string, error) {
 // Untracked files count. A fix batch is judged by what changed between HEAD and
 // the end of the run, and a file that was already lying there unversioned would
 // be read as something the fixer produced.
-func (r *Repo) Clean(ctx context.Context) error {
-	out, err := r.run(ctx, "status", "--porcelain")
+func (r *Repo) Clean(ctx context.Context, ignore ...string) error {
+	args := []string{"status", "--porcelain", "--"}
+	for _, path := range ignore {
+		args = append(args, ":(exclude)"+path)
+	}
+	out, err := r.run(ctx, args...)
 	if err != nil {
 		return err
 	}
@@ -103,6 +107,13 @@ func (r *Repo) AddWorktree(ctx context.Context, dir, branch, commit string) (*Wo
 		return nil, fmt.Errorf("creating the worktree: %w", err)
 	}
 	return &Worktree{Dir: abs, Branch: branch, repo: r}, nil
+}
+
+// OpenWorktree names a worktree that is already there, from a run that made it
+// earlier. Nothing is checked here: what proves it is the right one is that the
+// ledger's own lineage lines up, which the engine does with the bytes.
+func OpenWorktree(r *Repo, dir, branch string) *Worktree {
+	return &Worktree{Dir: dir, Branch: branch, repo: r}
 }
 
 // Remove deletes the worktree and the branch it was on.

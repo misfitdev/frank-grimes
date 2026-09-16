@@ -694,11 +694,17 @@ func TestRunAdoptsEmptyLedger(t *testing.T) {
 	}
 }
 
-func TestRunFixModeRejected(t *testing.T) {
+// A fix run needs somewhere to put a worktree. Without a repository there is
+// nothing to branch from, and editing the operator's own tree is what the
+// worktree exists to avoid.
+func TestRunFixModeNeedsARepository(t *testing.T) {
 	e := newEngine(&fakeProvider{}, &memLedger{}, &memState{}, nil)
+	// Not the directory the test happens to be running in, which is a
+	// repository, and one nothing here is authorized to put a worktree in.
+	e.Dir = t.TempDir()
 	_, err := e.Run(context.Background(), testSpec(), pb.Mode_MODE_FIX)
-	if !errors.Is(err, ErrFixModeUnsupported) {
-		t.Errorf("error = %v, want ErrFixModeUnsupported", err)
+	if !errors.Is(err, ErrFixNeedsRepository) {
+		t.Errorf("error = %v, want ErrFixNeedsRepository", err)
 	}
 }
 

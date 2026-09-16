@@ -118,7 +118,7 @@ func cmdRun(args []string) (int, error) {
 		Broker:        engine.StrictBroker{},
 		Adjudicator:   adjudicatorFor(cfg, run, mech),
 		Refuter:       refuterFor(cfg, run, mech),
-		Gate:          engine.NotApplicableGate{},
+		Gate:          gateFor(cfg),
 		Inventory:     store.NewFileInventoryStore(cfg.Dir),
 		Content:       store.NewFileContentStore(cfg.Dir),
 		Claims:        store.NewFileClaimStore(cfg.Dir),
@@ -132,6 +132,7 @@ func cmdRun(args []string) (int, error) {
 		Research:      cfg.Research,
 		Confinement:   mech.Name(),
 		Unconfined:    cfg.Unsafe,
+		Commit:        cfg.Commit,
 		Dir:           cfg.Dir,
 	}
 
@@ -149,6 +150,17 @@ func cmdRun(args []string) (int, error) {
 	return codeFor(result.GetVerdict().GetDecision()), nil
 }
 
+// gateFor picks the verification a fix batch will be held to.
+//
+// Report mode edits nothing, so there is nothing to verify and the record says
+// so rather than leaving the field to be read as a gate that failed.
+func gateFor(cfg *config) engine.GateRunner {
+	if cfg.Mode != pb.Mode_MODE_FIX {
+		return engine.NotApplicableGate{}
+	}
+	return engine.SelectGate(cfg.VerifyCommand, cfg.Dir)
+}
+
 // mechanismFor resolves how each role will be confined, and proves it before
 // any role runs.
 //
@@ -164,6 +176,13 @@ func mechanismFor(ctx context.Context, cfg *config) (confine.Mechanism, error) {
 	}
 	if err := confine.Verify(ctx, mech, cfg.Dir); err != nil {
 		return nil, err
+	}
+	// A fixing role runs under a second policy, and a mechanism that applies one
+	// correctly has not thereby been shown to apply the other.
+	if cfg.Mode == pb.Mode_MODE_FIX {
+		if err := confine.VerifyFixing(ctx, mech, cfg.Dir); err != nil {
+			return nil, err
+		}
 	}
 	return mech, nil
 }

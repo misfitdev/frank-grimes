@@ -201,6 +201,7 @@ func cmdReportSeal(args []string) error {
 	scope := fs.String("target-scope", "", "what was reviewed")
 	kind := fs.String("kind", "code", "code, document, idea, or external")
 	iteration := fs.Uint("iteration", 1, "iteration this report covers")
+	mode := fs.String("mode", "report", "the mode the engine asked for; a report answers one request")
 	summary := fs.String("summary", "", "one-sentence BLUF")
 	routed := fs.String("routed", "", "comma-separated categories routed this pass")
 	examined := fs.Uint("examined", 0, "candidates examined during the self-grind")
@@ -290,7 +291,14 @@ func cmdReportSeal(args []string) error {
 		Display:           *scope,
 		Kind:              targetKind,
 	}
-	report.Mode = pb.Mode_MODE_REPORT
+	switch strings.ToLower(*mode) {
+	case "report":
+		report.Mode = pb.Mode_MODE_REPORT
+	case "fix":
+		report.Mode = pb.Mode_MODE_FIX
+	default:
+		return fmt.Errorf("unknown mode %q", *mode)
+	}
 	report.Iteration = uint32(*iteration)
 	report.RoutedCategories = cats
 	report.CandidatesExamined = uint32(*examined)

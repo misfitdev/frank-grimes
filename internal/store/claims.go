@@ -2,8 +2,6 @@ package store
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"os"
 	"path/filepath"
 
@@ -55,13 +53,8 @@ func (c *FileClaimStore) Discard(_ context.Context, path string) error {
 	return nil
 }
 
-// RunSlug names a run in a path. A run identity is not constrained to the
-// characters a filename admits, so it is digested rather than sanitized: two
-// distinct runs that sanitize alike would collide on the file this is naming.
-func RunSlug(runID string) string {
-	sum := sha256.Sum256([]byte(runID))
-	return hex.EncodeToString(sum[:8])
-}
+// RunSlug names a run in a path.
+func RunSlug(runID string) string { return contracts.RunSlug(runID) }
 
 // WorkDir, relative to the review directory, is the only place a spawned role
 // may write. It holds what a role is building — its report, its refutation —

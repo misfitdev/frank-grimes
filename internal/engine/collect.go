@@ -157,6 +157,10 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*Collected, error) {
 	sum := sha256.New()
 	units := make([]*pb.TargetUnit, 0, len(paths))
 	digests := make(map[string][]byte, len(paths))
+	var bodies map[string][]byte
+	if spec.KeepBodies {
+		bodies = make(map[string][]byte, len(paths))
+	}
 	for _, p := range paths {
 		rel, err := filepath.Rel(base, p)
 		if err != nil {
@@ -173,6 +177,9 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*Collected, error) {
 		fmt.Fprintf(sum, "%s\x00%s\n", rel, hex.EncodeToString(body[:]))
 		units = append(units, unit(rel, rel))
 		digests[rel] = append([]byte(nil), body[:]...)
+		if bodies != nil {
+			bodies[rel] = content
+		}
 	}
 
 	// The scope itself: a tree when it names a directory, one file when it names
@@ -186,6 +193,7 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*Collected, error) {
 		Kind:              pb.TargetKind_TARGET_KIND_CODE,
 	}, units, abs)
 	out.UnitDigests = digests
+	out.UnitBodies = bodies
 	return out, nil
 }
 
