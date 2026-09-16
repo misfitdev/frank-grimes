@@ -126,6 +126,15 @@ When your provider supports arguments, you can skip the interactive prompts:
 | `--max-iterations N` | Maximum iterations (default: 5) |
 | `--auto-loop` | Continue while iterations still change the verdict |
 | `--research online\|offline\|frozen:<path>` | Use bounded current-landscape research, disable network research, or load a pinned research bundle |
+| `--sandbox-command <cmd>` | Confine each role with your own wrapper instead of the built-in mechanism |
+| `--unsafe` | Run the roles unconfined; recorded in the result and caps confidence |
+
+### Confinement
+
+Every role runs inside a boundary the engine builds from the run itself: it may not write anywhere in the review directory except its own scratch path, and it may not read the ledger, the recorded verdict, or a copy staged for another role. Everything else, including `$HOME` and the network, is left alone — this bounds what a role can do to the review, not what it can do to your machine.
+
+The built-in mechanism is `sandbox-exec` on macOS and `bubblewrap` on Linux, and it needs no configuration. Elsewhere, supply one with `--sandbox-command` (`srt`, `firejail`, a container runner) or waive it with `--unsafe`. Whatever is in force is proved before the first role spawns: a canary attempts exactly the reads and writes the boundary forbids, and a mechanism that lets either through refuses the run rather than reporting findings gathered under a boundary that was not there.
+
 
 ### Current-Landscape Research
 
