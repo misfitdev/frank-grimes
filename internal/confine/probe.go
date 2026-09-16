@@ -31,6 +31,12 @@ const probeTimeout = 30 * time.Second
 // The canary is graded on what it did, not on what it returned. A wrapper is
 // free to exit zero while blocking everything, or to eat the exit code of what
 // it ran.
+//
+// What this cannot catch is a wrapper built to pass it: the canary is in the
+// argv the wrapper is handed, so one that recognised the probe could answer it
+// and then let the roles through. The operator chose the wrapper, and can
+// choose --unsafe instead; the probe is here for a mechanism that is broken or
+// inert, which is the one that looks like a working one.
 func Verify(ctx context.Context, m Mechanism, root string) error {
 	if _, ok := m.(Unsafe); ok {
 		return nil
