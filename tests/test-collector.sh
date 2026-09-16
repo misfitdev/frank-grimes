@@ -650,6 +650,11 @@ if [[ -f "$WS/.grimes/target.bin" ]]; then
 else
     fail "a pasted argument was never written down"
 fi
+if compgen -G "$WS/.grimes/target-*.bin" >/dev/null; then
+    fail "a copy was staged for a role this run does not have"
+else
+    pass "no copy is staged for a role this run does not have"
+fi
 rm -rf "$WS"
 
 # An external target: the snapshot is the artifact, and it already has a path.

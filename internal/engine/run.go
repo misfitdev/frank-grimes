@@ -110,11 +110,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	// Before either derivation reads the ledger: both tuples have to be over the
 	// same findings, and a claim's standing under attack is part of the finding
 	// rather than of the verdict that reads it.
-	refuterContent, err := e.handoff(ctx, spec, collected, RoleRefuter)
-	if err != nil {
-		return nil, err
-	}
-	check, err := e.refute(ctx, ledger, target, refuterContent, iteration)
+	check, err := e.refute(ctx, ledger, spec, collected, iteration)
 	if err != nil {
 		return nil, err
 	}
@@ -134,11 +130,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		Oscillation:                  oscillation,
 	})
 
-	adjudicatorContent, err := e.handoff(ctx, spec, collected, RoleAdjudicator)
-	if err != nil {
-		return nil, err
-	}
-	review, err := e.adjudicate(ctx, target, adjudicatorContent, primary.Verdict)
+	review, err := e.adjudicate(ctx, spec, collected, primary.Verdict)
 	if err != nil {
 		return nil, err
 	}
@@ -453,11 +445,17 @@ func verifyIdentity(f *pb.Finding) error {
 	return nil
 }
 
-func (e *Engine) adjudicate(ctx context.Context, target *pb.Target, contentPath string, claimed *pb.Verdict) (*pb.IndependentReview, error) {
+func (e *Engine) adjudicate(ctx context.Context, spec TargetSpec, collected *Collected, claimed *pb.Verdict) (*pb.IndependentReview, error) {
 	if e.Adjudicator == nil {
 		return nil, nil
 	}
-	review, err := e.Adjudicator.Adjudicate(ctx, target, contentPath, claimed)
+	// Staged only once there is a second opinion to hand it to, for the same
+	// reason refutation stages only when a pass will run.
+	contentPath, err := e.handoff(ctx, spec, collected, RoleAdjudicator)
+	if err != nil {
+		return nil, err
+	}
+	review, err := e.Adjudicator.Adjudicate(ctx, collected.Target, contentPath, claimed)
 	if err != nil {
 		// Absence of a second opinion is not agreement, but it is also not a
 		// run failure: the verdict caps itself instead.
