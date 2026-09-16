@@ -289,6 +289,46 @@ git -C "$REPO" commit --quiet --message "add a check"
 OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" --repository-check)"
 assert_match "$OUT" 'selected_by: +GATE_SELECTION_REPOSITORY_CHECK' \
     "and runs once the operator says they have read it"
+# Selected is not run. The recipe is `check: true`, so anything but a pass means
+# the gate was chosen and then could not be executed.
+assert_match "$OUT" 'status: +VERIFICATION_STATUS_PASSED' \
+    "and the recipe it selected actually ran"
+rm -rf "$REPO"
+
+echo ""
+echo "--- The gate runs inside the boundary, not beside it ---"
+
+# A gate is a command out of the repository as much as a role is. Its working
+# directory is not what stops it reaching the tree the worktree exists to keep
+# out of reach.
+REPO="$(repository)"
+MAIN_BEFORE="$(git -C "$REPO" rev-parse main)"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" \
+    --verify-command="echo gate-was-here >../../src/app.sh; echo gate-was-here >../ledger.pb; echo gate-was-here >../../.git/refs/heads/main; true")"
+if [[ "$(cat "$REPO/src/app.sh")" != *gate-was-here* ]]; then
+    pass "a gate cannot write the tree the operator is holding"
+else
+    fail "a gate cannot write the tree the operator is holding"
+fi
+if [[ ! -f "$REPO/.grimes/ledger.pb" ]] || ! grep -q gate-was-here "$REPO/.grimes/ledger.pb"; then
+    pass "a gate cannot write the review's own record"
+else
+    fail "a gate cannot write the review's own record"
+fi
+if [[ "$(git -C "$REPO" rev-parse main)" == "$MAIN_BEFORE" ]]; then
+    pass "a gate cannot move the repository's history"
+else
+    fail "a gate cannot move the repository's history"
+fi
+rm -rf "$REPO"
+
+# The boundary still has to leave a real check able to run. git writes inside
+# the worktree's own administrative directory to do no more than read status.
+REPO="$(repository)"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" \
+    --verify-command="git status --porcelain >/dev/null && go version >/dev/null")"
+assert_match "$OUT" 'status: +VERIFICATION_STATUS_PASSED' \
+    "a gate that reads the repository and its toolchain still passes"
 rm -rf "$REPO"
 
 echo ""

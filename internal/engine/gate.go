@@ -14,6 +14,7 @@ import (
 	"time"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
+	"github.com/misfitdev/frank-grimes/internal/confine"
 	"github.com/misfitdev/frank-grimes/internal/proc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -29,15 +30,23 @@ const gateOutputLimit = 4 << 20
 
 // ExecGate runs one command over a whole fix batch and records what it did.
 //
-// The gate is not a role and is not confined: it is the repository's own check,
-// selected by a rule the record names, and it has to be able to build. What
-// bounds it is the worktree it runs in, which is where the batch already is.
+// The gate is not a role, but it is a command out of the repository all the
+// same, and it runs inside the same boundary the fixing role does: it may build
+// in the worktree and may not reach the operator's own tree or the review's
+// record. A working directory is not a boundary.
 type ExecGate struct {
 	// Command is run through a shell, because a repository's check is written
 	// for one: "just check", "make test && make lint".
 	Command  string
 	Selected pb.GateSelection
 	Timeout  time.Duration
+	// Confine bounds the gate the way a role is bounded. Root is the review
+	// directory and Writable is the worktree holding the batch. Nothing else:
+	// a gate that stages or commits is writing the repository's history, which
+	// belongs to the supervisor and to the one commit it is authorized to make.
+	Confine  confine.Mechanism
+	Root     string
+	Writable []string
 }
 
 // Run executes the gate in cwd and reports the outcome whichever way it exits.
@@ -60,7 +69,16 @@ func (g ExecGate) Run(ctx context.Context, cwd string) (*pb.Verification, error)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "/bin/sh", "-c", g.Command)
+	argv := []string{"/bin/sh", "-c", g.Command}
+	if g.Confine != nil {
+		wrapped, err := g.Confine.Wrap(confine.Policy{Root: g.Root, WriteDirs: g.Writable}, argv)
+		if err != nil {
+			return nil, err
+		}
+		argv = wrapped
+	}
+
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = cwd
 	// A gate is given a repository, not a conversation.
 	cmd.Stdin = nil

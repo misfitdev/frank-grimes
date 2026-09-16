@@ -118,7 +118,7 @@ func cmdRun(args []string) (int, error) {
 		Broker:        engine.StrictBroker{},
 		Adjudicator:   adjudicatorFor(cfg, run, mech),
 		Refuter:       refuterFor(cfg, run, mech),
-		Gate:          gateFor(cfg),
+		Gate:          gateFor(cfg, mech),
 		Inventory:     store.NewFileInventoryStore(cfg.Dir),
 		Content:       store.NewFileContentStore(cfg.Dir),
 		Claims:        store.NewFileClaimStore(cfg.Dir),
@@ -154,11 +154,13 @@ func cmdRun(args []string) (int, error) {
 //
 // Report mode edits nothing, so there is nothing to verify and the record says
 // so rather than leaving the field to be read as a gate that failed.
-func gateFor(cfg *config) engine.GateRunner {
+func gateFor(cfg *config, mech confine.Mechanism) engine.GateRunner {
 	if cfg.Mode != pb.Mode_MODE_FIX {
 		return engine.NotApplicableGate{}
 	}
-	return engine.SelectGate(cfg.VerifyCommand, cfg.Dir, cfg.RepositoryCheck)
+	g := engine.SelectGate(cfg.VerifyCommand, cfg.Dir, cfg.RepositoryCheck)
+	g.Confine = mech
+	return g
 }
 
 // mechanismFor resolves how each role will be confined, and proves it before

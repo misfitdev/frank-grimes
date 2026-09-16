@@ -212,6 +212,12 @@ func (w *Worktree) Remove(ctx context.Context) error {
 // Changed lists the repository-relative paths the worktree differs from its
 // starting commit in, tracked or not, in the order git reports them.
 func (w *Worktree) Changed(ctx context.Context) ([]string, error) {
+	// What this returns decides which findings the batch is credited with and
+	// whether it stayed in scope, so it is asked of the repository this
+	// worktree belonged to when it was opened.
+	if err := w.check(ctx); err != nil {
+		return nil, err
+	}
 	out, err := w.git(ctx, "status", "--porcelain=v1", "-z", "--untracked-files=all")
 	if err != nil {
 		return nil, err

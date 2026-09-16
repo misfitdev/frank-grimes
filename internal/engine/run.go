@@ -134,6 +134,12 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	if fix != nil {
 		gateDir = fix.tree.Dir
 	}
+	if fix != nil {
+		if g, ok := e.Gate.(ExecGate); ok {
+			g.Root, g.Writable = e.Dir, []string{fix.tree.Dir}
+			e.Gate = g
+		}
+	}
 	verification, err := e.Gate.Run(ctx, gateDir)
 	if err != nil {
 		return nil, fmt.Errorf("gate: %w", err)

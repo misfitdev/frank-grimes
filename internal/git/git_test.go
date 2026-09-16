@@ -248,6 +248,26 @@ func TestACommitIntoARepointedWorktreeIsRefused(t *testing.T) {
 	}
 }
 
+// What Changed reports decides which findings the batch is credited with and
+// whether it stayed in scope, so it is asked of the repository this worktree
+// belonged to when it was opened.
+func TestChangedFromARepointedWorktreeIsRefused(t *testing.T) {
+	ctx := context.Background()
+	mine, theirs := repo(t), repo(t)
+	head, _ := mine.Head(ctx)
+	w, err := mine.AddWorktree(ctx, filepath.Join(t.TempDir(), "fix"), "grimes/fix-6", head)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, filepath.Join(w.Dir, ".git"), "gitdir: "+filepath.Join(theirs.Dir, ".git")+"\n")
+
+	_, err = w.Changed(ctx)
+
+	if !errors.Is(err, ErrForeignWorktree) {
+		t.Fatalf("err = %v, want ErrForeignWorktree", err)
+	}
+}
+
 func TestRemoveTakesTheWorktreeAndItsBranch(t *testing.T) {
 	ctx := context.Background()
 	r := repo(t)

@@ -136,6 +136,8 @@ When your provider supports arguments, you can skip the interactive prompts:
 
 A finding whose file the batch touched is recorded as `fixed`. It becomes `verified` only when the gate passed after the edit. The gate is `--verify-command`, or — with `--repository-check` — a `check` recipe in a checked-in `justfile` or `Makefile`. That second one is a command from inside the target, so the flag is you saying you have read it; without the flag it is found and not run. A gate that fails or cannot run verifies nothing, and the worktree is left on disk with its path in the run record so you can read or cherry-pick it.
 
+The gate runs inside the same boundary the fixer does: it may build in the worktree, and it cannot reach your working tree, the review's own record, or the repository's history. A check that stages or commits is refused — that history belongs to the supervisor and to the one commit it is authorized to make.
+
 `--commit` is authorized separately from `--mode fix`, and makes at most one commit per verified batch, on the worktree's own branch, naming the findings it closes. A batch that edited outside the reviewed scope is refused whole.
 
 ### Confinement
