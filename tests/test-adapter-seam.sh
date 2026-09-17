@@ -160,6 +160,24 @@ set -e
 assert_eq "$EMPTY_CODE" "0" "an untouched project allows exit"
 
 echo ""
+echo "--- Recent changes means what a clean tree cannot show ---"
+
+# A tree is clean precisely because the work was just committed, and the two
+# working-tree diffs are then empty: an adapter that asks only those resolves a
+# review of the last commit to nothing.
+GRIND_CMD="$PROJECT_ROOT/adapters/claude-code/commands/grind.md"
+if grep -qF 'git diff HEAD^ HEAD' "$GRIND_CMD"; then
+    pass "the adapter asks what the last commit introduced"
+else
+    fail "the adapter asks what the last commit introduced"
+fi
+if grep -qF 'no parent to compare against' "$GRIND_CMD"; then
+    pass "and says what that means on a repository with one commit"
+else
+    fail "and says what that means on a repository with one commit"
+fi
+
+echo ""
 echo "--- The documented commands produce a record the engine accepts ---"
 
 # Run the sequence grind.md specifies, with the report a review would build.
