@@ -82,7 +82,7 @@ Review Contract
 - Unknowns: [facts not established]
 ```
 
-A review has one artifact set, and every unit it resolves to is a unit the review is accountable for. Where the subject spans several artifacts, **name the narrowest artifact that contains them**: the file itself when the subject is one file, the directory when it is several. What that artifact holds beyond the subject is not thereby out of scope; it is coverage the review owes, and the difference between what was named and what was examined caps `review_completeness` rather than going unsaid.
+A review has one artifact set, and every unit it resolves to is a unit the review is accountable for. Where the subject spans several artifacts, **name the narrowest artifact that contains them**: the file itself when the subject is one file, the directory when it is several, the revision range when the subject is a change rather than a place. What that artifact holds beyond the subject is not thereby out of scope; it is coverage the review owes, and the difference between what was named and what was examined caps `review_completeness` rather than going unsaid.
 
 Resolve the artifact set with recorded read-only commands when an artifact is on disk: record `pwd`; record the repository's own file or diff command when one exists, otherwise record `rg --files` and the paths selected. For a supplied non-file artifact, record its name and boundaries instead of inventing a command. Derive claims and invariants from user-stated requirements and observable behavior; label every inference.
 

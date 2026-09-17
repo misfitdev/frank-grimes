@@ -394,6 +394,43 @@ assert_no_match "$OUT" 'legacy_color' \
     "a refused batch produces no result"
 rm -rf "$REPO"
 
+# A range selecting more than one file, and a batch that commits an edit to one
+# of them. The spelling means something different once that commit lands, and a
+# second iteration that re-read it would review only what the fixer touched and
+# measure coverage against that.
+REPO="$(repository)"
+printf 'echo second\n' >"$REPO/src/other.sh"
+git -C "$REPO" add -A
+git -C "$REPO" commit --quiet --message "add another file"
+# shellcheck disable=SC2016 # the text is the target's content
+printf 'rm -rf ./build/*\n# edited\n' >"$REPO/src/app.sh"
+printf 'echo second, edited\n' >"$REPO/src/other.sh"
+git -C "$REPO" add -A
+git -C "$REPO" commit --quiet --message "touch both"
+run_range_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" \
+    --verify-command="true" --commit >/dev/null
+UNITS="$(grimes-contract decode-report --type=TargetInventory \
+    "$REPO/.grimes/inventory.pb" 2>/dev/null | grep -cE '^ *id:' || true)"
+if [[ "$UNITS" == "2" ]]; then
+    pass "the first iteration reviews both files the range changed"
+else
+    fail "the first iteration reviews both files the range changed (got $UNITS)"
+fi
+SECOND="$(run_range_fix "$REPO" --provider-command="$FAKES/provider-green.sh" \
+    --verify-command="true" --commit)"
+# Asserted before the count: a refused second run leaves the first run's
+# inventory on disk, and counting that would pass without anything having been
+# collected again.
+assert_no_match "$SECOND" 'error:' "a committed iteration is collected again rather than refused"
+AGAIN="$(grimes-contract decode-report --type=TargetInventory \
+    "$REPO/.grimes/inventory.pb" 2>/dev/null | grep -cE '^ *id:' || true)"
+if [[ "$AGAIN" == "2" ]]; then
+    pass "and a committed iteration still reviews both, not just what it fixed"
+else
+    fail "and a committed iteration still reviews both, not just what it fixed (got $AGAIN)"
+fi
+rm -rf "$REPO"
+
 echo ""
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"

@@ -1176,6 +1176,28 @@ else
 fi
 rm -rf "$WS"
 
+# A review directory inside the repository. git names a range's files from the
+# repository root, and the collector joins them onto the directory it was given:
+# taken root-relative, every one of them would resolve to a path that is not
+# there and the range would look empty.
+WS="$(ranged)"
+set +e
+OUT="$(cd "$WS/src" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-green.sh" \
+    --format=prototext 'HEAD^..HEAD' 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" != "1" ]]; then
+    pass "a range resolves from a subdirectory of the repository"
+else
+    fail "a range resolved to nothing from a subdirectory: $OUT"
+fi
+if show_inventory "$WS/src" | grep -qE 'id: +"a.sh"'; then
+    pass "and its units are named relative to the directory under review"
+else
+    fail "and its units are named relative to the directory under review"
+fi
+rm -rf "$WS"
+
 echo ""
 echo "--- A scope that reads two ways is refused rather than guessed at ---"
 

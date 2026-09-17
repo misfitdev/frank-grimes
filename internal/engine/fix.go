@@ -37,9 +37,11 @@ type fixRun struct {
 	// scope was named: everything under a path, or exactly the files a range
 	// changed.
 	inScope func(string) bool
-	gate    *pb.Verification
-	closed  []string
-	commit  string
+	// continued reports a worktree an earlier iteration left behind.
+	continued bool
+	gate      *pb.Verification
+	closed    []string
+	commit    string
 }
 
 // prepareFix puts the batch somewhere the operator's own working tree is not.
@@ -63,7 +65,7 @@ func (e *Engine) prepareFix(ctx context.Context) (*fixRun, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &fixRun{repo: repo, tree: tree}, nil
+		return &fixRun{repo: repo, tree: tree, continued: true}, nil
 	}
 
 	// .grimes is the review's own, not the operator's work.
@@ -85,6 +87,27 @@ func (e *Engine) prepareFix(ctx context.Context) (*fixRun, error) {
 }
 
 func fixBranch(runID string) string { return "grimes/fix-" + contracts.RunSlug(runID) }
+
+// pinned returns the scope a continued fix run is to collect, which is the one
+// its first iteration resolved.
+//
+// A symbolic range names different commits once the run has committed a batch.
+// Re-resolving "HEAD^..HEAD" after a fix commit would make the next iteration a
+// review of that commit, dropping every other file the range originally
+// selected, and coverage would be measured against what the fixer touched
+// rather than against what was asked about. The recorded scope is itself a
+// range spelling, so collecting it again resolves to the same commits.
+func pinned(f *fixRun, ledger *pb.Ledger, spec TargetSpec) TargetSpec {
+	if f == nil || !f.continued {
+		return spec
+	}
+	was := ledger.GetTarget().GetScope()
+	if was == "" || !strings.Contains(was, "..") {
+		return spec
+	}
+	spec.Scope = was
+	return spec
+}
 
 // record returns what the run says it did with its edits.
 func (f *fixRun) record() *pb.FixBatch {
@@ -230,6 +253,13 @@ func commitMessage(closed []string) string {
 // is what separates that from a target that moved on its own, and a later run
 // that cannot show the same record is still refused.
 func (e *Engine) rebaseline(ctx context.Context, spec TargetSpec, collected *Collected, ledger *pb.Ledger) error {
+	// A range is re-collected as the commits it resolved to, not as the
+	// spelling. By now the batch may have been committed, and the spelling
+	// would name that commit: the ledger would come away describing a review of
+	// the fix rather than of what was asked about.
+	if collected.Range {
+		spec.Scope = collected.Target.GetScope()
+	}
 	again, err := e.Collector.Collect(ctx, spec)
 	if err != nil {
 		return fmt.Errorf("rechecking the target: %w", err)

@@ -98,15 +98,20 @@ func (r *Repo) mergeBase(ctx context.Context, a, b string) (string, error) {
 	return strings.TrimSpace(out), nil
 }
 
-// RangeFiles lists the repository-relative paths the range changed and that
-// still exist at its far end.
+// RangeFiles lists the paths the range changed, relative to this repository
+// handle's own directory, that still exist at its far end.
+//
+// Relative to the handle rather than to the repository root, because a caller
+// pointed at a subdirectory joins these onto that subdirectory: root-relative
+// names would double the prefix and resolve to nothing. It also bounds the list
+// to what is under the directory the review is of.
 //
 // A file the range deleted is left out. There are no bytes to review, no line
 // for a finding to anchor to, and counting it would inflate the denominator
 // coverage is measured against with a unit no reviewer could examine.
 func (r *Repo) RangeFiles(ctx context.Context, rg Range) ([]string, error) {
 	out, err := r.run(ctx, "diff", "--name-only", "-z", "--diff-filter=d",
-		"--no-renames", "--end-of-options", rg.From, rg.To)
+		"--no-renames", "--relative", "--end-of-options", rg.From, rg.To)
 	if err != nil {
 		return nil, err
 	}

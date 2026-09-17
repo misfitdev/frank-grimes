@@ -96,7 +96,7 @@ Execute a Grimes Grind on the target using the grimey methodology.
     ```
   - If "Something else" is selected (or the user writes a custom answer), ask them to describe the target and use their response as the scope.
   - **Scope resolution:**
-    - "Recent changes" → pass the revision range itself as the target, `HEAD^..HEAD`. The engine resolves it to the files those commits changed, and coverage is then measured against that set rather than against the whole repository. For work that is not committed yet, run `git diff HEAD --name-only` and resolve what it names to an artifact set the way Phase 1 requires. On a repository whose only commit is its first there is no parent to range against, so the uncommitted set is all there is
+    - "Recent changes" → the target argument takes a revision range, so pass `HEAD^..HEAD` (or a wider range) directly. For work that is not committed yet, run `git diff HEAD --name-only`. On a repository whose only commit is its first there is no parent to range against. Resolve what you have the way Phase 1 requires
     - "Whole repo" → use the repository root as the target
     - Custom → use the provided path/description as the target
 
