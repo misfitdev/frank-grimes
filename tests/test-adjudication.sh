@@ -129,6 +129,17 @@ assert_present "$SKILL" 'caps the verdict at .conditional|caps at .conditional' 
     "accepted-but-unfixed P0 caps the verdict"
 
 echo ""
+echo "--- A panel is all of the reviewers it asked for ---"
+assert_present "$SKILL" 'Asking for several independent reviewers is asking for all of them' \
+    "skill treats a requested panel as a whole"
+assert_present "$SKILL" 'has not been adjudicated as asked' \
+    "skill refuses a short panel as adjudication"
+assert_present "$SKILL" 'strictest decision among the reviewers' \
+    "skill resolves a panel by the rule that resolves two"
+assert_present "$SKILL" 'every reviewer that answered is one whose independence was established' \
+    "skill holds one uncertain reviewer against the whole panel"
+
+echo ""
 echo "--- The old self-certifying escape hatch is gone ---"
 assert_absent "$GRIND" 'All P0 risks mitigated or explicitly accepted with timeline' \
     "adapter no longer grants GREEN to an accepted P0"

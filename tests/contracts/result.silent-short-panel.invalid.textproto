@@ -1,0 +1,41 @@
+# One of two reviewers answered, and the record says nothing about the one that
+# did not. A shortfall that is not reported is a smaller panel presented whole.
+schema_major: 2
+run_id: "run-003"
+producer_role: PRODUCER_ROLE_ORCHESTRATOR
+target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
+mode: MODE_REPORT
+iteration: 1
+max_iterations: 5
+completion_state: COMPLETION_STATE_CONTINUE
+verdict { decision: DECISION_CONDITIONAL residual_risk: RESIDUAL_RISK_MODERATE review_confidence: REVIEW_CONFIDENCE_MEDIUM review_completeness: REVIEW_COMPLETENESS_LIMITED }
+legacy_color: LEGACY_COLOR_YELLOW
+marginal_yield { candidates_examined: 6 candidates_disproved: 6 }
+counts { total: 0 }
+independent_review {
+  run_id: "run-003-adj"
+  reviewer_id: "reviewer-0"
+  context_origin: CONTEXT_ORIGIN_ENGINE_SPAWNED
+  target_fingerprint_sha256: "01234567890123456789012345678901"
+  verdict { decision: DECISION_PASS residual_risk: RESIDUAL_RISK_LOW review_confidence: REVIEW_CONFIDENCE_HIGH review_completeness: REVIEW_COMPLETENESS_SUFFICIENT }
+  completed_at { seconds: 1780000000 }
+}
+verification { status: VERIFICATION_STATUS_NOT_APPLICABLE selected_by: GATE_SELECTION_UNAVAILABLE }
+ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678901" }
+unmet_gates: "decision"
+unmet_gates: "residual_risk"
+unmet_gates: "review_confidence"
+unmet_gates: "review_completeness"
+summary: "Every routed category reached its stop with nothing surviving."
+confinement: "sandbox-exec"
+adjudication {
+  requested: 2
+  completed {
+    run_id: "run-003-adj"
+    reviewer_id: "reviewer-0"
+    context_origin: CONTEXT_ORIGIN_ENGINE_SPAWNED
+    target_fingerprint_sha256: "01234567890123456789012345678901"
+    verdict { decision: DECISION_PASS residual_risk: RESIDUAL_RISK_LOW review_confidence: REVIEW_CONFIDENCE_HIGH review_completeness: REVIEW_COMPLETENESS_SUFFICIENT }
+    completed_at { seconds: 1780000000 }
+  }
+}

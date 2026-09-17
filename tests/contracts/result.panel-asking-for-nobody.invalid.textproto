@@ -1,0 +1,45 @@
+# A recorded panel that asked for nobody. A run with no reviewers records no
+# panel; one that records a panel asked for someone.
+schema_major: 2
+run_id: "run-003"
+producer_role: PRODUCER_ROLE_ORCHESTRATOR
+target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
+mode: MODE_REPORT
+iteration: 1
+max_iterations: 5
+completion_state: COMPLETION_STATE_REVIEW_COMPLETE
+verdict { decision: DECISION_PASS residual_risk: RESIDUAL_RISK_LOW review_confidence: REVIEW_CONFIDENCE_HIGH review_completeness: REVIEW_COMPLETENESS_SUFFICIENT }
+legacy_color: LEGACY_COLOR_GREEN
+marginal_yield { candidates_examined: 6 candidates_disproved: 6 }
+counts { total: 0 }
+verification { status: VERIFICATION_STATUS_NOT_APPLICABLE selected_by: GATE_SELECTION_UNAVAILABLE }
+independent_review {
+  run_id: "run-003-adj"
+  reviewer_id: "grimey-verifier"
+  context_origin: CONTEXT_ORIGIN_ENGINE_SPAWNED
+  target_fingerprint_sha256: "01234567890123456789012345678901"
+  verdict { decision: DECISION_PASS residual_risk: RESIDUAL_RISK_LOW review_confidence: REVIEW_CONFIDENCE_HIGH review_completeness: REVIEW_COMPLETENESS_SUFFICIENT }
+  completed_at { seconds: 1780000000 }
+}
+ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678901" }
+summary: "Every routed category reached its stop with nothing surviving."
+confinement: "sandbox-exec"
+adjudication {
+  requested: 0
+  completed {
+    run_id: "run-003-adj"
+    reviewer_id: "reviewer-0"
+    context_origin: CONTEXT_ORIGIN_ENGINE_SPAWNED
+    target_fingerprint_sha256: "01234567890123456789012345678901"
+    verdict { decision: DECISION_PASS residual_risk: RESIDUAL_RISK_LOW review_confidence: REVIEW_CONFIDENCE_HIGH review_completeness: REVIEW_COMPLETENESS_SUFFICIENT }
+    completed_at { seconds: 1780000000 }
+  }
+  completed {
+    run_id: "run-003-adj"
+    reviewer_id: "reviewer-1"
+    context_origin: CONTEXT_ORIGIN_ENGINE_SPAWNED
+    target_fingerprint_sha256: "01234567890123456789012345678901"
+    verdict { decision: DECISION_PASS residual_risk: RESIDUAL_RISK_LOW review_confidence: REVIEW_CONFIDENCE_HIGH review_completeness: REVIEW_COMPLETENESS_SUFFICIENT }
+    completed_at { seconds: 1780000000 }
+  }
+}

@@ -959,6 +959,23 @@ enum ContextOrigin {
 // The retired zero_knowledge field was a bool constrained to true, which made
 // an honest "we cannot tell" unrepresentable: every record asserted
 // independence because the schema permitted nothing else.
+// What a run asked for in the way of independent review, and what answered.
+//
+// Asking for several reviewers is asking for all of them: a count of what was
+// requested is the only thing that makes a missing one visible, since the
+// reviews that did arrive look exactly like a smaller panel that was never
+// asked for.
+message AdjudicationPanel {
+  option (buf.validate.message).cel = {
+    id: "panel.requested_at_least_one"
+    message: "a recorded panel must have asked for at least one reviewer"
+    expression: "this.requested > 0u"
+  };
+
+  uint32 requested = 1;
+  repeated IndependentReview completed = 2;
+}
+
 message IndependentReview {
   reserved 3;
   reserved "zero_knowledge";
@@ -1068,6 +1085,28 @@ message GrimesResult {
     expression: "!has(this.fix_batch) || this.mode == 2"
   };
   option (buf.validate.message).cel = {
+    id: "result.short_panel_is_an_unmet_gate"
+    message: "a run that got fewer reviewers than it asked for must report the adjudication gate as unmet"
+    expression:
+      "!has(this.adjudication) || "
+      "uint(size(this.adjudication.completed)) >= this.adjudication.requested || "
+      "this.unmet_gates.exists(g, g == 'adjudication')"
+  };
+  option (buf.validate.message).cel = {
+    id: "result.green_needs_the_whole_panel"
+    message: "GREEN requires every reviewer the run asked for to have answered"
+    expression:
+      "this.legacy_color != 1 || !has(this.adjudication) || "
+      "uint(size(this.adjudication.completed)) >= this.adjudication.requested"
+  };
+  option (buf.validate.message).cel = {
+    id: "result.panel_names_the_review_that_stood"
+    message: "a panel that answered must carry the review whose verdict stood"
+    expression:
+      "!has(this.adjudication) || size(this.adjudication.completed) == 0 || "
+      "has(this.independent_review)"
+  };
+  option (buf.validate.message).cel = {
     id: "result.green_is_independent_and_verified"
     message: "GREEN requires an independent matching pass from a context the engine spawned, no oscillation, and required verification"
     expression:
@@ -1150,6 +1189,9 @@ message GrimesResult {
   // What a fix-mode run did with its edits. Absent in report mode, which edits
   // nothing.
   FixBatch fix_batch = 22;
+  // The reviewers this run asked for and the ones that answered.
+  // independent_review above is the one of them whose verdict stood.
+  AdjudicationPanel adjudication = 23;
 }
 
 // Where a fix-mode run put its edits, and what became of them.

@@ -296,6 +296,10 @@ An independent pass never upgrades a primary `block` or `conditional`. Adjudicat
 
 **When adjudication is unavailable.** Record `Independent adjudication: not available`, set `review_confidence = low`, and treat `pass` as unreachable: the verdict caps at `conditional`/YELLOW. A provider that cannot furnish a separately identified context cannot produce GREEN. Absence of a second opinion is not agreement.
 
+**When more than one reviewer was asked for.** Asking for several independent reviewers is asking for all of them. Record how many were asked for and how many answered. A review that got fewer than were asked for has not been adjudicated as asked: the shortfall is reported and `pass` stays unreachable, because reading the reviews that did arrive as the whole panel is the quiet downgrade that asking for a panel was meant to prevent.
+
+The strictest decision among the reviewers is the one that stands, by the rule that already resolves two. One objection is an objection whoever raised it, and a reviewer whose context cannot be established makes the whole panel uncertain: confidence rises only when every reviewer that answered is one whose independence was established.
+
 **Compromised independence.** If the primary report, its findings, or its evidence reach the adjudicator, independence is broken. Record it as a finding, mark adjudication `not available`, and apply the cap above. A contaminated confirmation is worth less than none, because it looks like corroboration.
 
 **Accepted but unfixed P0.** A P0 that a human accepted rather than fixed caps the verdict at `conditional`/YELLOW even when adjudication confirms. Acceptance is a decision to carry risk, not evidence that the risk is gone.
