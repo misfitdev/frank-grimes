@@ -81,30 +81,41 @@ func (e *Exec) confined(req engine.Request) ([]string, error) {
 	return e.Confine.Wrap(p, e.Command)
 }
 
-// discardAbandoned removes the report this pass was accumulating, if it is
-// still there when the pass ends.
+// discardAbandoned removes whatever this pass was accumulating, if it is still
+// there when the pass ends.
 //
 // A sealed report clears itself, so anything left is a pass that did not get
-// that far. Only this pass's own leftovers are touched: the file records which
-// pass opened it, and one opened outside any pass is the documented sequence
-// where a review builds its report before the run that carries it.
+// that far. Found by looking rather than by name: a role may accumulate into a
+// file of its own choosing, and the one place it can write them is this
+// directory, so every marker in it is asked who it belongs to.
+//
+// Only this pass's own leftovers are touched. A marker naming another pass is
+// that pass's business, and a report opened outside any pass has no marker at
+// all — the documented sequence, where a review builds its report before the
+// run that carries it.
 func (e *Exec) discardAbandoned(req engine.Request) {
 	root, err := filepath.Abs(e.Dir)
 	if err != nil {
 		return
 	}
-	report := filepath.Join(root, store.ReportPath)
-	pass := filepath.Join(root, store.ReportPath+".pass")
-	held, err := os.ReadFile(pass)
+	markers, err := filepath.Glob(filepath.Join(root, store.WorkDir, "*"+passSuffix))
 	if err != nil {
 		return
 	}
-	if strings.TrimSpace(string(held)) != contracts.PassToken(req.RunID, roleName(req.Role), req.Iteration) {
-		return
+	mine := contracts.PassToken(req.RunID, roleName(req.Role), req.Iteration)
+	for _, marker := range markers {
+		held, err := os.ReadFile(marker)
+		if err != nil || strings.TrimSpace(string(held)) != mine {
+			continue
+		}
+		_ = os.Remove(strings.TrimSuffix(marker, passSuffix))
+		_ = os.Remove(marker)
 	}
-	_ = os.Remove(report)
-	_ = os.Remove(pass)
 }
+
+// passSuffix names a report's marker from the report. The contract CLI writes
+// it; this is the only other place that has to recognise one.
+const passSuffix = ".pass"
 
 // lookup reports where the role's command will be found, resolving it the way
 // the spawned process will.

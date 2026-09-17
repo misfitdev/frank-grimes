@@ -371,6 +371,18 @@ assert_match "$OUT" 'total: +1' "the next pass delivers only its own candidate"
 assert_no_match "$OUT" 'open_p0' "and not the P0 the abandoned pass had opened"
 rm -rf "$WS"
 
+# The default path is a default, not a rule. A pass that accumulated into a file
+# of its own still leaves it to the pass that spawned it.
+WS="$(workspace)"
+run_grimes "$WS" --provider-command="$FAKES/provider-abandons-elsewhere.sh" >/dev/null
+LEFT="$(find "$WS/.grimes/work" -type f 2>/dev/null | wc -l | tr -d ' ')"
+if [[ "$LEFT" == "0" ]]; then
+    pass "a pass that named its own report leaves neither it nor its marker"
+else
+    fail "a pass that named its own report leaves neither it nor its marker ($LEFT left)"
+fi
+rm -rf "$WS"
+
 # With the report left in place by hand, the refusal is what stands between one
 # pass's candidates and another pass's report.
 WS="$(workspace)"
