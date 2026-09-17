@@ -5,7 +5,6 @@ package confine
 import (
 	"fmt"
 	"os/exec"
-	"path/filepath"
 	"strings"
 )
 
@@ -51,17 +50,27 @@ func profile(p Policy) string {
 	b.WriteString("(version 1)\n(allow default)\n")
 
 	fmt.Fprintf(&b, "(deny file-write* (subpath %s))\n", quote(p.Root))
-	if p.WriteDir != "" {
-		fmt.Fprintf(&b, "(allow file-write* (subpath %s))\n", quote(p.WriteDir))
+	for _, w := range p.WriteDirs {
+		fmt.Fprintf(&b, "(allow file-write* (subpath %s))\n", quote(w))
 	}
 
-	fmt.Fprintf(&b, "(deny file-read* (subpath %s))\n", quote(filepath.Join(p.Root, GrimesDir)))
+	// After the grants, and again for reads below. A fixing role is handed the
+	// whole repository, and the review's own directory is inside it: granted
+	// first and taken back here, since the last rule to match is the one that
+	// applies.
+	fmt.Fprintf(&b, "(deny file-write* (subpath %s))\n", quote(p.grimesDir()))
+	fmt.Fprintf(&b, "(deny file-read* (subpath %s))\n", quote(p.grimesDir()))
 	for _, r := range p.ReadPaths {
 		fmt.Fprintf(&b, "(allow file-read* (literal %s))\n", quote(r))
 	}
-	// A directory it may write is a directory it may read back.
-	if p.WriteDir != "" {
-		fmt.Fprintf(&b, "(allow file-read* (subpath %s))\n", quote(p.WriteDir))
+	// Only what the role is meant to keep inside that directory: its own work.
+	// Everything else it may write is outside, where reads are allowed anyway.
+	for _, w := range p.WriteDirs {
+		if !p.inGrimes(w) {
+			continue
+		}
+		fmt.Fprintf(&b, "(allow file-write* (subpath %s))\n", quote(w))
+		fmt.Fprintf(&b, "(allow file-read* (subpath %s))\n", quote(w))
 	}
 	return b.String()
 }

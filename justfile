@@ -40,11 +40,17 @@ sync-github:
     python3 scripts/sync-beads-github.py
 
 # Lint, format-check, validate, and run contract tests
-check: lint fmt-check proto-lint proto-breaking vet test-go validate test-fix-gate test-adjudication test-refutation test-stop-hook test-contracts test-collector test-orchestrator test-adapter-seam test-confinement
+check: lint fmt-check proto-lint proto-breaking vet test-go validate test-fix-gate test-adjudication test-refutation test-stop-hook test-contracts test-collector test-orchestrator test-adapter-seam test-confinement test-fix
 
 # Vet the Go packages
+#
+# Both platforms, because the confinement backends are behind build tags: a
+# darwin-only vet cannot see a linux file at all, and the first thing to notice
+# would be CI.
 vet:
     go vet ./...
+    GOOS=linux go build ./...
+    GOOS=darwin go build ./...
 
 # Run the Go unit tests
 test-go:
@@ -69,6 +75,10 @@ test-stop-hook:
 # Run the execution-boundary tests
 test-confinement:
     ./tests/test-confinement.sh
+
+# Run the fix-mode supervisor tests
+test-fix:
+    ./tests/test-fix.sh
 
 # Regenerate protobuf bindings from the contract
 gen:

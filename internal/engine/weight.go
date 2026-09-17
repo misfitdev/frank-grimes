@@ -44,8 +44,13 @@ func count(cands []Candidate) *pb.FindingCounts {
 // Accepting a risk is a decision to carry it, not evidence it is gone, so an
 // accepted finding ranks in residual risk even though it is not open. Counting
 // it as open instead would demand a block the decision rules do not produce.
+//
+// A fix that no gate has passed over is the same kind of claim: someone edited
+// something and said it was enough. Only verified leaves nothing behind.
 func carriesRisk(s pb.FindingStatus) bool {
-	return Open(s) || s == pb.FindingStatus_FINDING_STATUS_ACCEPTED
+	return Open(s) ||
+		s == pb.FindingStatus_FINDING_STATUS_ACCEPTED ||
+		s == pb.FindingStatus_FINDING_STATUS_FIXED
 }
 
 func decide(in DeriveInput, counts *pb.FindingCounts) pb.Decision {

@@ -31,6 +31,10 @@ func (e *Engine) assemble(
 		NewP0P1:       yield.GetNewP0P1(),
 		Exhausted:     Exhausted(d.UnmetGates),
 	})
+	completion := outcome.CompletionState()
+	if mode == pb.Mode_MODE_FIX {
+		completion = fixCompletion(outcome, verification)
+	}
 	return &pb.GrimesResult{
 		SchemaMajor:       contracts.SchemaMajor,
 		RunId:             e.RunID,
@@ -39,7 +43,7 @@ func (e *Engine) assemble(
 		Mode:              mode,
 		Iteration:         iteration,
 		MaxIterations:     e.MaxIterations,
-		CompletionState:   outcome.CompletionState(),
+		CompletionState:   completion,
 		Verdict:           d.Verdict,
 		LegacyColor:       d.Color,
 		RefuterCheck:      check,

@@ -1,0 +1,33 @@
+# A fix batch whose gate passed and was committed. The commit is what lets the
+# batch name the findings it closed.
+schema_major: 2
+run_id: "run-010"
+producer_role: PRODUCER_ROLE_ORCHESTRATOR
+target { root: "/repo" scope: "bad-script.sh" fingerprint_sha256: "01234567890123456789012345678901" display: "bad-script.sh" kind: TARGET_KIND_CODE }
+mode: MODE_FIX
+iteration: 1
+max_iterations: 5
+completion_state: COMPLETION_STATE_CONTINUE
+verdict { decision: DECISION_CONDITIONAL residual_risk: RESIDUAL_RISK_MODERATE review_confidence: REVIEW_CONFIDENCE_MEDIUM review_completeness: REVIEW_COMPLETENESS_LIMITED }
+legacy_color: LEGACY_COLOR_YELLOW
+marginal_yield { candidates_examined: 4 candidates_disproved: 3 }
+counts { total: 1 verified: 1 }
+verification {
+  status: VERIFICATION_STATUS_PASSED
+  command: "just check"
+  cwd { value: "." }
+  exit_code: 0
+  output_sha256: "01234567890123456789012345678901"
+  completed_at { seconds: 1789600000 }
+  selected_by: GATE_SELECTION_USER_SUPPLIED
+}
+ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678901" }
+unmet_gates: "coverage"
+summary: "One deletion path fixed and verified."
+confinement: "sandbox-exec"
+fix_batch {
+  worktree: "/tmp/grimes-fix-010"
+  branch: "grimes/fix-010"
+  commit_sha1: "0123456789012345678a"
+  closed_finding_ids: "FG-SEC-0001"
+}

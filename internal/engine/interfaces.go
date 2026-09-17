@@ -18,6 +18,10 @@ type TargetSpec struct {
 	Kind       pb.TargetKind
 	Snapshot   string
 	Categories []pb.Category
+	// KeepBodies asks collection to hold what it read, for a run that is about
+	// to change it. Evidence is checked against the bytes that were reviewed,
+	// and after a fix the file on disk is not those.
+	KeepBodies bool
 }
 
 // Role distinguishes the primary review from the roles that receive far less
@@ -61,6 +65,9 @@ type Request struct {
 	// ClaimsPath is where a refuter reads the claims it is to attack. No other
 	// role receives it.
 	ClaimsPath string
+	// WriteRoot is the worktree a fixing role may change. Empty for every role
+	// that is only reading, which is all of them outside fix mode.
+	WriteRoot  string
 	Mode       pb.Mode
 	Iteration  uint32
 	Categories []pb.Category
@@ -96,6 +103,10 @@ type Collected struct {
 	// inject the line it then quotes and have the citation admitted against a
 	// fingerprint taken before the edit.
 	UnitDigests map[string][]byte
+	// UnitBodies is what each unit held at collection time, kept only when the
+	// run is going to change them. Evidence is checked against the bytes that
+	// were reviewed, and in fix mode the file on disk is no longer those.
+	UnitBodies map[string][]byte
 }
 
 // Collector resolves a caller's target spec into a fingerprinted target, the

@@ -38,5 +38,6 @@ grimes-contract report seal \
     --target-scope="${GRIMES_TARGET_SCOPE:-src}" \
     --kind="${GRIMES_TARGET_KIND:-code}" \
     --iteration="${GRIMES_ITERATION:-1}" \
+    --mode="${GRIMES_MODE:-report}" \
     --routed="$CATEGORIES" \
     --examined="$1" --disproved="$2" --summary="$3"

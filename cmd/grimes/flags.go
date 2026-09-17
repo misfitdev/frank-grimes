@@ -10,7 +10,6 @@ import (
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
-	"github.com/misfitdev/frank-grimes/internal/engine"
 )
 
 // repeatedArg collects one flag occurrence per argument, so an argument
@@ -73,6 +72,7 @@ type config struct {
 	Mode               pb.Mode
 	VerifyCommand      string
 	Commit             bool
+	RepositoryCheck    bool
 	MaxIterations      uint
 	AutoLoop           bool
 	Research           string
@@ -110,6 +110,7 @@ func parseRun(args []string) (*config, error) {
 	mode := fs.String("mode", "report", "report or fix")
 	verify := fs.String("verify-command", "", "gate command run once over a fix batch")
 	commit := fs.Bool("commit", false, "authorize one commit; requires --mode fix and a passing gate")
+	repoCheck := fs.Bool("repository-check", false, "authorize running the repository's own check recipe as the gate; it is a command from inside the target, so this is you saying you have read it")
 	maxIter := fs.Uint("max-iterations", 5, "iteration ceiling")
 	autoLoop := fs.Bool("auto-loop", false, "continue while iterations still change the verdict")
 	research := fs.String("research", "offline", "online, offline, or frozen:<path>; advisory until execution boundaries land")
@@ -148,6 +149,7 @@ func parseRun(args []string) (*config, error) {
 		ScopeSet:         wasSet(fs, "scope"),
 		VerifyCommand:    *verify,
 		Commit:           *commit,
+		RepositoryCheck:  *repoCheck,
 		MaxIterations:    *maxIter,
 		AutoLoop:         *autoLoop,
 		Research:         *research,
@@ -234,11 +236,16 @@ func (c *config) validate() error {
 	if c.Commit && c.Mode != pb.Mode_MODE_FIX {
 		return fmt.Errorf("--commit requires --mode fix")
 	}
-	if c.Commit && c.VerifyCommand == "" {
-		return fmt.Errorf("--commit requires --verify-command")
+	if c.Commit && c.VerifyCommand == "" && !c.RepositoryCheck {
+		return fmt.Errorf("--commit requires --verify-command or --repository-check")
 	}
-	if c.Mode == pb.Mode_MODE_FIX {
-		return engine.ErrFixModeUnsupported
+	if c.RepositoryCheck && c.Mode != pb.Mode_MODE_FIX {
+		return fmt.Errorf("--repository-check requires --mode fix")
+	}
+	// A fix run edits a checkout and commits from one. Every other kind of
+	// target is bytes with no history to put a worktree on.
+	if c.Mode == pb.Mode_MODE_FIX && c.Kind != pb.TargetKind_TARGET_KIND_CODE {
+		return fmt.Errorf("--mode fix applies only to --kind code")
 	}
 	if len(c.ProviderCommand) == 0 {
 		return fmt.Errorf("--provider-command is required")

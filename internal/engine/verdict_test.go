@@ -168,6 +168,19 @@ func TestDeriveVerifiedCarriesNoRisk(t *testing.T) {
 	}
 }
 
+// An unverified fix is an edit and a claim about it, which is what every other
+// unevidenced assertion in this engine is refused for.
+func TestDeriveFixedButUnverifiedStillCarriesRisk(t *testing.T) {
+	in := clean()
+	in.Candidates = []Candidate{{
+		Severity: pb.Severity_SEVERITY_P0, Status: pb.FindingStatus_FINDING_STATUS_FIXED,
+		Tier: pb.EvidenceTier_EVIDENCE_TIER_E1, ProbeAttempted: true,
+	}}
+	if got := Derive(in).Verdict.GetResidualRisk(); got != pb.ResidualRisk_RESIDUAL_RISK_CRITICAL {
+		t.Errorf("residual risk = %v, want critical for a fix no gate passed over", got)
+	}
+}
+
 func TestDeriveUnweightedFindingsExcluded(t *testing.T) {
 	for _, tag := range []string{TagAssumptionDependent, TagUnverified} {
 		in := clean()

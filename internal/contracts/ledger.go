@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
+	"google.golang.org/protobuf/proto"
 )
 
 // allowedTransitions is the whole lifecycle. Anything absent is rejected;
@@ -49,6 +50,9 @@ type TransitionOpts struct {
 	Actor          string
 	NewEvidenceSum []byte
 	Owner          *pb.HumanOwner
+	// VerifiedBySum is the output digest of the gate that passed over this
+	// finding's fix. Required to reach verified and refused anywhere else.
+	VerifiedBySum []byte
 }
 
 // Transition applies one lifecycle change to one finding.
@@ -87,6 +91,18 @@ func Transition(l *pb.Ledger, id string, to pb.FindingStatus, opts TransitionOpt
 		return false, fmt.Errorf("illegal transition for %s: %s -> %s", id, shortStatus(from), shortStatus(to))
 	}
 
+	// Restored on refusal. Validation runs over the ledger this has already
+	// changed, so without this a refused transition leaves the finding in the
+	// state it was refused for, and the next attempt is refused for that
+	// instead.
+	before := proto.Clone(f).(*pb.Finding)
+	defer func() {
+		if err != nil {
+			proto.Reset(f)
+			proto.Merge(f, before)
+		}
+	}()
+
 	if to == pb.FindingStatus_FINDING_STATUS_REGRESSED &&
 		(from == pb.FindingStatus_FINDING_STATUS_FIXED || from == pb.FindingStatus_FINDING_STATUS_VERIFIED) {
 		oscillation = true
@@ -100,12 +116,13 @@ func Transition(l *pb.Ledger, id string, to pb.FindingStatus, opts TransitionOpt
 	}
 	f.Status = to
 	f.History = append(f.History, &pb.FindingEvent{
-		Iteration:      opts.Iteration,
-		From:           from,
-		To:             to,
-		EvidenceSha256: f.GetEvidenceSha256(),
-		At:             nowTimestamp(),
-		Actor:          opts.Actor,
+		Iteration:        opts.Iteration,
+		From:             from,
+		To:               to,
+		EvidenceSha256:   f.GetEvidenceSha256(),
+		At:               nowTimestamp(),
+		Actor:            opts.Actor,
+		VerifiedBySha256: opts.VerifiedBySum,
 	})
 
 	if err := Validate(l); err != nil {

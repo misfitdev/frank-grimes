@@ -22,6 +22,7 @@ import (
 	"github.com/misfitdev/frank-grimes/internal/confine"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
 	"github.com/misfitdev/frank-grimes/internal/engine"
+	"github.com/misfitdev/frank-grimes/internal/proc"
 	"github.com/misfitdev/frank-grimes/internal/store"
 )
 
@@ -67,9 +68,15 @@ func (e *Exec) confined(req engine.Request) ([]string, error) {
 	// it here. Created by the engine because creating it is itself a write into
 	// the review directory the role is not allowed to make.
 	//
-	p.WriteDir = filepath.Join(root, store.WorkDir)
-	if err := os.MkdirAll(p.WriteDir, 0o755); err != nil {
+	work := filepath.Join(root, store.WorkDir)
+	if err := os.MkdirAll(work, 0o755); err != nil {
 		return nil, err
+	}
+	p.WriteDirs = append(p.WriteDirs, work)
+	// A fixing role is handed the worktree as well: the target it is reviewing
+	// stays read-only, and the copy it was authorized to change does not.
+	if req.WriteRoot != "" {
+		p.WriteDirs = append(p.WriteDirs, req.WriteRoot)
 	}
 	return e.Confine.Wrap(p, e.Command)
 }
@@ -137,10 +144,10 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	// that decided to prompt would hold the operator's terminal until the
 	// timeout, and read whatever was typed at it in the meantime.
 	cmd.Stdin = nil
-	setProcessGroup(cmd)
+	proc.SetGroup(cmd)
 	// CommandContext kills only the direct child; a shell provider leaves its
 	// own children holding the pipe open and Wait blocks past the deadline.
-	cmd.Cancel = func() error { return killGroup(cmd) }
+	cmd.Cancel = func() error { return proc.KillGroup(cmd) }
 	cmd.WaitDelay = 5 * time.Second
 
 	stdout, err := cmd.StdoutPipe()
@@ -161,7 +168,7 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	out, readErr := io.ReadAll(io.LimitReader(stdout, limit+1))
 	overrun := int64(len(out)) > limit
 	if overrun {
-		_ = killGroup(cmd)
+		_ = proc.KillGroup(cmd)
 		// Closed rather than drained: a descendant that left the process group
 		// survives the kill, and draining its output would wait on a writer
 		// that has no reason to stop.

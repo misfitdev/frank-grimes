@@ -674,6 +674,19 @@ enum RefuterCheck {
 // ---------------------------------------------------------------------------
 
 message FindingEvent {
+  // A move to verified is the one transition a context cannot assert: it is a
+  // claim about a gate, so the gate's own output digest is what carries it.
+  option (buf.validate.message).cel = {
+    id: "finding_event.verified_carries_its_gate"
+    message: "a move to verified must carry the digest of the gate that passed"
+    expression: "this.to != 3 || size(this.verified_by_sha256) == 32"
+  };
+  option (buf.validate.message).cel = {
+    id: "finding_event.only_verified_carries_a_gate"
+    message: "only a move to verified carries a gate digest"
+    expression: "this.to == 3 || size(this.verified_by_sha256) == 0"
+  };
+
   uint32 iteration = 1 [(buf.validate.field).uint32.gt = 0];
   FindingStatus from = 2 [(buf.validate.field).enum.defined_only = true];
   FindingStatus to = 3 [(buf.validate.field).enum = {
@@ -683,6 +696,11 @@ message FindingEvent {
   bytes evidence_sha256 = 4 [(buf.validate.field).bytes.len = 32];
   google.protobuf.Timestamp at = 5 [(buf.validate.field).required = true];
   string actor = 6 [(buf.validate.field).string.min_len = 1];
+  // The output digest of the verification that passed over this finding's fix.
+  bytes verified_by_sha256 = 7 [
+    (buf.validate.field).bytes.len = 32,
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
 }
 
 message Finding {
@@ -768,6 +786,15 @@ message Ledger {
   uint32 schema_minor = 2;
   Target target = 3 [(buf.validate.field).required = true];
   map<string, Finding> findings = 4;
+  // The target this ledger's findings were raised against before a fix moved
+  // it. Present only on a ledger that crossed a fingerprint change, and written
+  // by the run that made the change: it is what separates a target the review
+  // edited from one that moved under it.
+  repeated bytes ancestor_fingerprints_sha256 = 5 [(buf.validate.field).repeated = {
+    items: {
+      bytes: {len: 32}
+    }
+  }];
 }
 
 // ---------------------------------------------------------------------------
@@ -1014,6 +1041,32 @@ message GrimesResult {
       "this.unmet_gates.exists(g, g == 'coverage' || g == 'refutation') ? 6 : 2"
       ") : 1)"
   };
+  // The fix-mode counterpart of the rule above. Same stopping discipline, with
+  // two differences the mode forces: a finished run is FIX_COMPLETE, and a run
+  // whose gate did not pass has not finished anything, so it is BOUNDED rather
+  // than complete.
+  option (buf.validate.message).cel = {
+    id: "result.fix_completion_is_derived"
+    message: "the completion state must be the one the colour, iteration, bound, exhaustion, and gate imply"
+    expression:
+      "this.mode != 2 || this.completion_state == ("
+      "this.legacy_color == 1 ? 3 : "
+      "this.iteration >= this.max_iterations ? 4 : "
+      "(this.iteration > 1 && this.marginal_yield.new_p0_p1 == 0u) ? ("
+      "this.unmet_gates.exists(g, g == 'coverage' || g == 'refutation') ? 6 : "
+      "(this.verification.status == 1 ? 3 : 6)"
+      ") : 1)"
+  };
+  option (buf.validate.message).cel = {
+    id: "result.commit_requires_a_passed_gate"
+    message: "a batch may be committed only when the gate it ran passed"
+    expression: "!has(this.fix_batch) || size(this.fix_batch.commit_sha1) == 0 || this.verification.status == 1"
+  };
+  option (buf.validate.message).cel = {
+    id: "result.fix_batch_belongs_to_fix_mode"
+    message: "only a fix-mode run records a fix batch"
+    expression: "!has(this.fix_batch) || this.mode == 2"
+  };
   option (buf.validate.message).cel = {
     id: "result.green_is_independent_and_verified"
     message: "GREEN requires an independent matching pass from a context the engine spawned, no oscillation, and required verification"
@@ -1094,6 +1147,45 @@ message GrimesResult {
   // rather than flagged, so a record says which mechanism was relied on and a
   // reader can tell a built-in boundary from an operator's wrapper.
   string confinement = 21 [(buf.validate.field).string.min_len = 1];
+  // What a fix-mode run did with its edits. Absent in report mode, which edits
+  // nothing.
+  FixBatch fix_batch = 22;
+}
+
+// Where a fix-mode run put its edits, and what became of them.
+//
+// A batch is the whole iteration's work, not one fix: the gate runs once over
+// all of it, so nothing smaller than the batch has a verification to point at.
+message FixBatch {
+  // A commit is the only outcome that needs no directory to point at, since the
+  // edits are in history by then. Anything else has to say where the work is,
+  // or the run has quietly thrown away what it did.
+  option (buf.validate.message).cel = {
+    id: "fix_batch.uncommitted_work_has_a_place"
+    message: "a batch that produced no commit must name the directory holding its edits"
+    expression: "size(this.commit_sha1) != 0 || this.worktree != ''"
+  };
+  // Findings a commit closes are the ones the gate passed over. Naming them
+  // when there is no commit would claim a closure nothing verified.
+  option (buf.validate.message).cel = {
+    id: "fix_batch.closed_requires_commit"
+    message: "only a committed batch closes findings"
+    expression: "size(this.commit_sha1) != 0 || size(this.closed_finding_ids) == 0"
+  };
+
+  // Absolute: a worktree is outside the repository it was made from, so this is
+  // not a RepoPath.
+  string worktree = 1;
+  string branch = 2;
+  bytes commit_sha1 = 3 [
+    (buf.validate.field).bytes.len = 20,
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
+  repeated string closed_finding_ids = 4 [(buf.validate.field).repeated = {
+    items: {
+      string: {min_len: 1}
+    }
+  }];
 }
 
 message LoopState {

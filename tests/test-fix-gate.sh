@@ -122,6 +122,31 @@ assert_present "$PROTO" 'VERIFICATION_STATUS_(PASSED|FAILED|UNAVAILABLE|NOT_APPL
     "the contract names every verification status"
 
 echo ""
+echo "--- A ledger crosses a fix only with a record of the change ---"
+assert_present "$SKILL" 'recorded the previous fingerprint as the new target.s parent' \
+    "skill carries a ledger across a fix only against a recorded parent"
+assert_present "$SKILL" 'unexplained change' \
+    "skill names a fingerprint change with no record as unexplained"
+assert_present "$SKILL" 'anchor that vanished is evidence that something moved' \
+    "skill refuses a vanished anchor as proof of a repair"
+
+echo ""
+echo "--- A fix batch is bounded by the scope the review resolved ---"
+assert_present "$SKILL" 'invalidates the batch rather than shrinking it' \
+    "skill refuses an out-of-scope batch whole"
+assert_present "$SKILL" 'not re-reported as new' \
+    "skill carries findings across a fix without re-reporting them"
+assert_present "$SKILL" 'has regressed, which is a different fact' \
+    "skill separates a regression from a defect nobody fixed"
+
+echo ""
+echo "--- An unverifiable batch is kept, not discarded ---"
+assert_present "$SKILL" 'kept rather than discarded, and the record says where' \
+    "skill keeps edits an unavailable gate could not test"
+assert_present "$SKILL" 'Prose is not a command' \
+    "skill resolves the documented-command rule through a reader, not the engine"
+
+echo ""
 echo "========================================"
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"

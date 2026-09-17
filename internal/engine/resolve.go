@@ -160,6 +160,12 @@ func unitBytes(unit *pb.TargetUnit, against *Collected) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		// What collection read, when the run kept it. A fix run has edited the
+		// file by now, on purpose, and a citation is checked against the bytes
+		// the review was raised over rather than the ones that replaced them.
+		if kept, ok := against.UnitBodies[unit.GetId()]; ok {
+			return string(kept), nil
+		}
 		body, err := os.ReadFile(path)
 		if err != nil {
 			return "", fmt.Errorf("%w: cannot read %q", ErrProviderOutput, unit.GetId())

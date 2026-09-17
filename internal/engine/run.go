@@ -37,12 +37,27 @@ type Engine struct {
 	Confinement string
 	// Unconfined is set when the operator waived it.
 	Unconfined bool
+	// Commit authorizes one commit per verified batch, separately from fix
+	// mode itself. Without it a fix run edits and stops.
+	Commit bool
+	// Mode is what this run was asked for, held here because the roles after
+	// the first are handed a target a fix run has already changed.
+	Mode pb.Mode
 }
 
 // Run executes one iteration and returns the result the engine derived.
 func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.GrimesResult, error) {
+	// Before collection: in fix mode the bytes under review are the worktree's,
+	// so the worktree has to exist before anything is fingerprinted.
+	e.Mode = mode
+	var fix *fixRun
 	if mode == pb.Mode_MODE_FIX {
-		return nil, ErrFixModeUnsupported
+		var err error
+		if fix, err = e.prepareFix(ctx, spec.Scope); err != nil {
+			return nil, err
+		}
+		spec.Root = fix.tree.Dir
+		spec.KeepBodies = true
 	}
 
 	collected, err := e.Collector.Collect(ctx, spec)
@@ -51,14 +66,14 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	}
 	target := collected.Target
 
-	iteration, err := e.resume(ctx, target)
-	if err != nil {
-		return nil, err
-	}
-
 	ledger, err := e.Ledger.Load(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("ledger: %w", err)
+	}
+
+	iteration, err := e.resume(ctx, target, ledger)
+	if err != nil {
+		return nil, err
 	}
 	if err := adoptLedger(ledger, target); err != nil {
 		return nil, err
@@ -92,7 +107,13 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	if e.Inventory != nil {
 		inventoryPath = e.Inventory.Path()
 	}
-	report, err := e.review(ctx, target, collected.ContentPath, inventoryPath, collected.Categories, mode, iteration)
+	// The worktree is the one place a fixing role may write, and the only role
+	// that gets it is this one.
+	writeRoot := ""
+	if fix != nil {
+		writeRoot = fix.tree.Dir
+	}
+	report, err := e.review(ctx, target, collected.ContentPath, inventoryPath, writeRoot, collected.Categories, mode, iteration)
 	if err != nil {
 		return nil, err
 	}
@@ -107,9 +128,27 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		return nil, err
 	}
 
-	verification, err := e.Gate.Run(ctx, e.Dir)
+	// The gate runs where the batch is, which in report mode is the review
+	// directory nothing edited.
+	gateDir := e.Dir
+	if fix != nil {
+		gateDir = fix.tree.Dir
+	}
+	if fix != nil {
+		if g, ok := e.Gate.(ExecGate); ok {
+			g.Root, g.Writable = e.Dir, []string{fix.tree.Dir}
+			e.Gate = g
+		}
+	}
+	verification, err := e.Gate.Run(ctx, gateDir)
 	if err != nil {
 		return nil, fmt.Errorf("gate: %w", err)
+	}
+	if fix != nil {
+		fix.gate = verification
+		if err := e.settle(ctx, fix, ledger, iteration); err != nil {
+			return nil, err
+		}
 	}
 
 	// Before either derivation reads the ledger: both tuples have to be over the
@@ -157,7 +196,13 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		Unconfined:              e.Unconfined,
 	})
 
-	if err := e.recheck(ctx, spec, collected); err != nil {
+	// The target a fix run leaves behind is not the one it reviewed, and that is
+	// the one difference between the two modes here.
+	if fix != nil {
+		if err := e.rebaseline(ctx, spec, collected, ledger); err != nil {
+			return nil, err
+		}
+	} else if err := e.recheck(ctx, spec, collected); err != nil {
 		return nil, err
 	}
 
@@ -168,6 +213,9 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 
 	yield := marginalYield(report, ledger, surfaced)
 	result := e.assemble(target, mode, iteration, final, review, verification, ledger, digest, oscillation, yield, check)
+	if fix != nil {
+		result.FixBatch = fix.record()
+	}
 	if _, err := contracts.EncodeCanonical(result); err != nil {
 		return nil, fmt.Errorf("derived result rejected by the contract: %w", err)
 	}
@@ -185,13 +233,17 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 // fingerprinted, once per role. One with a path of its own cannot be copied
 // that way, so it is recollected and the run refused if its fingerprint moved.
 //
-// This does not confine the provider, and a process it left behind can still
-// reach a staged copy between the write and the read. Closing that is
-// fg-64y.7.
+// In fix mode the target has changed by now, on purpose, and what a later role
+// reads is the batch rather than the bytes the primary reviewed. That can only
+// make the verdict stricter, since the engine takes the stricter of the two
+// decisions either way, and the fingerprint the role answers against is still
+// the reviewed one. Handing it the reviewed bytes instead is fg-dfs.
 func (e *Engine) handoff(ctx context.Context, spec TargetSpec, collected *Collected, role Role) (string, error) {
 	if len(collected.ContentBytes) == 0 {
-		if err := e.recheck(ctx, spec, collected); err != nil {
-			return "", err
+		if e.Mode != pb.Mode_MODE_FIX {
+			if err := e.recheck(ctx, spec, collected); err != nil {
+				return "", err
+			}
 		}
 		return collected.ContentPath, nil
 	}
@@ -247,7 +299,7 @@ func adoptLedger(ledger *pb.Ledger, target *pb.Target) error {
 
 // resume returns the iteration this run is on, refusing state raised against a
 // different target.
-func (e *Engine) resume(ctx context.Context, target *pb.Target) (uint32, error) {
+func (e *Engine) resume(ctx context.Context, target *pb.Target, ledger *pb.Ledger) (uint32, error) {
 	state, err := e.State.Load(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("state: %w", err)
@@ -255,7 +307,15 @@ func (e *Engine) resume(ctx context.Context, target *pb.Target) (uint32, error) 
 	if state == nil {
 		return 1, nil
 	}
-	if !proto.Equal(state.GetTarget(), target) {
+	// A fix run leaves state describing the bytes it reviewed and a ledger
+	// describing the bytes it produced, so the iteration after it collects
+	// neither of the two things a report-mode run would compare. What carries
+	// it across is the ledger's own record of the change: this target, from
+	// that one. What refuses a move nobody recorded is adoptLedger, below, and
+	// it is unchanged.
+	carried := descends(ledger, state.GetTarget().GetFingerprintSha256()) &&
+		bytes.Equal(ledger.GetTarget().GetFingerprintSha256(), target.GetFingerprintSha256())
+	if !proto.Equal(state.GetTarget(), target) && !carried {
 		return 0, fmt.Errorf("%w: state holds %q, this run is %q",
 			ErrStaleState, state.GetTarget().GetScope(), target.GetScope())
 	}
@@ -268,13 +328,14 @@ func (e *Engine) resume(ctx context.Context, target *pb.Target) (uint32, error) 
 
 // review obtains and decodes provider output. Nothing here is trusted beyond
 // its findings; every authoritative field on the proposal is discarded.
-func (e *Engine) review(ctx context.Context, target *pb.Target, contentPath, inventoryPath string, categories []pb.Category, mode pb.Mode, iteration uint32) (*pb.ProviderReport, error) {
+func (e *Engine) review(ctx context.Context, target *pb.Target, contentPath, inventoryPath, writeRoot string, categories []pb.Category, mode pb.Mode, iteration uint32) (*pb.ProviderReport, error) {
 	out, err := e.Provider.Review(ctx, Request{
 		Role:          RolePrimary,
 		RunID:         e.RunID,
 		Target:        target,
 		ContentPath:   contentPath,
 		InventoryPath: inventoryPath,
+		WriteRoot:     writeRoot,
 		Mode:          mode,
 		Iteration:     iteration,
 		Categories:    categories,

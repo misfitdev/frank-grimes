@@ -38,6 +38,21 @@ const probeTimeout = 30 * time.Second
 // choose --unsafe instead; the probe is here for a mechanism that is broken or
 // inert, which is the one that looks like a working one.
 func Verify(ctx context.Context, m Mechanism, root string) error {
+	return verify(ctx, m, root, false)
+}
+
+// VerifyFixing proves the boundary a fixing role runs under, which permits the
+// repository and must still refuse the review's own directory.
+//
+// A separate probe because it is a separate policy: a mechanism that gets the
+// read-only case right can still hand a writable root to a role that was only
+// supposed to get the worktree, and the run it produces looks the same either
+// way.
+func VerifyFixing(ctx context.Context, m Mechanism, root string) error {
+	return verify(ctx, m, root, true)
+}
+
+func verify(ctx context.Context, m Mechanism, root string, fixing bool) error {
 	if _, ok := m.(Unsafe); ok {
 		return nil
 	}
@@ -76,13 +91,21 @@ func Verify(ctx context.Context, m Mechanism, root string) error {
 	// never happened.
 	const ran = "grimes-probe-ran"
 
+	// A second write, inside the review's own directory. The read-only policy
+	// denies both; the fixing policy denies only this one, which is the half
+	// that is still load-bearing when a role is allowed to edit.
+	insideGrimes := filepath.Join(dir, "written")
+
 	// The probe is confined by a policy that hands it nothing: no readable
-	// path, no writable directory. Every mechanism that works at all must stop
-	// both of these.
-	argv, err := m.Wrap(Policy{Root: root}, []string{
+	// path, and a writable directory only where a fixing role would have one.
+	policy := Policy{Root: root}
+	if fixing {
+		policy.WriteDirs = []string{root}
+	}
+	argv, err := m.Wrap(policy, []string{
 		"/bin/sh", "-c",
-		fmt.Sprintf("echo %s; cat %s 2>/dev/null; : >%s 2>/dev/null; exit 0",
-			shellQuote(ran), shellQuote(readable), shellQuote(written)),
+		fmt.Sprintf("echo %s; cat %s 2>/dev/null; : >%s 2>/dev/null; : >%s 2>/dev/null; exit 0",
+			shellQuote(ran), shellQuote(readable), shellQuote(written), shellQuote(insideGrimes)),
 	})
 	if err != nil {
 		return err
@@ -117,9 +140,20 @@ func Verify(ctx context.Context, m Mechanism, root string) error {
 	if strings.Contains(string(out), secret) {
 		leaked = append(leaked, "read a file it was not handed")
 	}
+	if _, err := os.Stat(insideGrimes); err == nil {
+		_ = os.Remove(insideGrimes)
+		leaked = append(leaked, "wrote inside the review's own directory")
+	}
 	if _, err := os.Stat(written); err == nil {
 		_ = os.Remove(written)
-		leaked = append(leaked, "wrote inside the target")
+		// A fixing role is allowed the repository; that is the whole point of
+		// the policy, and finding the file here proves the mechanism applied
+		// the grant rather than that it lost the boundary.
+		if !fixing {
+			leaked = append(leaked, "wrote inside the target")
+		}
+	} else if fixing {
+		leaked = append(leaked, "could not write the worktree it was handed")
 	}
 	if len(leaked) > 0 {
 		return fmt.Errorf("%w: under %s a probe %s", ErrNotConfined, m.Name(), strings.Join(leaked, " and "))

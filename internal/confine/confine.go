@@ -14,6 +14,7 @@ package confine
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 )
 
 // Policy is what one role may do inside the reviewed repository.
@@ -23,16 +24,20 @@ import (
 // the per-provider knowledge this package refuses to hold.
 type Policy struct {
 	// Root is the reviewed repository. Nothing under it is writable except
-	// WriteDir.
+	// WriteDirs.
 	Root string
 	// ReadPaths are the files under Root/.grimes this role was handed. The rest
 	// of that directory is unreadable: the ledger, the result, the loop state,
 	// and the copies staged for other roles.
 	ReadPaths []string
-	// WriteDir is the one directory this role may write, empty when it should
-	// write nothing. A directory rather than a file because a record is written
+	// WriteDirs are the directories this role may write, empty when it should
+	// write nothing. Directories rather than files because a record is written
 	// through a temporary file and a rename, which a single-file mount refuses.
-	WriteDir string
+	//
+	// A fixing role gets two: the one it records what it did in, and the
+	// worktree holding the bytes it was authorized to change. Everything else
+	// under Root stays read-only, including the target the worktree came from.
+	WriteDirs []string
 }
 
 // GrimesDir is the review's own directory inside the target, named here
@@ -59,10 +64,12 @@ func (p Policy) resolve() (Policy, error) {
 		}
 		out.ReadPaths = append(out.ReadPaths, got)
 	}
-	if p.WriteDir != "" {
-		if out.WriteDir, err = resolvePath(p.WriteDir, "writable directory"); err != nil {
+	for _, w := range p.WriteDirs {
+		got, err := resolvePath(w, "writable directory")
+		if err != nil {
 			return Policy{}, err
 		}
+		out.WriteDirs = append(out.WriteDirs, got)
 	}
 	return out, nil
 }
@@ -78,6 +85,31 @@ func resolvePath(path, what string) (string, error) {
 		return "", fmt.Errorf("confine: resolving %s %q: %w", what, path, err)
 	}
 	return resolved, nil
+}
+
+// grimesDir is Root's review directory, which every backend has to carve back
+// out of whatever it granted.
+func (p Policy) grimesDir() string { return filepath.Join(p.Root, GrimesDir) }
+
+// inGrimes reports whether a granted directory sits inside the review's own,
+// which is the only case a backend has to re-grant after denying it.
+func (p Policy) inGrimes(dir string) bool {
+	rel, err := filepath.Rel(p.grimesDir(), dir)
+	if err != nil {
+		return false
+	}
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}
+
+// writableRoot reports whether the whole repository was granted, which is what
+// a fixing role gets and nothing else does.
+func (p Policy) writableRoot() bool {
+	for _, w := range p.WriteDirs {
+		if w == p.Root {
+			return true
+		}
+	}
+	return false
 }
 
 // Mechanism turns the argv a role would have run into the argv that runs it

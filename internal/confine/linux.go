@@ -5,7 +5,6 @@ package confine
 import (
 	"fmt"
 	"os/exec"
-	"path/filepath"
 )
 
 // bubblewrap applies the policy through bwrap.
@@ -42,14 +41,30 @@ func (bubblewrap) Wrap(p Policy, argv []string) ([]string, error) {
 		// it is setuid this is unnecessary and harmless.
 		"--unshare-user-try",
 		"--dev-bind", "/", "/",
-		"--ro-bind", p.Root, p.Root,
-		"--tmpfs", filepath.Join(p.Root, GrimesDir),
 	}
+	// Mounts apply in order, so the repository is bound before the review's own
+	// directory is replaced: a fixing role that was handed the whole repository
+	// still finds nothing where the ledger is.
+	if p.writableRoot() {
+		out = append(out, "--bind", p.Root, p.Root)
+	} else {
+		out = append(out, "--ro-bind", p.Root, p.Root)
+	}
+	for _, w := range p.WriteDirs {
+		if w == p.Root || p.inGrimes(w) {
+			continue
+		}
+		out = append(out, "--bind", w, w)
+	}
+	out = append(out, "--tmpfs", p.grimesDir())
 	for _, r := range p.ReadPaths {
 		out = append(out, "--ro-bind", r, r)
 	}
-	if p.WriteDir != "" {
-		out = append(out, "--bind", p.WriteDir, p.WriteDir)
+	// Last, over the tmpfs: what the role keeps inside the review's directory.
+	for _, w := range p.WriteDirs {
+		if p.inGrimes(w) {
+			out = append(out, "--bind", w, w)
+		}
 	}
 	// A provider command can begin with something that looks like a bwrap flag.
 	return append(append(out, "--"), argv...), nil

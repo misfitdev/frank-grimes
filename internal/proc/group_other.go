@@ -1,6 +1,6 @@
 //go:build !unix
 
-package provider
+package proc
 
 import "os/exec"
 
@@ -13,11 +13,11 @@ import "os/exec"
 // than pretended: the package does not build on these targets.
 //
 // Every shipped path in this repository is POSIX.
-func init() { panic("provider: process-group termination is unimplemented on this platform") }
+func init() { panic("proc: process-group termination is unimplemented on this platform") }
 
-func setProcessGroup(*exec.Cmd) {}
+func SetGroup(*exec.Cmd) {}
 
-func killGroup(cmd *exec.Cmd) error {
+func KillGroup(cmd *exec.Cmd) error {
 	if cmd.Process == nil {
 		return nil
 	}

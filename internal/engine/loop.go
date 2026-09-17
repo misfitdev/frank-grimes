@@ -69,6 +69,27 @@ func (o LoopOutcome) CompletionState() pb.CompletionState {
 	}
 }
 
+// fixCompletion is the report-mode stopping rule read for a mode that edits.
+//
+// A run that finished has fixed something, so a finish is recorded as such. A
+// run that ran out of new findings without its gate ever passing has verified
+// nothing: it stopped, and saying it completed would put the word on an
+// iteration where no batch was ever tested.
+func fixCompletion(o LoopOutcome, v *pb.Verification) pb.CompletionState {
+	passed := v.GetStatus() == pb.VerificationStatus_VERIFICATION_STATUS_PASSED
+	switch o {
+	case OutcomeConfirmedPass, OutcomeYieldExhausted:
+		if passed {
+			return pb.CompletionState_COMPLETION_STATE_FIX_COMPLETE
+		}
+		// Whatever else it was, it was not a finished fix: nothing here has
+		// been tested.
+		return pb.CompletionState_COMPLETION_STATE_BOUNDED
+	default:
+		return o.CompletionState()
+	}
+}
+
 // Progress is what the stopping rule reads. It holds nothing about which files
 // the two callers loaded, so the record the engine writes and the decision the
 // stop hook reaches are the same conclusion over the same facts.
