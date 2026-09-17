@@ -479,6 +479,57 @@ fi
 rm -rf "$REPO"
 
 echo ""
+echo "--- A repair is credited only to a claim that survived an attack ---"
+
+# The fixing role reports a defect and repairs it in one pass, so nothing has
+# tested whether there was a defect to repair. The gate is evidence about the
+# repair: an edit that compiles is not evidence there was something to compile
+# away. A claim a second context broke has not earned one.
+REPO="$(repository)"
+REVIEWED="$(cat "$REPO/src/app.sh")"
+OUT="$("$GRIMES" run --dir="$REPO" --mode=fix \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --refuter-command="$FAKES/refuter-refuted.sh" --refuter-fresh \
+    --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true" --commit \
+    --format=prototext src 2>&1 || true)"
+# Asserted first: a pass that never graded the control raises nothing above
+# unattacked, and every check below would hold without an attack having run.
+assert_match "$OUT" 'refuter_check: +REFUTER_CHECK_PASSED' \
+    "the refutation pass was one the engine could grade"
+assert_match "$OUT" 'provenance: +FINDING_PROVENANCE_REFUTED' \
+    "a claim a second context broke is recorded as broken"
+assert_no_match "$OUT" 'status: +FINDING_STATUS_FIXED' \
+    "and the edit made for it does not make it fixed"
+assert_no_match "$OUT" 'status: +FINDING_STATUS_VERIFIED' \
+    "nor verified, whatever the gate said"
+assert_no_match "$OUT" 'commit_sha1' \
+    "and nothing is committed over it"
+# The edit is still there to read; it is credited to nothing.
+TREE="$(worktree_of "$OUT")"
+if [[ -n "$TREE" && "$(cat "$TREE/src/app.sh")" != "$REVIEWED" ]]; then
+    pass "the edit stands in the worktree for the operator to read"
+else
+    fail "the edit stands in the worktree for the operator to read"
+fi
+rm -rf "$REPO"
+
+# The same run with the claim upheld: the ordering must not cost a real repair
+# its credit.
+REPO="$(repository)"
+OUT="$("$GRIMES" run --dir="$REPO" --mode=fix \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --refuter-command="$FAKES/refuter-upheld.sh" --refuter-fresh \
+    --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true" --commit \
+    --format=prototext src 2>&1 || true)"
+assert_match "$OUT" 'provenance: +FINDING_PROVENANCE_UPHELD' \
+    "a claim that survived the attack is recorded as having survived"
+assert_match "$OUT" 'status: +FINDING_STATUS_VERIFIED' \
+    "and the repair made for it is verified"
+assert_match "$OUT" 'commit_sha1' \
+    "and committed"
+rm -rf "$REPO"
+
+echo ""
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"
 [[ "$FAILED" -eq 0 ]] || exit 1
