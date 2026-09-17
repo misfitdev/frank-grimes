@@ -210,10 +210,10 @@ func cmdReportAdd(args []string) error {
 // Written whole and renamed into place, since the engine collects it as soon as
 // the pass returns and a partial file would read as a truncated report rather
 // than as a write still in progress.
-func deliverSealed(fallbackDir string, encoded []byte) error {
+func deliverSealed(fallbackDir string, encoded []byte) (bool, error) {
 	pass := os.Getenv("GRIMES_PASS")
 	if pass == "" {
-		return nil
+		return false, nil
 	}
 	// The engine names this directory absolutely, because a role is free to run
 	// the contract CLI from wherever it likes and a relative path would then
@@ -223,16 +223,33 @@ func deliverSealed(fallbackDir string, encoded []byte) error {
 		dir = fallbackDir
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("delivering the sealed report: %w", err)
+		return false, fmt.Errorf("delivering the sealed report: %w", err)
 	}
 	final := filepath.Join(dir, filepath.Base(contracts.WorkEnvelopePath(pass)))
 	tmp := final + ".partial"
 	if err := os.WriteFile(tmp, []byte(envelope.WrapReport(encoded)), 0o600); err != nil {
-		return fmt.Errorf("delivering the sealed report: %w", err)
+		return false, fmt.Errorf("delivering the sealed report: %w", err)
 	}
 	if err := os.Rename(tmp, final); err != nil {
 		_ = os.Remove(tmp)
-		return fmt.Errorf("delivering the sealed report: %w", err)
+		return false, fmt.Errorf("delivering the sealed report: %w", err)
+	}
+	return true, nil
+}
+
+// emitSealed delivers the envelope and then writes it to stdout.
+//
+// Delivery comes first, and a stdout write that fails afterwards is not an
+// error. The engine closes an over-limit pipe, and a role killed by its own
+// broken stdout would take a report that had already been delivered with it:
+// exiting cleanly is what lets that report be collected.
+func emitSealed(fallbackDir string, encoded []byte) error {
+	delivered, err := deliverSealed(fallbackDir, encoded)
+	if err != nil {
+		return err
+	}
+	if _, err := fmt.Print(envelope.WrapReport(encoded)); err != nil && !delivered {
+		return err
 	}
 	return nil
 }
@@ -365,14 +382,8 @@ func cmdReportSeal(args []string) error {
 		if _, err := os.Stdout.Write(encoded); err != nil {
 			return err
 		}
-	} else if _, err := fmt.Print(envelope.WrapReport(encoded)); err != nil {
+	} else if err := emitSealed(filepath.Dir(*file), encoded); err != nil {
 		return err
-	}
-
-	if !*raw {
-		if err := deliverSealed(filepath.Dir(*file), encoded); err != nil {
-			return err
-		}
 	}
 
 	// Sealing ends this report, but only once it has been delivered. The

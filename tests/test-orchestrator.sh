@@ -248,6 +248,52 @@ assert_no_match "$OUT" 'unmet_gates: +"adjudication"' \
     "and the adjudication gate is met"
 rm -rf "$WS"
 
+# A role can put something other than a file where the engine collects. This
+# read happens after the process has been waited on, so nothing else would have
+# interrupted it.
+WS="$(workspace)"
+set +e
+"$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-fifo-envelope.sh" src \
+    >/dev/null 2>&1 &
+FIFO_PID=$!
+WAITED=0
+while kill -0 "$FIFO_PID" 2>/dev/null && [[ "$WAITED" -lt 30 ]]; do
+    sleep 1
+    WAITED=$((WAITED + 1))
+done
+if kill -0 "$FIFO_PID" 2>/dev/null; then
+    kill -9 "$FIFO_PID" 2>/dev/null
+    wait "$FIFO_PID" 2>/dev/null
+    CODE=124
+else
+    wait "$FIFO_PID"
+    CODE=$?
+fi
+set -e
+if [[ "$CODE" == "124" ]]; then
+    fail "the engine waited on a pipe a role left where its report goes"
+else
+    pass "a role that left a pipe where its report goes does not hold the engine"
+fi
+assert_eq "$CODE" "1" "and the run fails for want of a report"
+rm -rf "$WS"
+
+# Sealed and then dead. The envelope was delivered but never collected, and a
+# repeat of this run, role and iteration computes the same path.
+WS="$(workspace)"
+CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-seals-then-fails.sh")"
+assert_eq "$CODE" "1" "a provider that sealed and then died fails the run"
+if compgen -G "$WS/.grimes/work/*.envelope" >/dev/null; then
+    fail "a failed pass left its sealed report for the next one to collect"
+else
+    pass "a failed pass leaves no sealed report behind"
+fi
+# The retry has to produce its own answer rather than inherit one.
+OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-noenvelope.sh" \
+    --format=prototext src 2>&1 || true)"
+assert_match "$OUT" 'no report envelope' "and a retry is not answered by it"
+rm -rf "$WS"
+
 echo ""
 echo "--- Output and time are bounded ---"
 

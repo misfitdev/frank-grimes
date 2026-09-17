@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
@@ -93,13 +94,32 @@ func (e *Exec) collectSealed(req engine.Request) []byte {
 		return nil
 	}
 	pass := contracts.PassToken(req.RunID, roleName(req.Role), req.Iteration)
-	path := filepath.Join(root, contracts.WorkEnvelopePath(pass))
-	sealed, err := os.ReadFile(path)
+	sealed := readSealed(filepath.Join(root, contracts.WorkEnvelopePath(pass)))
+	return sealed
+}
+
+// readSealed returns what is at path, and removes it either way.
+//
+// A role may write this directory, so it may put something other than a file at
+// the path the engine collects from. Opening a FIFO blocks until a writer
+// arrives, and this read happens after Wait: neither the command timeout nor
+// WaitDelay reaches it, so a role that left one behind would hold the engine
+// open for as long as it liked. O_NONBLOCK is what makes the open return, and
+// anything that then refuses to read like a file reads as no report at all.
+func readSealed(path string) []byte {
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 		return nil
 	}
-	_ = os.Remove(path)
-	return sealed
+	defer func() {
+		_ = f.Close()
+		_ = os.Remove(path)
+	}()
+	body, err := io.ReadAll(io.LimitReader(f, DefaultMaxOutputBytes))
+	if err != nil {
+		return nil
+	}
+	return body
 }
 
 // discardAbandoned removes whatever this pass was accumulating, if it is still
@@ -124,6 +144,11 @@ func (e *Exec) discardAbandoned(req engine.Request) {
 		return
 	}
 	mine := contracts.PassToken(req.RunID, roleName(req.Role), req.Iteration)
+	// A pass that sealed and then died -- a non-zero exit, a timeout -- never
+	// reached collection, so its envelope is still here. The pass token is the
+	// same for a repeated invocation of this run, role and iteration, and a
+	// retry would collect that report before producing one of its own.
+	_ = os.Remove(filepath.Join(root, contracts.WorkEnvelopePath(mine)))
 	for _, marker := range markers {
 		held, err := os.ReadFile(marker)
 		if err != nil || strings.TrimSpace(string(held)) != mine {

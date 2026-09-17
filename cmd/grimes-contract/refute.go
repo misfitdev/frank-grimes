@@ -11,7 +11,6 @@ import (
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
-	"github.com/misfitdev/frank-grimes/internal/envelope"
 	"github.com/misfitdev/frank-grimes/internal/store"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -243,14 +242,8 @@ func cmdRefuteSeal(args []string) error {
 		if _, err := os.Stdout.Write(encoded); err != nil {
 			return err
 		}
-	} else if _, err := fmt.Print(envelope.WrapReport(encoded)); err != nil {
+	} else if err := emitSealed(filepath.Dir(*file), encoded); err != nil {
 		return err
-	}
-
-	if !*raw {
-		if err := deliverSealed(filepath.Dir(*file), encoded); err != nil {
-			return err
-		}
 	}
 
 	// The outcomes in the working file are the only durable copy, so clearing

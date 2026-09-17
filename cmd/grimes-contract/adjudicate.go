@@ -9,7 +9,6 @@ import (
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
-	"github.com/misfitdev/frank-grimes/internal/envelope"
 	"github.com/misfitdev/frank-grimes/internal/store"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -71,10 +70,7 @@ func cmdAdjudicate(args []string) error {
 		_, err = os.Stdout.Write(encoded)
 		return err
 	}
-	if _, err = fmt.Print(envelope.WrapReport(encoded)); err != nil {
-		return err
-	}
-	return deliverSealed(store.WorkDir, encoded)
+	return emitSealed(store.WorkDir, encoded)
 }
 
 func firstNonEmpty(vals ...string) string {

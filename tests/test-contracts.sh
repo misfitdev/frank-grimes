@@ -599,6 +599,45 @@ done
 rm -rf "$WORK"
 
 echo ""
+echo "--- A sealed report is delivered before it is spoken ---"
+
+# The engine closes an over-limit pipe. A seal that wrote stdout first and let
+# the failure end it would take with it a report that had already been built,
+# and the pass would come back with nothing.
+WORK="$(mktemp -d)"
+mkdir -p "$WORK/.grimes/work"
+(
+    cd "$WORK" || exit 1
+    "$BIN" report add --category=SEC --severity=P2 --blast=local_component \
+        --likelihood=unlikely --path=a.sh --tier=E2 --claim="c" --quote="q" >/dev/null
+    "$BIN" report stop --category=SEC --condition=marginal-yield --probes=2 >/dev/null
+) || fail "the report the seal below is given could not be built"
+
+# stdout opened for reading only, so every write to it fails and none of it
+# depends on a reader going away at the right moment.
+set +e
+(
+    cd "$WORK" || exit 1
+    GRIMES_PASS=deadbeefdeadbeef GRIMES_WORK_DIR="$WORK/.grimes/work" \
+        "$BIN" report seal --target-root=/repo --target-scope=a.sh \
+        --iteration=1 --routed=SEC --examined=1 --disproved=0 --summary="s" 1</dev/null
+) 2>/dev/null
+CODE=$?
+set -e
+assert_eq "$CODE" "0" "a seal whose stdout is closed still exits cleanly"
+if [[ -s "$WORK/.grimes/work/deadbeefdeadbeef.envelope" ]]; then
+    pass "and the report it built was delivered"
+else
+    fail "and the report it built was delivered"
+fi
+if grep -q 'GRIMES_REPORT_PROTOBUF_V2_BEGIN' "$WORK/.grimes/work/deadbeefdeadbeef.envelope" 2>/dev/null; then
+    pass "and what was delivered is an envelope"
+else
+    fail "what was delivered is not an envelope"
+fi
+rm -rf "$WORK"
+
+echo ""
 echo "========================================"
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"
