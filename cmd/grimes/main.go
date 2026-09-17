@@ -116,7 +116,7 @@ func cmdRun(args []string) (int, error) {
 			MaxOutputBytes: cfg.MaxOutputBytes, Timeout: cfg.ProviderTimeout,
 		},
 		Broker:        engine.StrictBroker{},
-		Adjudicator:   adjudicatorFor(cfg, run, mech),
+		Adjudicators:  adjudicatorsFor(cfg, run, mech),
 		Refuter:       refuterFor(cfg, run, mech),
 		Gate:          gateFor(cfg, mech),
 		Inventory:     store.NewFileInventoryStore(cfg.Dir),
@@ -205,20 +205,27 @@ func resolveMechanism(cfg *config) (confine.Mechanism, error) {
 	return mech, nil
 }
 
-func adjudicatorFor(cfg *config, run string, mech confine.Mechanism) engine.Adjudicator {
-	if len(cfg.AdjudicatorCommand) == 0 {
-		return nil
+// adjudicatorsFor builds one reviewer per command the operator asked for.
+//
+// Each gets its own process under the same boundary. What makes them
+// independent of each other is the operator's choice of commands; the engine
+// counts them and does not classify them, because naming provider families
+// would be the per-provider knowledge nothing here holds.
+func adjudicatorsFor(cfg *config, run string, mech confine.Mechanism) []engine.Adjudicator {
+	var panel []engine.Adjudicator
+	for _, command := range cfg.AdjudicatorCommands {
+		panel = append(panel, engine.ProviderAdjudicator{
+			Fresh: cfg.AdjudicatorFresh,
+			Provider: &provider.Exec{
+				Command: command, Dir: cfg.Dir, Confine: mech,
+				MaxOutputBytes: cfg.MaxOutputBytes, Timeout: cfg.ProviderTimeout,
+			},
+			ReviewerID: command[0],
+			RunID:      run,
+			Clock:      engine.SystemClock,
+		})
 	}
-	return engine.ProviderAdjudicator{
-		Fresh: cfg.AdjudicatorFresh,
-		Provider: &provider.Exec{
-			Command: cfg.AdjudicatorCommand, Dir: cfg.Dir, Confine: mech,
-			MaxOutputBytes: cfg.MaxOutputBytes, Timeout: cfg.ProviderTimeout,
-		},
-		ReviewerID: cfg.AdjudicatorCommand[0],
-		RunID:      run,
-		Clock:      engine.SystemClock,
-	}
+	return panel
 }
 
 func refuterFor(cfg *config, run string, mech confine.Mechanism) engine.Refuter {

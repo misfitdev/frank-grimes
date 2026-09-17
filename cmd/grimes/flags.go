@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
@@ -64,31 +65,113 @@ func rejectSwallowedFlags(fs *flag.FlagSet, args []string) error {
 	return nil
 }
 
+// adjudicators groups the reviewer commands out of the raw arguments.
+//
+// The flag package sees a list of values with no memory of what they followed,
+// and a panel needs that memory: --adjudicator-arg belongs to the reviewer it
+// was written after. Scanning the arguments is what recovers it, the same way
+// rejectSwallowedFlags recovers how a value was written.
+//
+// Only these two options are read here, and only they consume the token after
+// them. A scanner that consumed one token per option would swallow whatever
+// followed a boolean flag: --auto-loop --adjudicator-command=x reads as
+// --auto-loop taking the reviewer as its value, and the panel disappears with
+// the flag package none the wiser.
+//
+// One command with its arguments parses to exactly what it did before a panel
+// was possible.
+func adjudicators(args []string) ([][]string, error) {
+	var panel [][]string
+	for i := 0; i < len(args); i++ {
+		name, value, ok := adjudicatorOption(args, &i)
+		if !ok {
+			continue
+		}
+		switch name {
+		case "adjudicator-command":
+			fields := strings.Fields(value)
+			if len(fields) == 0 {
+				return nil, fmt.Errorf("%w: --adjudicator-command needs a command", errUsage)
+			}
+			if at := indexOfCommand(panel, fields); at >= 0 {
+				return nil, fmt.Errorf(
+					"--adjudicator-command %q is already reviewer %d; two reviewers that run the same command are one reviewer asked twice",
+					value, at+1)
+			}
+			panel = append(panel, fields)
+		case "adjudicator-arg":
+			if len(panel) == 0 {
+				return nil, fmt.Errorf("--adjudicator-arg needs --adjudicator-command")
+			}
+			panel[len(panel)-1] = append(panel[len(panel)-1], value)
+		}
+	}
+	return panel, nil
+}
+
+// adjudicatorOption reads one of the two options this scanner knows at
+// args[*i], advancing i past a value written as a separate token. Every other
+// token, option or not, is left exactly where it was.
+func adjudicatorOption(args []string, i *int) (name, value string, ok bool) {
+	tok := args[*i]
+	if !strings.HasPrefix(tok, "-") {
+		return "", "", false
+	}
+	name, value, joined := strings.TrimLeft(tok, "-"), "", false
+	if n, v, cut := strings.Cut(name, "="); cut {
+		name, value, joined = n, v, true
+	}
+	if name != "adjudicator-command" && name != "adjudicator-arg" {
+		return "", "", false
+	}
+	if joined {
+		return name, value, true
+	}
+	if *i+1 >= len(args) {
+		return name, "", true
+	}
+	*i++
+	return name, args[*i], true
+}
+
+// indexOfCommand reports where an identical reviewer command already sits in
+// the panel.
+func indexOfCommand(panel [][]string, want []string) int {
+	for i, have := range panel {
+		if slices.Equal(have, want) {
+			return i
+		}
+	}
+	return -1
+}
+
 type config struct {
-	Target             string
-	Scope              string
-	ScopeSet           bool
-	Categories         []pb.Category
-	Mode               pb.Mode
-	VerifyCommand      string
-	Commit             bool
-	RepositoryCheck    bool
-	MaxIterations      uint
-	AutoLoop           bool
-	Research           string
-	ProviderCommand    []string
-	AdjudicatorCommand []string
-	RefuterCommand     []string
-	ProviderTimeout    time.Duration
-	MaxOutputBytes     int64
-	Format             string
-	Dir                string
-	Kind               pb.TargetKind
-	Snapshot           string
-	AdjudicatorFresh   bool
-	RefuterFresh       bool
-	SandboxCommand     []string
-	Unsafe             bool
+	Target          string
+	Scope           string
+	ScopeSet        bool
+	Categories      []pb.Category
+	Mode            pb.Mode
+	VerifyCommand   string
+	Commit          bool
+	RepositoryCheck bool
+	MaxIterations   uint
+	AutoLoop        bool
+	Research        string
+	ProviderCommand []string
+	// AdjudicatorCommands is one command per independent reviewer, each with
+	// the arguments that followed it.
+	AdjudicatorCommands [][]string
+	RefuterCommand      []string
+	ProviderTimeout     time.Duration
+	MaxOutputBytes      int64
+	Format              string
+	Dir                 string
+	Kind                pb.TargetKind
+	Snapshot            string
+	AdjudicatorFresh    bool
+	RefuterFresh        bool
+	SandboxCommand      []string
+	Unsafe              bool
 }
 
 // Root is the repository root a code target is taken from. Only a code target
@@ -115,7 +198,10 @@ func parseRun(args []string) (*config, error) {
 	autoLoop := fs.Bool("auto-loop", false, "continue while iterations still change the verdict")
 	research := fs.String("research", "offline", "online, offline, or frozen:<path>; advisory until execution boundaries land")
 	providerCmd := fs.String("provider-command", "", "command that performs the review; split on whitespace")
-	adjudicatorCmd := fs.String("adjudicator-command", "", "command that performs the independent review; split on whitespace")
+	// Declared so the flag package accepts it and reports it in usage; the
+	// value is read from the raw arguments, where the order that groups a
+	// reviewer with its arguments still exists.
+	_ = fs.String("adjudicator-command", "", "command that performs an independent review; split on whitespace, repeatable for a panel of reviewers")
 	adjudicatorFresh := fs.Bool("adjudicator-fresh", false, "assert the adjudicator command begins a new context; without it the review is recorded as unknown-origin and cannot raise confidence")
 	refuterCmd := fs.String("refuter-command", "", "command that attacks the surviving findings; split on whitespace")
 	refuterFresh := fs.Bool("refuter-fresh", false, "assert the refuter command begins a new context; without it nothing it upholds can raise confidence")
@@ -123,7 +209,7 @@ func parseRun(args []string) (*config, error) {
 	unsafe := fs.Bool("unsafe", false, "run each role unconfined; recorded as an unmet gate and caps confidence")
 	var providerArgs, adjudicatorArgs, refuterArgs, sandboxArgs repeatedArg
 	fs.Var(&providerArgs, "provider-arg", "one argument for the provider command; repeatable, not split")
-	fs.Var(&adjudicatorArgs, "adjudicator-arg", "one argument for the adjudicator command; repeatable, not split")
+	fs.Var(&adjudicatorArgs, "adjudicator-arg", "one argument for the adjudicator command it follows; repeatable, not split")
 	fs.Var(&refuterArgs, "refuter-arg", "one argument for the refuter command; repeatable, not split")
 	fs.Var(&sandboxArgs, "sandbox-arg", "one argument for the sandbox command; repeatable, not split")
 	timeout := fs.Duration("provider-timeout", 10*time.Minute, "per-invocation provider timeout")
@@ -174,11 +260,10 @@ func parseRun(args []string) (*config, error) {
 		return nil, err
 	}
 	c.ProviderCommand = append(strings.Fields(*providerCmd), providerArgs...)
-	c.AdjudicatorCommand = append(strings.Fields(*adjudicatorCmd), adjudicatorArgs...)
-	if *adjudicatorCmd == "" && len(adjudicatorArgs) > 0 {
-		return nil, fmt.Errorf("--adjudicator-arg needs --adjudicator-command")
+	if c.AdjudicatorCommands, err = adjudicators(args); err != nil {
+		return nil, err
 	}
-	if *adjudicatorCmd == "" && *adjudicatorFresh {
+	if len(c.AdjudicatorCommands) == 0 && *adjudicatorFresh {
 		return nil, fmt.Errorf("--adjudicator-fresh needs --adjudicator-command")
 	}
 	c.RefuterCommand = append(strings.Fields(*refuterCmd), refuterArgs...)

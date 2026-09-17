@@ -35,6 +35,14 @@ assert_eq() {
     if [[ "$1" == "$2" ]]; then pass "$3"; else fail "$3 (got '$1' vs '$2')"; fi
 }
 
+assert_match() {
+    if grep -qE "$2" <<<"$1"; then pass "$3"; else fail "$3"; fi
+}
+
+assert_no_match() {
+    if grep -qE "$2" <<<"$1"; then fail "$3"; else pass "$3"; fi
+}
+
 if ! command -v go &>/dev/null; then
     echo -e "${YELLOW}SKIP${NC}: go is not installed; orchestrator tests require the toolchain"
     exit 2
@@ -347,11 +355,92 @@ fi
 rm -rf "$WS"
 
 echo ""
-echo "--- Fix mode is not available ---"
+echo "--- A panel is every reviewer that was asked for ---"
+
+# Two reviewers, both of which answer. The record says so, and neither the
+# count nor the reviewers' own identities come from anything but the run.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" \
+    --adjudicator-command="$FAKES/adjudicator-agrees.sh" \
+    --adjudicator-fresh --format=prototext)"
+assert_match "$OUT" 'requested: +2' "a panel records how many reviewers it asked for"
+if [[ "$(grep -cE '^    reviewer_id:' <<<"$OUT")" == "2" ]]; then
+    pass "and records each one that answered"
+else
+    fail "and records each one that answered"
+fi
+assert_no_match "$OUT" 'unmet_gates: +"adjudication"' \
+    "a panel that answered in full clears the adjudication gate"
+rm -rf "$WS"
+
+# One of the two never answers. The reviews that did arrive look exactly like a
+# smaller panel nobody asked for, which is what the count is for.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" \
+    --adjudicator-command="$FAKES/adjudicator-absent.sh" \
+    --adjudicator-fresh --format=prototext)"
+assert_match "$OUT" 'requested: +2' "a reviewer that did not answer is still one that was asked for"
+assert_match "$OUT" 'unmet_gates: +"adjudication"' \
+    "and a short panel leaves the adjudication gate unmet"
+assert_no_match "$OUT" 'legacy_color: +LEGACY_COLOR_GREEN' \
+    "a short panel cannot reach a pass"
+rm -rf "$WS"
+
+# The strictest of them decides, and the record names that reviewer as the one
+# whose verdict stood, whichever order they were asked in.
+for ORDER in "pass:block" "block:pass"; do
+    FIRST="${ORDER%%:*}"
+    SECOND="${ORDER##*:}"
+    WS="$(workspace)"
+    OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-green.sh" \
+        --adjudicator-command="$FAKES/adjudicator-$FIRST.sh" \
+        --adjudicator-command="$FAKES/adjudicator-$SECOND.sh" \
+        --adjudicator-fresh --format=prototext)"
+    assert_match "$OUT" 'legacy_color: +LEGACY_COLOR_RED' \
+        "a panel holding one block decides as that reviewer did ($FIRST then $SECOND)"
+    rm -rf "$WS"
+done
+
+# The reviewer that answered blocked, and the one that did not answer must not
+# be able to soften that: a shortfall caps a pass, it does not cap a block.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-block.sh" \
+    --adjudicator-command="$FAKES/adjudicator-absent.sh" \
+    --adjudicator-fresh --format=prototext)"
+assert_match "$OUT" 'legacy_color: +LEGACY_COLOR_RED' \
+    "a block from the reviewer that answered survives the one that did not"
+rm -rf "$WS"
+
+# A reviewer whose context nobody established makes the whole panel uncertain,
+# even beside one whose context is known.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" \
+    --adjudicator-command="$FAKES/adjudicator-agrees.sh" --format=prototext)"
+assert_match "$OUT" 'unmet_gates: +"independent_context"' \
+    "an unattested panel is recorded as unknown-origin"
+rm -rf "$WS"
+
+echo ""
+echo "--- The flags mean what they say ---"
 
 WS="$(workspace)"
-CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-red.sh" --mode=fix)"
-assert_eq "$CODE" "1" "fix mode is refused rather than ignored"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-arg=-p --adjudicator-command="$FAKES/adjudicator-pass.sh" --format=prototext)"
+assert_match "$OUT" 'needs --adjudicator-command' \
+    "an argument before any reviewer belongs to no reviewer"
+rm -rf "$WS"
+
+echo ""
+echo "--- Fix mode is available for a repository ---"
+
+# Not a repository, so the run is refused for that and not for the mode.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-red.sh" --mode=fix)"
+assert_match "$OUT" 'git repository' "fix mode is refused for want of a repository, not by the flag"
 rm -rf "$WS"
 
 echo ""

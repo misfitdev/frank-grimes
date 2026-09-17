@@ -290,11 +290,18 @@ A reviewer cannot confirm its own acquittal. A pass decision requires a second r
 | pass | pass | `pass` stands; GREEN remains reachable |
 | pass | conditional | `conditional`, YELLOW |
 | pass | block | `block`, RED |
-| conditional or block | anything | the primary decision stands, never relaxed |
+| conditional | block | `block`, RED: the stricter of the two, as everywhere else |
+| conditional or block | anything less strict | the primary decision stands, never relaxed |
 
-An independent pass never upgrades a primary `block` or `conditional`. Adjudication can only remove confidence, never manufacture it.
+An independent pass never upgrades a primary `block` or `conditional`. It does not follow that a primary decision is beyond reach in the other direction: a reviewer that blocks has found something, and what it found does not stop counting because the primary was already withholding.
+
+What adjudication does to confidence runs the other way. A pass and the confidence it needs are unreachable until a complete panel of established reviewers has agreed, so agreement is what earns them rather than something granted in advance. What agreement cannot do is soften a decision that withheld, or stand in for a panel that came up short, could not be established, or never ran: confidence is what a review survived, not what was said about it afterwards.
 
 **When adjudication is unavailable.** Record `Independent adjudication: not available`, set `review_confidence = low`, and treat `pass` as unreachable: the verdict caps at `conditional`/YELLOW. A provider that cannot furnish a separately identified context cannot produce GREEN. Absence of a second opinion is not agreement.
+
+**When more than one reviewer was asked for.** Asking for several independent reviewers is asking for all of them. Record how many were asked for and how many answered. A review that got fewer than were asked for has not been adjudicated as asked: the shortfall is reported and `pass` stays unreachable, because reading the reviews that did arrive as the whole panel is the quiet downgrade that asking for a panel was meant to prevent.
+
+The strictest decision among the reviewers is the one that stands, by the rule that already resolves two. One objection is an objection whoever raised it, and a reviewer whose context cannot be established makes the whole panel uncertain: confidence rises only when every reviewer that answered is one whose independence was established.
 
 **Compromised independence.** If the primary report, its findings, or its evidence reach the adjudicator, independence is broken. Record it as a finding, mark adjudication `not available`, and apply the cap above. A contaminated confirmation is worth less than none, because it looks like corroboration.
 

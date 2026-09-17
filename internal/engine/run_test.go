@@ -342,10 +342,14 @@ func seedCandidate() *pb.CandidateFinding {
 }
 
 func newEngine(p Provider, l Ledger, s StateStore, a Adjudicator) *Engine {
+	var panel []Adjudicator
+	if a != nil {
+		panel = []Adjudicator{a}
+	}
 	return &Engine{
 		Confinement: "sandbox-exec",
 		Collector:   stubCollector{}, Provider: p, Broker: StrictBroker{},
-		Adjudicator: a, Gate: NotApplicableGate{}, Ledger: l,
+		Adjudicators: panel, Gate: NotApplicableGate{}, Ledger: l,
 		Results: &memResults{}, State: s,
 		Clock: func() time.Time { return testTime() },
 		RunID: "run-001", AutoLoop: true, MaxIterations: 5,

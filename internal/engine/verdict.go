@@ -2,6 +2,7 @@ package engine
 
 import (
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
+	"github.com/misfitdev/frank-grimes/internal/adjudicate"
 )
 
 // Tags a provider may attach to a finding that remove it from verdict weight.
@@ -51,6 +52,13 @@ type DeriveInput struct {
 
 	// Adjudication
 	AdjudicationAvailable bool
+	// AdjudicationRequested and AdjudicationCompleted are how many independent
+	// reviewers the run asked for and how many answered. Fewer answers than
+	// requests is a panel that was not assembled, which caps the verdict the
+	// way no answer at all does: the reviews that did arrive are not the panel
+	// somebody asked for.
+	AdjudicationRequested uint32
+	AdjudicationCompleted uint32
 	IndependentDecision   pb.Decision
 	// IndependentContextUnknown is set when a second opinion arrived from a
 	// context whose origin could not be established. It caps confidence and
@@ -99,8 +107,12 @@ func Derive(in DeriveInput) Derived {
 	counts := count(in.Candidates)
 
 	decision := decide(in, counts)
-	if in.AdjudicationAvailable && decision == pb.Decision_DECISION_PASS {
-		decision = resolveWith(in.IndependentDecision)
+	// Applied whatever the primary reached, not only to a pass. A reviewer that
+	// blocked said so, and a shortfall that had already capped the primary at
+	// conditional would otherwise swallow it: asking for one more reviewer
+	// would have weakened the answer the first one gave.
+	if in.AdjudicationAvailable {
+		decision = adjudicate.Resolve(decision, in.IndependentDecision)
 	}
 
 	v := &pb.Verdict{
