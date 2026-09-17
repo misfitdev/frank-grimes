@@ -64,8 +64,8 @@ Execute a Grimes Grind on the target using the grimey methodology.
 # Report on a single file
 /frank-grimes:grind ./src/auth.go
 
-# Recent changes, report only
-/frank-grimes:grind --scope recent-changes --mode report
+# The whole repository, report only
+/frank-grimes:grind . --mode report
 
 # Fix mode with an explicit gate, committing only if it passes
 /frank-grimes:grind ./src/api --mode fix --verify-command "just check" --commit

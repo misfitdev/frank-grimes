@@ -446,6 +446,30 @@ else
     pass "no adapter or hook decides a verdict"
 fi
 
+# A flag the engine refuses must not be documented as one a caller can use.
+# --scope was advertised in four places and rejected in all of them, which a
+# live run found the hard way.
+echo "--- Documented Flags ---"
+
+REFUSED_FLAGS=("--scope")
+for flag in "${REFUSED_FLAGS[@]}"; do
+    FOUND=$(grep -rlF -- "$flag " \
+        "$PROJECT_ROOT/README.md" \
+        "$PROJECT_ROOT/adapters" \
+        "$PROJECT_ROOT/docs" 2>/dev/null |
+        grep -v '/audit/' |
+        xargs -r grep -lF -- "grind $flag" 2>/dev/null || true)
+    ALSO=$(grep -rn -- "$flag recent-changes\|$flag whole-repo" \
+        "$PROJECT_ROOT/README.md" "$PROJECT_ROOT/adapters" "$PROJECT_ROOT/docs" 2>/dev/null |
+        grep -v '/audit/' || true)
+    if [[ -n "$FOUND$ALSO" ]]; then
+        fail "the engine refuses $flag, and it is documented as usable"
+        echo "$FOUND$ALSO"
+    else
+        pass "no document offers $flag, which the engine refuses"
+    fi
+done
+
 echo ""
 
 # SKILL.md is the sole normative methodology. A second copy in an adapter or a

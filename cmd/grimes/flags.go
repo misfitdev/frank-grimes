@@ -300,9 +300,11 @@ func (c *config) validate() error {
 	}
 	// The collector resolves a target from the positional argument alone, so a
 	// caller asking for a narrower scope would be silently reviewed on a wider
-	// one. Refused until collection can honour it.
+	// one. Refused until collection can honour it, and refused by name so that
+	// a caller who read it somewhere is told what to write instead.
 	if c.ScopeSet {
-		return fmt.Errorf("--scope is not implemented; the target argument selects the scope")
+		return fmt.Errorf(
+			"--scope is not implemented; the target argument is the scope: pass a path, or . for the whole repository")
 	}
 	// A snapshot is the whole of an external target, and it is meaningless for
 	// the kinds that are read from disk directly.
