@@ -196,6 +196,47 @@ func cmdReportAdd(args []string) error {
 	return nil
 }
 
+// deliverSealed writes the envelope where the engine will look for it.
+//
+// Every role seals through here. A report reaches the engine on the provider's
+// stdout, which for an agent CLI means a model reproducing a base64 block as
+// its last words; whether it does is a property of that CLI, and the engine
+// holds no per-provider knowledge to predict it. Delivery becomes something
+// this binary did instead.
+//
+// Only inside a pass: a report sealed outside one has no engine waiting on it,
+// and a file named for no pass is one nothing would come back for.
+//
+// Written whole and renamed into place, since the engine collects it as soon as
+// the pass returns and a partial file would read as a truncated report rather
+// than as a write still in progress.
+func deliverSealed(fallbackDir string, encoded []byte) error {
+	pass := os.Getenv("GRIMES_PASS")
+	if pass == "" {
+		return nil
+	}
+	// The engine names this directory absolutely, because a role is free to run
+	// the contract CLI from wherever it likes and a relative path would then
+	// deliver into somewhere nothing is waiting.
+	dir := os.Getenv("GRIMES_WORK_DIR")
+	if dir == "" {
+		dir = fallbackDir
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("delivering the sealed report: %w", err)
+	}
+	final := filepath.Join(dir, filepath.Base(contracts.WorkEnvelopePath(pass)))
+	tmp := final + ".partial"
+	if err := os.WriteFile(tmp, []byte(envelope.WrapReport(encoded)), 0o600); err != nil {
+		return fmt.Errorf("delivering the sealed report: %w", err)
+	}
+	if err := os.Rename(tmp, final); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("delivering the sealed report: %w", err)
+	}
+	return nil
+}
+
 func cmdReportSeal(args []string) error {
 	fs := flag.NewFlagSet("report seal", flag.ExitOnError)
 	file := fs.String("file", DefaultReportPath, "report being built")
@@ -326,6 +367,12 @@ func cmdReportSeal(args []string) error {
 		}
 	} else if _, err := fmt.Print(envelope.WrapReport(encoded)); err != nil {
 		return err
+	}
+
+	if !*raw {
+		if err := deliverSealed(filepath.Dir(*file), encoded); err != nil {
+			return err
+		}
 	}
 
 	// Sealing ends this report, but only once it has been delivered. The

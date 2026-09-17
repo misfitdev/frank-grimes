@@ -79,6 +79,15 @@ type Request struct {
 // decodes and strips it.
 type ProviderOutput struct {
 	Raw []byte
+	// Diagnostics is what the provider wrote to stderr, bounded. Carried even
+	// when the provider exited cleanly: an agent CLI logs its working here and
+	// prints its answer on stdout, so a clean exit with an unusable answer is
+	// the case where this is the only account of what happened.
+	Diagnostics string
+	// Sealed is the report the role left behind for this pass, if it sealed
+	// one. Untrusted in the same way Raw is, and preferred over it: this binary
+	// wrote these bytes, where Raw is whatever a model chose to say last.
+	Sealed []byte
 }
 
 // Collected is what resolving a target produced.

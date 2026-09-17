@@ -89,6 +89,7 @@ func (a ProviderAdjudicator) Adjudicate(ctx context.Context, target *pb.Target, 
 	}
 	out, err := a.Provider.Review(ctx, Request{
 		Role:        RoleAdjudicator,
+		RunID:       a.RunID,
 		Target:      target,
 		ContentPath: contentPath,
 		Claimed:     claimed,
@@ -96,7 +97,11 @@ func (a ProviderAdjudicator) Adjudicate(ctx context.Context, target *pb.Target, 
 	if err != nil {
 		return nil, err
 	}
-	raw, err := envelope.ExtractReport(string(out.Raw))
+	body, ok := delivered(out)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrProviderOutput, missingEnvelope(out))
+	}
+	raw, err := envelope.ExtractReport(string(body))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrProviderOutput, err)
 	}

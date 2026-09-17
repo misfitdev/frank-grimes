@@ -358,6 +358,21 @@ assert_no_match "$(cat "$AGENT")" 'control' \
     "the refuter is not told a control is coming"
 
 echo ""
+echo "--- A refuter delivers through the contract CLI, not through what it says ---"
+
+# The same delivery every role depends on. A refuter that seals and then
+# describes its work has attacked the claims; its answer must not be lost
+# because the last thing it said was prose.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" \
+    --refuter-command="$FAKES/refuter-seals-then-talks.sh" --refuter-fresh)"
+assert_match "$OUT" 'provenance: +FINDING_PROVENANCE_UPHELD' \
+    "a refuter that sealed and then talked still has its outcomes read"
+assert_no_match "$OUT" 'unmet_gates: +"refutation"' \
+    "and the refutation gate is met"
+rm -rf "$WS"
+
+echo ""
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"
 

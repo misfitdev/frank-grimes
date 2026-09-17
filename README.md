@@ -213,6 +213,33 @@ to say which.
 A scope that is both a path on disk and a valid range is refused rather than
 guessed at. Write `./that-path` for the path.
 
+### How a report reaches the engine
+
+A role does its work and seals it with the contract CLI:
+
+```bash
+grimes-contract report seal --summary="..." --routed=... --examined=N --disproved=K
+```
+
+`seal` prints the report envelope **and** writes it to `$GRIMES_WORK_DIR`, named
+for the pass that sealed it. The engine collects the file first and falls back to
+the provider's stdout. `refute seal` and `adjudicate` do the same for their roles.
+
+This matters when the provider is another coding agent. Inside an agent CLI the
+seal is a tool call, so its envelope lands in that CLI's transcript, and what
+arrives on stdout is whatever the model chose to say last. Delivery through a
+file is something the contract CLI did, not something a model has to be asked
+for — so `--provider-command="codex exec"`, or any other agent, works without
+per-provider prompting.
+
+Two consequences:
+
+- A report sealed by one pass is not collected by another. The file is named for
+  the pass, and it does not outlive it.
+- If neither the file nor stdout carries an envelope, the run fails and says what
+  the provider did write, to stdout and to stderr, so a provider that reviewed
+  and then described its work is distinguishable from one that never ran.
+
 ## The Grimes Grind Process
 
 The methodology is defined in [`skills/frank-grimes/SKILL.md`](skills/frank-grimes/SKILL.md), which is the only normative source. This is a summary; where the two differ, the skill is correct.

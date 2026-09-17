@@ -247,6 +247,12 @@ func cmdRefuteSeal(args []string) error {
 		return err
 	}
 
+	if !*raw {
+		if err := deliverSealed(filepath.Dir(*file), encoded); err != nil {
+			return err
+		}
+	}
+
 	// The outcomes in the working file are the only durable copy, so clearing
 	// waits until they have been delivered. A stale file would otherwise be
 	// sealed again into the next pass, answering claims that pass never saw.

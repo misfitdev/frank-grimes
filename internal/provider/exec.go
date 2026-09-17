@@ -81,6 +81,27 @@ func (e *Exec) confined(req engine.Request) ([]string, error) {
 	return e.Confine.Wrap(p, e.Command)
 }
 
+// collectSealed takes the report this pass sealed, if it sealed one.
+//
+// Read and removed here rather than left for the engine, because the same defer
+// that clears an abandoned pass would clear this too. Nothing is interpreted:
+// the bytes go back untouched, and the engine decides whether they answer its
+// request.
+func (e *Exec) collectSealed(req engine.Request) []byte {
+	root, err := filepath.Abs(e.Dir)
+	if err != nil {
+		return nil
+	}
+	pass := contracts.PassToken(req.RunID, roleName(req.Role), req.Iteration)
+	path := filepath.Join(root, contracts.WorkEnvelopePath(pass))
+	sealed, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	_ = os.Remove(path)
+	return sealed
+}
+
 // discardAbandoned removes whatever this pass was accumulating, if it is still
 // there when the pass ends.
 //
@@ -182,6 +203,10 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = e.Dir
 	cmd.Env = append(baseEnv(e.Env), requestEnv(req)...)
+	// Absolute, so a role that seals from a directory of its own choosing still
+	// delivers where the engine collects. Taken from the Exec rather than the
+	// request, since this is where the child is about to be run.
+	cmd.Env = append(cmd.Env, "GRIMES_WORK_DIR="+absolute(filepath.Join(e.Dir, store.WorkDir)))
 	// A role is given a request, not a conversation. Left inherited, a provider
 	// that decided to prompt would hold the operator's terminal until the
 	// timeout, and read whatever was typed at it in the meantime.
@@ -231,7 +256,11 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	if waitErr != nil {
 		return nil, fmt.Errorf("%w: %v: %s", engine.ErrProviderFailed, waitErr, strings.TrimSpace(stderr.String()))
 	}
-	return &engine.ProviderOutput{Raw: out}, nil
+	return &engine.ProviderOutput{
+		Raw:         out,
+		Diagnostics: strings.TrimSpace(stderr.String()),
+		Sealed:      e.collectSealed(req),
+	}, nil
 }
 
 // boundedBuffer keeps the first limit bytes and counts the rest.

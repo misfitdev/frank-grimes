@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
+	"unicode/utf8"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/adjudicate"
@@ -355,9 +357,9 @@ func (e *Engine) review(ctx context.Context, target *pb.Target, contentPath, inv
 		return nil, fmt.Errorf("%w: %v", ErrProviderFailed, err)
 	}
 
-	raw := out.Raw
-	if !envelope.ContainsReport(string(raw)) {
-		return nil, fmt.Errorf("%w: no report envelope", ErrProviderOutput)
+	raw, ok := delivered(out)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrProviderOutput, missingEnvelope(out))
 	}
 	raw, err = envelope.ExtractReport(string(raw))
 	if err != nil {
@@ -372,6 +374,66 @@ func (e *Engine) review(ctx context.Context, target *pb.Target, contentPath, inv
 		return nil, fmt.Errorf("%w: %s", ErrProviderOutput, why)
 	}
 	return report, nil
+}
+
+// delivered returns the bytes a role's answer is to be read from.
+//
+// What it sealed comes before what it said. Both are untrusted and each is
+// bound to the request by its caller, but the sealed copy was written by the
+// contract CLI, where stdout is a model's last message about it. A role that
+// seals and then describes its work is the ordinary case for an agent CLI, and
+// it is not a failure.
+func delivered(out *ProviderOutput) ([]byte, bool) {
+	if envelope.ContainsReport(string(out.Sealed)) {
+		return out.Sealed, true
+	}
+	if envelope.ContainsReport(string(out.Raw)) {
+		return out.Raw, true
+	}
+	return nil, false
+}
+
+// missingEnvelope accounts for a provider that came back without one.
+//
+// The provider exited cleanly, so nothing else will be said about it: what it
+// wrote is the only evidence of why. An agent CLI puts its working on stderr
+// and its answer on stdout, and the answer is a model's last message, so the
+// ordinary failure is a provider that did the review and then described it
+// instead of emitting it. Naming what did arrive is what separates that from a
+// provider that never started.
+func missingEnvelope(out *ProviderOutput) string {
+	var b strings.Builder
+	b.WriteString("no report envelope; the provider exited cleanly and wrote ")
+	fmt.Fprintf(&b, "%d bytes to stdout", len(out.Raw))
+	if len(out.Raw) == 0 {
+		b.WriteString(". It produced no output at all")
+	} else {
+		fmt.Fprintf(&b, ", ending: %q", tail(string(out.Raw), diagnosticTail))
+	}
+	if out.Diagnostics != "" {
+		fmt.Fprintf(&b, ". Its stderr ended: %q", tail(out.Diagnostics, diagnosticTail))
+	}
+	b.WriteString(". A report reaches the engine on the provider's own stdout")
+	return b.String()
+}
+
+// diagnosticTail bounds each excerpt in that account. Enough to recognise what
+// a provider was saying, short enough that an error is still one message.
+const diagnosticTail = 400
+
+// tail returns the last n characters, marked as an excerpt when it cut.
+func tail(s string, n int) string {
+	s = strings.TrimSpace(s)
+	if len(s) <= n {
+		return s
+	}
+	// Byte offsets can land inside a rune, which would put a replacement
+	// character in an error that is quoting what a provider actually wrote.
+	cut := len(s) - n
+	for cut < len(s) && !utf8.RuneStart(s[cut]) {
+		cut++
+	}
+	return "..." + s[cut:]
 }
 
 // reportBinding names why a report is not the answer to this request, or
