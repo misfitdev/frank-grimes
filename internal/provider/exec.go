@@ -354,7 +354,13 @@ func requestEnv(req engine.Request) []string {
 	// the engine resolves the two tuples afterwards, which needs nothing shown
 	// to the adjudicator beforehand.
 	if req.Role == engine.RoleAdjudicator {
-		return append(env, "GRIMES_ROLE=adjudicator")
+		// The run it answers under, so the engine can refuse a verdict reached
+		// for some other one. Not knowledge of the first review: it is the
+		// identity of the request, which every other role is given.
+		return append(env,
+			"GRIMES_ROLE=adjudicator",
+			"GRIMES_RUN_ID="+req.RunID,
+		)
 	}
 	// A refuter gets the claims and the run it must answer under. It is given no
 	// inventory and no categories: it is not reviewing the target, and a

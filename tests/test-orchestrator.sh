@@ -294,6 +294,24 @@ OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-noenvelope.
 assert_match "$OUT" 'no report envelope' "and a retry is not answered by it"
 rm -rf "$WS"
 
+# A verdict reached for another run, over bytes that happen to match. The
+# fingerprint admits it; the run is what does not.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-other-run.sh" \
+    --adjudicator-fresh --format=prototext)"
+assert_match "$OUT" 'requested: +1' "a reviewer answering for another run was still asked for"
+if [[ "$(grep -cE '^    reviewer_id:' <<<"$OUT")" == "0" ]]; then
+    pass "and its verdict is not counted as an answer"
+else
+    fail "a verdict reached for another run was admitted"
+fi
+assert_match "$OUT" 'unmet_gates: +"adjudication"' \
+    "and the run is left without adjudication"
+assert_no_match "$OUT" 'decision: +DECISION_PASS' \
+    "so it cannot carry the run to a pass"
+rm -rf "$WS"
+
 echo ""
 echo "--- Output and time are bounded ---"
 
