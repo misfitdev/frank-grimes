@@ -486,6 +486,7 @@ NORMATIVE_MARKERS=(
     'Route exactly'
     'Derive `RED` from'
     'A check that cannot fail distinguishes nothing'
+    'name the narrowest artifact that contains them'
 )
 
 for marker in "${NORMATIVE_MARKERS[@]}"; do

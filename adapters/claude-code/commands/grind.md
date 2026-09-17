@@ -96,7 +96,7 @@ Execute a Grimes Grind on the target using the grimey methodology.
     ```
   - If "Something else" is selected (or the user writes a custom answer), ask them to describe the target and use their response as the scope.
   - **Scope resolution:**
-    - "Recent changes" → run `git diff HEAD` and `git diff --staged` to identify the changed files, then target the one file when only one changed, or the directory holding them when several did. A run takes one target, and a directory wider than the changes shows up as a coverage limit rather than as silence
+    - "Recent changes" → run `git diff HEAD` and `git diff --staged` to identify the changed files, then resolve them to an artifact set the way Phase 1 requires
     - "Whole repo" → use the repository root as the target
     - Custom → use the provided path/description as the target
 
