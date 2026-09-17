@@ -138,6 +138,10 @@ assert_present "$SKILL" 'strictest decision among the reviewers' \
     "skill resolves a panel by the rule that resolves two"
 assert_present "$SKILL" 'every reviewer that answered is one whose independence was established' \
     "skill holds one uncertain reviewer against the whole panel"
+assert_present "$SKILL" 'unreachable until a complete panel of established reviewers has agreed' \
+    "skill states that agreement is what earns a pass rather than what is assumed"
+assert_present "$SKILL" 'confidence is what a review survived' \
+    "skill does not let agreement stand in for a panel that never ran"
 
 echo ""
 echo "--- The old self-certifying escape hatch is gone ---"
