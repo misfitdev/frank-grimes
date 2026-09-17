@@ -65,3 +65,8 @@ func RunSlug(runID string) string { return contracts.RunSlug(runID) }
 // before the run that carries it exists, and both halves have to name the same
 // file without an agreement passed between them.
 const WorkDir = ".grimes/work"
+
+// ReportPath is where the contract CLI accumulates a report, relative to the
+// review directory. Named here because the engine has to be able to clear one
+// a pass of its own abandoned.
+const ReportPath = WorkDir + "/report.textproto"

@@ -81,6 +81,42 @@ func (e *Exec) confined(req engine.Request) ([]string, error) {
 	return e.Confine.Wrap(p, e.Command)
 }
 
+// discardAbandoned removes whatever this pass was accumulating, if it is still
+// there when the pass ends.
+//
+// A sealed report clears itself, so anything left is a pass that did not get
+// that far. Found by looking rather than by name: a role may accumulate into a
+// file of its own choosing, and the one place it can write them is this
+// directory, so every marker in it is asked who it belongs to.
+//
+// Only this pass's own leftovers are touched. A marker naming another pass is
+// that pass's business, and a report opened outside any pass has no marker at
+// all — the documented sequence, where a review builds its report before the
+// run that carries it.
+func (e *Exec) discardAbandoned(req engine.Request) {
+	root, err := filepath.Abs(e.Dir)
+	if err != nil {
+		return
+	}
+	markers, err := filepath.Glob(filepath.Join(root, store.WorkDir, "*"+passSuffix))
+	if err != nil {
+		return
+	}
+	mine := contracts.PassToken(req.RunID, roleName(req.Role), req.Iteration)
+	for _, marker := range markers {
+		held, err := os.ReadFile(marker)
+		if err != nil || strings.TrimSpace(string(held)) != mine {
+			continue
+		}
+		_ = os.Remove(strings.TrimSuffix(marker, passSuffix))
+		_ = os.Remove(marker)
+	}
+}
+
+// passSuffix names a report's marker from the report. The contract CLI writes
+// it; this is the only other place that has to recognise one.
+const passSuffix = ".pass"
+
 // lookup reports where the role's command will be found, resolving it the way
 // the spawned process will.
 //
@@ -124,6 +160,12 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	if err != nil {
 		return nil, err
 	}
+
+	// A pass that does not come back leaves whatever it was accumulating, and
+	// the file outlives the process. Cleared here rather than before the next
+	// spawn, because only this pass knows the leftovers are its own: a report
+	// built before the run began belongs to whoever built it.
+	defer e.discardAbandoned(req)
 
 	timeout := e.Timeout
 	if timeout <= 0 {
@@ -218,6 +260,19 @@ func (b *boundedBuffer) String() string {
 	return b.buf.String()
 }
 
+// roleName is how a role is written into the environment and into the token
+// that names its pass.
+func roleName(r engine.Role) string {
+	switch r {
+	case engine.RoleAdjudicator:
+		return "adjudicator"
+	case engine.RoleRefuter:
+		return "refuter"
+	default:
+		return "primary"
+	}
+}
+
 func requestEnv(req engine.Request) []string {
 	env := []string{
 		// Absolute, like the content path and for the same reason: a provider
@@ -235,6 +290,10 @@ func requestEnv(req engine.Request) []string {
 		// cannot see the artifact cannot form an opinion of its own, and zero
 		// knowledge is about the first report, not the target.
 		"GRIMES_TARGET_CONTENT=" + req.ContentPath,
+		// Which pass this is. The contract CLI stamps it on the report it is
+		// accumulating, so a pass that died before sealing cannot have its
+		// candidates delivered by the next one.
+		"GRIMES_PASS=" + contracts.PassToken(req.RunID, roleName(req.Role), req.Iteration),
 	}
 	// The claimed tuple is deliberately withheld. An independent review that is
 	// shown the conclusion it is meant to reach is anchored by construction;

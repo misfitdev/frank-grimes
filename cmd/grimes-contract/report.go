@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -20,7 +21,7 @@ import (
 
 // DefaultReportPath is where a report accumulates, inside the one directory a
 // spawned role is allowed to write.
-const DefaultReportPath = store.WorkDir + "/report.textproto"
+const DefaultReportPath = store.ReportPath
 
 // cmdReport builds a provider report one candidate at a time.
 //
@@ -183,6 +184,9 @@ func cmdReportAdd(args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := claimPass(*file, os.Getenv("GRIMES_PASS")); err != nil {
+		return err
+	}
 	report.Candidates = append(report.Candidates, candidate)
 	if err := saveReport(*file, report); err != nil {
 		return err
@@ -208,6 +212,12 @@ func cmdReportSeal(args []string) error {
 	disproved := fs.Uint("disproved", 0, "candidates the self-grind disproved")
 	raw := fs.Bool("raw", false, "write canonical bytes instead of the envelope")
 	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	// Before anything is built from it: a report another pass opened is not
+	// this pass's to deliver.
+	if err := sealablePass(*file, os.Getenv("GRIMES_PASS")); err != nil {
 		return err
 	}
 	// The engine exports the request it is making when it invokes a provider, so
@@ -329,6 +339,9 @@ func cmdReportSeal(args []string) error {
 	if err := os.Remove(*file); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("clearing the sealed report: %w", err)
 	}
+	if err := os.Remove(passPath(*file)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("clearing the sealed report: %w", err)
+	}
 	return nil
 }
 
@@ -425,6 +438,9 @@ func cmdReportCover(args []string) error {
 	if err := contracts.Validate(report.GetCoverage()); err != nil {
 		return err
 	}
+	if err := claimPass(*file, os.Getenv("GRIMES_PASS")); err != nil {
+		return err
+	}
 	if err := saveReport(*file, report); err != nil {
 		return err
 	}
@@ -468,6 +484,9 @@ func cmdReportStop(args []string) error {
 		return err
 	}
 	report.CategoryStops = append(report.CategoryStops, stop)
+	if err := claimPass(*file, os.Getenv("GRIMES_PASS")); err != nil {
+		return err
+	}
 	if err := saveReport(*file, report); err != nil {
 		return err
 	}
@@ -562,6 +581,9 @@ func cmdReportAcquit(args []string) error {
 		return err
 	}
 	report.Acquittals = append(report.Acquittals, acquittal)
+	if err := claimPass(*file, os.Getenv("GRIMES_PASS")); err != nil {
+		return err
+	}
 	if err := saveReport(*file, report); err != nil {
 		return err
 	}
@@ -640,6 +662,110 @@ func cmdReportShow(args []string) error {
 
 // loadReport reads the in-progress report without validating it: it is
 // incomplete by construction until seal fills in the run-level fields.
+// passPath is where the pass that opened a report is recorded, beside it.
+func passPath(reportPath string) string {
+	return reportPath + ".pass"
+}
+
+// claimPass records which pass is accumulating this report, and refuses to add
+// to one that another pass opened.
+//
+// A pass is a role the engine spawned, named by GRIMES_PASS. Outside one there
+// is no pass to record: a review that builds a report before starting the run
+// that will carry it is the documented sequence, and the run that seals it
+// adopts what it finds. What this stops is the other case, where a pass died
+// before sealing and the next pass delivers its candidates as its own.
+func claimPass(reportPath, pass string) error {
+	if pass == "" {
+		return nil
+	}
+	// The report's own directory, which a role that builds its report in a
+	// scratch directory of its own does not have yet. WriteAtomic makes it for
+	// the report; the marker beside it needs the same.
+	if err := os.MkdirAll(filepath.Dir(passPath(reportPath)), 0o755); err != nil {
+		return err
+	}
+	// Exclusive create rather than read-then-write: two passes spawned into one
+	// review directory would otherwise both find no marker, both write, and the
+	// one whose write landed second would own a report holding the other's
+	// candidates. Whoever creates the file owns the report.
+	f, err := os.OpenFile(passPath(reportPath), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err == nil {
+		return writePass(f, pass)
+	}
+	if !errors.Is(err, os.ErrExist) {
+		return err
+	}
+	held, _, err := readPass(reportPath)
+	if err != nil {
+		return err
+	}
+	if held == pass {
+		return nil
+	}
+	// An empty marker is one a pass created and did not live to write. It is
+	// claimed by somebody; it is not claimed by this pass.
+	return fmt.Errorf(
+		"%s holds candidates another pass opened and did not seal; remove it or seal it there",
+		reportPath)
+}
+
+// writePass records the pass in the marker it just created, reporting every
+// way that can fail. A marker that was not written names nobody, and the caller
+// is about to write candidates against it.
+func writePass(f *os.File, pass string) error {
+	if _, err := f.WriteString(pass); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
+}
+
+// readPass returns the pass that opened the report and whether a marker is
+// there at all.
+//
+// The two are different answers. A marker that exists and is empty belongs to a
+// pass that created it and has not written to it yet, which is a moment every
+// claim passes through; reading that as no marker would let another pass take
+// the report out from under it.
+func readPass(reportPath string) (pass string, exists bool, err error) {
+	data, err := os.ReadFile(passPath(reportPath))
+	if errors.Is(err, os.ErrNotExist) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return strings.TrimSpace(string(data)), true, nil
+}
+
+// sealablePass refuses to deliver candidates that belong to a pass other than
+// this one.
+//
+// An unclaimed report is the documented sequence: a review accumulated it
+// before the run existed, and this run carries it. A report claimed by another
+// pass is the abandoned one, and stamping this run's identity onto it would
+// deliver findings this pass never made.
+func sealablePass(reportPath, pass string) error {
+	held, exists, err := readPass(reportPath)
+	if err != nil {
+		return err
+	}
+	// No marker is the documented sequence; a marker naming this pass is its
+	// own. An empty one is a claim in progress, and sealing here would take the
+	// report and the marker with it.
+	if !exists || (held != "" && held == pass) {
+		return nil
+	}
+	return fmt.Errorf(
+		"%s was opened by another pass and never sealed; its candidates are not this pass's to deliver",
+		reportPath)
+}
+
 func loadReport(path string) (*pb.ProviderReport, error) {
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {

@@ -30,6 +30,30 @@ const (
 	FixDir    = GrimesDir + "/fix"
 )
 
+// WorkPassPath is where the contract CLI records which pass opened the report
+// it is accumulating, beside the report itself.
+//
+// Not part of any record: it is bookkeeping about a file that is still being
+// written, and it is removed with that file when the report is sealed.
+const WorkPassPath = GrimesDir + "/work/report.pass"
+
+// PassToken names one spawned pass: this run, this role, this iteration.
+//
+// Derived rather than random so that the role and the engine agree on it
+// without passing it back, and so a run that is asked for the same pass twice
+// names it the same way.
+//
+// Two passes that could overlap must not share one. Nothing here enforces that;
+// what does is that a run identity carries the process that made it, and that
+// the roles inside a run are spawned one after another. A change that made
+// several roles of one kind run at once, or that let two processes be given the
+// same run identity, would put two live passes behind one name, and the claim
+// each of them makes on a report would look to the other like its own.
+func PassToken(runID, role string, iteration uint32) string {
+	sum := sha256.Sum256(fmt.Appendf(nil, "%s\x00%s\x00%d", runID, role, iteration))
+	return hex.EncodeToString(sum[:8])
+}
+
 // RunSlug names a run in a path. A run identity is not constrained to the
 // characters a filename admits, so it is digested rather than sanitized: two
 // distinct runs that sanitize alike would collide on the file this names.
