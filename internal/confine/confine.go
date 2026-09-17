@@ -13,6 +13,7 @@ package confine
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -73,6 +74,16 @@ func (p Policy) resolve() (Policy, error) {
 		got, err := resolvePath(r, "readable directory")
 		if err != nil {
 			return Policy{}, err
+		}
+		// A tree is what the grant means, on both backends. A file here would
+		// become a subpath rule naming no subpath, which is a rule that grants
+		// something other than what was asked for.
+		info, err := os.Stat(got)
+		if err != nil {
+			return Policy{}, fmt.Errorf("confine: readable directory %q: %w", r, err)
+		}
+		if !info.IsDir() {
+			return Policy{}, fmt.Errorf("confine: readable directory %q is not a directory", r)
 		}
 		out.ReadDirs = append(out.ReadDirs, got)
 	}

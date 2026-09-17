@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -87,6 +88,17 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		}
 		defer staged.discard()
 		collected.ReviewedRoot = staged.dir
+		// The copy leaves out what belongs to the repository and to the review
+		// itself. A target inside either is one the roles after the fixing one
+		// would be pointed at and find nothing at, which surfaces as a role
+		// failing rather than as a target nobody should have named.
+		if at := inReviewed(collected); at.ContentPath != "" {
+			if _, err := os.Stat(at.ContentPath); err != nil {
+				return nil, fmt.Errorf(
+					"%w: %q is not reviewable in fix mode: it is not carried into the copy the later roles read",
+					ErrFixNeedsRepository, collected.Target.GetScope())
+			}
+		}
 	}
 
 	iteration, err := e.resume(ctx, target, ledger)
@@ -290,7 +302,7 @@ func (e *Engine) handoff(ctx context.Context, spec TargetSpec, collected *Collec
 func inReviewed(collected *Collected) Handoff {
 	at := Handoff{ContentPath: collected.ReviewedRoot, Root: collected.ReviewedRoot}
 	rel, err := filepath.Rel(collected.Target.GetRoot(), collected.ContentPath)
-	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+	if err != nil || rel == "." || !filepath.IsLocal(rel) {
 		return at
 	}
 	at.ContentPath = filepath.Join(collected.ReviewedRoot, rel)

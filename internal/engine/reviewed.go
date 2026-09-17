@@ -85,20 +85,47 @@ func copyTree(src, dst string) error {
 		case d.IsDir():
 			return os.MkdirAll(target, 0o755)
 		case d.Type()&os.ModeSymlink != 0:
-			// Copied as a link rather than followed: following one that points
-			// outside would put bytes nobody reviewed into the copy, under a
-			// name that says they were.
-			got, err := os.Readlink(path)
-			if err != nil {
-				return err
-			}
-			return os.Symlink(got, target)
+			return copyLink(src, dst, path, rel)
 		case !d.Type().IsRegular():
 			// A socket or a device is not reviewable and not copyable.
 			return nil
 		}
 		return copyFile(path, target, d)
 	})
+}
+
+// copyLink reproduces a symlink only where it goes on resolving inside the
+// copy, and drops it otherwise.
+//
+// A link is copied as a link rather than followed, so that the copy keeps the
+// shape the review saw. But a link is read at the far end, not here: one
+// pointing outside would resolve to whatever is there now, and a role reading
+// the copy would be handed live bytes under a name saying they were reviewed.
+// The link is rewritten relative to the copy so that what it reaches is the
+// copy's own file rather than the original, which a fixing role is editing.
+func copyLink(src, dst, path, rel string) error {
+	got, err := os.Readlink(path)
+	if err != nil {
+		return err
+	}
+	// Resolved against the link's own directory, which is where the kernel
+	// resolves a relative one from.
+	aimed := got
+	if !filepath.IsAbs(aimed) {
+		aimed = filepath.Join(filepath.Dir(path), aimed)
+	}
+	inside, err := filepath.Rel(src, filepath.Clean(aimed))
+	if err != nil || !filepath.IsLocal(inside) {
+		return nil
+	}
+	// Relative to the link's place in the copy, so the copy is self-contained
+	// wherever it is read from.
+	from := filepath.Dir(filepath.Join(dst, rel))
+	aimedInCopy, err := filepath.Rel(from, filepath.Join(dst, inside))
+	if err != nil {
+		return nil
+	}
+	return os.Symlink(aimedInCopy, filepath.Join(dst, rel))
 }
 
 func copyFile(src, dst string, d fs.DirEntry) error {

@@ -530,6 +530,66 @@ assert_match "$OUT" 'commit_sha1' \
 rm -rf "$REPO"
 
 echo ""
+echo "--- The copy is a copy, and what it holds resolves inside it ---"
+
+# A link is copied as a link so the copy keeps the shape the review saw, but a
+# link is read at the far end. One pointing out of the tree would resolve to
+# whatever is there now, and a role reading the copy would be handed live bytes
+# under a name saying they were reviewed.
+REPO="$(repository)"
+OUTSIDE="$(mktemp -d)"
+printf 'not part of any review\n' >"$OUTSIDE/elsewhere.txt"
+mkdir -p "$REPO/lib"
+printf 'shared\n' >"$REPO/lib/shared.sh"
+ln -s "$OUTSIDE/elsewhere.txt" "$REPO/src/escape.txt"
+ln -s "../lib/shared.sh" "$REPO/src/inside.sh"
+git -C "$REPO" add -A
+git -C "$REPO" commit --quiet --message "add links"
+"$GRIMES" run --dir="$REPO" --mode=fix \
+    --adjudicator-command="$FAKES/adjudicator-reports-where.sh" --adjudicator-fresh \
+    --adjudicator-arg=src/escape.txt --adjudicator-arg=src/inside.sh \
+    --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true" \
+    --format=prototext src >/dev/null 2>&1 || true
+WHERE="$(cat "$REPO/.grimes/work/where" 2>/dev/null || true)"
+if [[ -n "$WHERE" ]]; then
+    pass "the role reported where it was pointed"
+else
+    fail "the role reported nothing (it must, or what follows proves nothing)"
+fi
+assert_match "$WHERE" 'absent src/escape.txt' \
+    "a link out of the tree is not carried into the copy"
+assert_match "$WHERE" 'read src/inside.sh=shared' \
+    "and a link within it still resolves, inside the copy"
+assert_no_match "$WHERE" 'not part of any review' \
+    "so nothing outside the review is readable through the copy"
+rm -rf "$REPO" "$OUTSIDE"
+
+# A directory whose name begins with two dots is a name, not an escape. Read as
+# one, a later role is handed the whole copy instead of the path under review.
+REPO="$(repository)"
+mkdir -p "$REPO/..generated"
+printf 'echo generated\n' >"$REPO/..generated/app.sh"
+git -C "$REPO" add -A
+git -C "$REPO" commit --quiet --message "add a dotted directory"
+"$GRIMES" run --dir="$REPO" --mode=fix \
+    --adjudicator-command="$FAKES/adjudicator-reports-where.sh" --adjudicator-fresh \
+    --provider-command="$FAKES/provider-green.sh" \
+    --format=prototext '..generated' >/dev/null 2>&1 || true
+WHERE="$(cat "$REPO/.grimes/work/where" 2>/dev/null || true)"
+assert_match "$WHERE" 'content=.*/\.\.generated' \
+    "a scope whose name begins with dots is the scope the later role is given"
+rm -rf "$REPO"
+
+# The copy leaves out the repository's own directory, so a target inside it is
+# one the later roles would be pointed at and find nothing at.
+REPO="$(repository)"
+OUT="$("$GRIMES" run --dir="$REPO" --mode=fix --kind=code \
+    --provider-command="$FAKES/fixer-repairs.sh" --format=prototext .git 2>&1 || true)"
+assert_match "$OUT" 'not reviewable in fix mode' \
+    "a target the copy cannot carry is refused rather than half-staged"
+rm -rf "$REPO"
+
+echo ""
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"
 [[ "$FAILED" -eq 0 ]] || exit 1

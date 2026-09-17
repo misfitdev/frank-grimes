@@ -316,3 +316,40 @@ func TestAPolicyPathThatDoesNotExistIsRefused(t *testing.T) {
 		t.Fatal("a readable path that was never staged was accepted")
 	}
 }
+
+// A read grant for a directory is a grant for a tree, and the two backends
+// express it that way: a subpath rule on one, a bind on the other. A file here
+// would become a rule granting something other than what was asked for, and no
+// caller can reach this through the CLI.
+func TestAReadableDirectoryThatIsAFileIsRefused(t *testing.T) {
+	m := builtin(t)
+	root, handed, _, out := target(t)
+
+	_, err := m.Wrap(Policy{
+		Root:      root,
+		ReadDirs:  []string{handed},
+		WriteDirs: []string{out},
+	}, []string{"/bin/true"})
+
+	if err == nil {
+		t.Fatal("a file was accepted as a readable directory")
+	}
+}
+
+// The grant still has to work for what it is for.
+func TestAReadableDirectoryIsAccepted(t *testing.T) {
+	m := builtin(t)
+	root, _, _, out := target(t)
+	copied := filepath.Join(root, GrimesDir, "reviewed")
+	if err := os.MkdirAll(copied, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := m.Wrap(Policy{
+		Root:      root,
+		ReadDirs:  []string{copied},
+		WriteDirs: []string{out},
+	}, []string{"/bin/true"}); err != nil {
+		t.Fatalf("a staged directory was refused: %v", err)
+	}
+}
