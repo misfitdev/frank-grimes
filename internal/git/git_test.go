@@ -268,6 +268,40 @@ func TestChangedFromARepointedWorktreeIsRefused(t *testing.T) {
 	}
 }
 
+// A git hook exports these, and grimes is run from one. Inherited, they would
+// decide which repository every command here reached, whatever directory it was
+// given.
+func TestTheEnvironmentCannotRedirectWhichRepositoryIsUsed(t *testing.T) {
+	ctx := context.Background()
+	mine, theirs := repo(t), repo(t)
+	// A second commit, so the two repositories do not hash alike: identical
+	// trees committed in the same second are the same object name.
+	write(t, filepath.Join(theirs.Dir, "theirs.txt"), "not mine\n")
+	git(t, theirs.Dir, "add", "-A")
+	git(t, theirs.Dir, "commit", "--quiet", "--message", "second")
+	mineHead, err := mine.Head(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Uncommitted work in the other repository, which is what a redirected
+	// clean check would report.
+	write(t, filepath.Join(theirs.Dir, "app.sh"), "someone else's uncommitted work\n")
+
+	t.Setenv("GIT_DIR", filepath.Join(theirs.Dir, ".git"))
+	t.Setenv("GIT_WORK_TREE", theirs.Dir)
+
+	if err := mine.Clean(ctx); err != nil {
+		t.Errorf("a clean repository reported as dirty through the environment: %v", err)
+	}
+	head, err := mine.Head(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if head != mineHead {
+		t.Errorf("HEAD came from the repository the environment named: %s", head)
+	}
+}
+
 func TestRemoveTakesTheWorktreeAndItsBranch(t *testing.T) {
 	ctx := context.Background()
 	r := repo(t)

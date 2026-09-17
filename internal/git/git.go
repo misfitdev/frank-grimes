@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
@@ -301,7 +302,7 @@ func run(ctx context.Context, dir string, args ...string) (string, error) {
 	cmd.Dir = dir
 	cmd.Stdin = nil
 	// A pager would never return, and a prompt cannot be answered by anyone.
-	cmd.Env = append(cmd.Environ(), "GIT_PAGER=cat", "GIT_TERMINAL_PROMPT=0")
+	cmd.Env = append(withoutRepoSelection(cmd.Environ()), "GIT_PAGER=cat", "GIT_TERMINAL_PROMPT=0")
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &limited{w: &stdout, left: outputLimit}
@@ -318,6 +319,36 @@ func run(ctx context.Context, dir string, args ...string) (string, error) {
 		return "", fmt.Errorf("git %s: %w", args[0], err)
 	}
 	return stdout.String(), nil
+}
+
+// repoSelection names the variables that tell git which repository to act on,
+// whatever directory it was started in.
+//
+// Anything running inside a git hook has these exported, and grimes is run from
+// one. Left inherited, the directory this package is so careful about would not
+// be the repository the command reached.
+var repoSelection = []string{
+	"GIT_DIR",
+	"GIT_WORK_TREE",
+	"GIT_COMMON_DIR",
+	"GIT_INDEX_FILE",
+	"GIT_OBJECT_DIRECTORY",
+	"GIT_ALTERNATE_OBJECT_DIRECTORIES",
+	"GIT_NAMESPACE",
+	"GIT_CEILING_DIRECTORIES",
+	"GIT_DISCOVERY_ACROSS_FILESYSTEM",
+}
+
+func withoutRepoSelection(env []string) []string {
+	out := env[:0:0]
+	for _, kv := range env {
+		name, _, _ := strings.Cut(kv, "=")
+		if slices.Contains(repoSelection, name) {
+			continue
+		}
+		out = append(out, kv)
+	}
+	return out
 }
 
 // limited writes until it has taken its bound and then discards, so a command

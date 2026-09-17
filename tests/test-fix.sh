@@ -305,6 +305,10 @@ REPO="$(repository)"
 MAIN_BEFORE="$(git -C "$REPO" rev-parse main)"
 OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" \
     --verify-command="echo gate-was-here >../../src/app.sh; echo gate-was-here >../ledger.pb; echo gate-was-here >../../.git/refs/heads/main; true")"
+# Asserted first: a gate that never ran leaves every path below untouched, and
+# each check would pass without the boundary having done anything.
+assert_match "$OUT" 'status: +VERIFICATION_STATUS_PASSED' \
+    "the gate ran, so what it could not reach is the boundary's doing"
 if [[ "$(cat "$REPO/src/app.sh")" != *gate-was-here* ]]; then
     pass "a gate cannot write the tree the operator is holding"
 else
