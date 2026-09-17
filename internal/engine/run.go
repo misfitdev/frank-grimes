@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
+	"github.com/misfitdev/frank-grimes/internal/adjudicate"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
 	"github.com/misfitdev/frank-grimes/internal/envelope"
 	"google.golang.org/protobuf/proto"
@@ -14,19 +15,19 @@ import (
 
 // Engine runs reviews. Every field is a seam; none carries methodology.
 type Engine struct {
-	Collector   Collector
-	Provider    Provider
-	Broker      EvidenceBroker
-	Adjudicator Adjudicator
-	Refuter     Refuter
-	Gate        GateRunner
-	Inventory   InventoryStore
-	Content     ContentStore
-	Claims      ClaimStore
-	Ledger      Ledger
-	Results     ResultStore
-	State       StateStore
-	Clock       Clock
+	Collector    Collector
+	Provider     Provider
+	Broker       EvidenceBroker
+	Adjudicators []Adjudicator
+	Refuter      Refuter
+	Gate         GateRunner
+	Inventory    InventoryStore
+	Content      ContentStore
+	Claims       ClaimStore
+	Ledger       Ledger
+	Results      ResultStore
+	State        StateStore
+	Clock        Clock
 
 	RunID         string
 	AutoLoop      bool
@@ -175,25 +176,27 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		Unconfined:                   e.Unconfined,
 	})
 
-	review, err := e.adjudicate(ctx, spec, collected, primary.Verdict)
+	panel, err := e.adjudicate(ctx, spec, collected, primary.Verdict)
 	if err != nil {
 		return nil, err
 	}
+	review := decisive(panel)
 
 	final := Derive(DeriveInput{
 		Candidates:                   candidates,
 		AdjudicationAvailable:        review != nil,
+		AdjudicationRequested:        panel.GetRequested(),
+		AdjudicationCompleted:        uint32(len(panel.GetCompleted())),
 		RankingBlocked:               blocked,
 		CriticalFalsifierUnavailable: falsifierUnavailable,
 		IndependentDecision:          review.GetVerdict().GetDecision(),
-		IndependentContextUnknown: review != nil &&
-			review.GetContextOrigin() != pb.ContextOrigin_CONTEXT_ORIGIN_ENGINE_SPAWNED,
-		AllCategoriesStopped:    cov.CategoriesStopped,
-		CriticalInvariantProbed: cov.Probed,
-		CriticalUnknownRemains:  cov.UnknownRemains,
-		CoverageIncomplete:      len(cov.Unaccounted) > 0,
-		Oscillation:             oscillation,
-		Unconfined:              e.Unconfined,
+		IndependentContextUnknown:    contextUnknown(panel),
+		AllCategoriesStopped:         cov.CategoriesStopped,
+		CriticalInvariantProbed:      cov.Probed,
+		CriticalUnknownRemains:       cov.UnknownRemains,
+		CoverageIncomplete:           len(cov.Unaccounted) > 0,
+		Oscillation:                  oscillation,
+		Unconfined:                   e.Unconfined,
 	})
 
 	// The target a fix run leaves behind is not the one it reviewed, and that is
@@ -213,6 +216,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 
 	yield := marginalYield(report, ledger, surfaced)
 	result := e.assemble(target, mode, iteration, final, review, verification, ledger, digest, oscillation, yield, check)
+	result.Adjudication = panel
 	if fix != nil {
 		result.FixBatch = fix.record()
 	}
@@ -597,23 +601,65 @@ func verifyIdentity(f *pb.Finding) error {
 	return nil
 }
 
-func (e *Engine) adjudicate(ctx context.Context, spec TargetSpec, collected *Collected, claimed *pb.Verdict) (*pb.IndependentReview, error) {
-	if e.Adjudicator == nil {
+// adjudicate puts the claimed verdict to every reviewer that was asked for and
+// reports what answered.
+//
+// A reviewer that fails is missing rather than fatal, the way a single one
+// always was: absence of a second opinion is not agreement, but it is also not
+// a run failure. What changes with a panel is that the absence is counted, so
+// a run that asked for three and heard from one says so.
+//
+// One staged copy for the whole panel. They are reading the same reviewed bytes
+// under the same boundary, and a copy each would only multiply what the fixing
+// role could have reached.
+func (e *Engine) adjudicate(ctx context.Context, spec TargetSpec, collected *Collected, claimed *pb.Verdict) (*pb.AdjudicationPanel, error) {
+	if len(e.Adjudicators) == 0 {
 		return nil, nil
 	}
-	// Staged only once there is a second opinion to hand it to, for the same
-	// reason refutation stages only when a pass will run.
 	contentPath, err := e.handoff(ctx, spec, collected, RoleAdjudicator)
 	if err != nil {
 		return nil, err
 	}
-	review, err := e.Adjudicator.Adjudicate(ctx, collected.Target, contentPath, claimed)
-	if err != nil {
-		// Absence of a second opinion is not agreement, but it is also not a
-		// run failure: the verdict caps itself instead.
-		return nil, nil
+	panel := &pb.AdjudicationPanel{Requested: uint32(len(e.Adjudicators))}
+	for _, a := range e.Adjudicators {
+		review, err := a.Adjudicate(ctx, collected.Target, contentPath, claimed)
+		if err != nil {
+			continue
+		}
+		panel.Completed = append(panel.GetCompleted(), review)
 	}
-	return review, nil
+	return panel, nil
+}
+
+// decisive is the review whose verdict stood, which is the strictest of them.
+//
+// Returned rather than derived twice: the record names one review beside the
+// panel, and it has to be the one the decision came from.
+func decisive(panel *pb.AdjudicationPanel) *pb.IndependentReview {
+	var worst *pb.IndependentReview
+	for _, r := range panel.GetCompleted() {
+		if worst == nil {
+			worst = r
+			continue
+		}
+		if adjudicate.Strictest(worst.GetVerdict().GetDecision(), r.GetVerdict().GetDecision()) ==
+			r.GetVerdict().GetDecision() &&
+			r.GetVerdict().GetDecision() != worst.GetVerdict().GetDecision() {
+			worst = r
+		}
+	}
+	return worst
+}
+
+// contextUnknown reports whether any reviewer that answered came from a context
+// nobody could establish. One uncertain source makes the panel uncertain.
+func contextUnknown(panel *pb.AdjudicationPanel) bool {
+	for _, r := range panel.GetCompleted() {
+		if r.GetContextOrigin() != pb.ContextOrigin_CONTEXT_ORIGIN_ENGINE_SPAWNED {
+			return true
+		}
+	}
+	return false
 }
 
 // persist writes the result before the state that references it, so state

@@ -51,6 +51,13 @@ type DeriveInput struct {
 
 	// Adjudication
 	AdjudicationAvailable bool
+	// AdjudicationRequested and AdjudicationCompleted are how many independent
+	// reviewers the run asked for and how many answered. Fewer answers than
+	// requests is a panel that was not assembled, which caps the verdict the
+	// way no answer at all does: the reviews that did arrive are not the panel
+	// somebody asked for.
+	AdjudicationRequested uint32
+	AdjudicationCompleted uint32
 	IndependentDecision   pb.Decision
 	// IndependentContextUnknown is set when a second opinion arrived from a
 	// context whose origin could not be established. It caps confidence and

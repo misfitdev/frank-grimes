@@ -66,6 +66,52 @@ func TestParseRunAcceptsFixModeForCode(t *testing.T) {
 	}
 }
 
+// The flag package sees a list of values with no memory of what they followed,
+// so the grouping is recovered from the raw arguments. What it has to preserve
+// is that an argument belongs to the reviewer it was written after.
+func TestEachReviewerKeepsTheArgumentsWrittenAfterIt(t *testing.T) {
+	cfg, err := parseRun(baseArgs(
+		"--adjudicator-command", "claude",
+		"--adjudicator-arg", "-p",
+		"--adjudicator-arg", "first prompt",
+		"--adjudicator-command", "codex",
+		"--adjudicator-arg", "exec",
+		"--adjudicator-arg", "second prompt",
+	))
+	if err != nil {
+		t.Fatalf("parseRun: %v", err)
+	}
+
+	want := [][]string{
+		{"claude", "-p", "first prompt"},
+		{"codex", "exec", "second prompt"},
+	}
+	if len(cfg.AdjudicatorCommands) != len(want) {
+		t.Fatalf("got %d reviewers, want %d: %q", len(cfg.AdjudicatorCommands), len(want), cfg.AdjudicatorCommands)
+	}
+	for i, reviewer := range want {
+		if strings.Join(cfg.AdjudicatorCommands[i], "\x00") != strings.Join(reviewer, "\x00") {
+			t.Errorf("reviewer %d = %q, want %q", i, cfg.AdjudicatorCommands[i], reviewer)
+		}
+	}
+}
+
+// One reviewer with its arguments is what every adapter passes today, and it
+// has to keep parsing to exactly what it did before a panel was possible.
+func TestOneReviewerWithArgumentsIsUnchanged(t *testing.T) {
+	cfg, err := parseRun(baseArgs(
+		"--adjudicator-command=claude", "--adjudicator-arg=-p", "--adjudicator-arg=the prompt",
+	))
+	if err != nil {
+		t.Fatalf("parseRun: %v", err)
+	}
+
+	got := strings.Join(cfg.AdjudicatorCommands[0], "\x00")
+	if len(cfg.AdjudicatorCommands) != 1 || got != strings.Join([]string{"claude", "-p", "the prompt"}, "\x00") {
+		t.Errorf("got %q", cfg.AdjudicatorCommands)
+	}
+}
+
 func TestParseRunCommitRequiresFixMode(t *testing.T) {
 	_, err := parseRun(baseArgs("--commit"))
 	if err == nil {

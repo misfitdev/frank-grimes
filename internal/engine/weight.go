@@ -60,7 +60,7 @@ func decide(in DeriveInput, counts *pb.FindingCounts) pb.Decision {
 	if counts.GetOpenP1() > 0 {
 		return pb.Decision_DECISION_CONDITIONAL
 	}
-	if !in.AdjudicationAvailable {
+	if !in.AdjudicationAvailable || in.AdjudicationCompleted < in.AdjudicationRequested {
 		return pb.Decision_DECISION_CONDITIONAL
 	}
 	// A verdict over part of a target is not a verdict over the target.
@@ -146,7 +146,8 @@ func residualRisk(in DeriveInput) pb.ResidualRisk {
 // broke ranks with a material evidence conflict, because that is what it is:
 // two contexts over one artifact reaching opposite results.
 func confidence(in DeriveInput) pb.ReviewConfidence {
-	if in.CriticalFalsifierUnavailable || !in.AdjudicationAvailable {
+	if in.CriticalFalsifierUnavailable || !in.AdjudicationAvailable ||
+		in.AdjudicationCompleted < in.AdjudicationRequested {
 		return pb.ReviewConfidence_REVIEW_CONFIDENCE_LOW
 	}
 	driving := drivingFindings(in.Candidates)

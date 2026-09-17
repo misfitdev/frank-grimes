@@ -32,7 +32,7 @@ func unmetGates(v *pb.Verdict, in DeriveInput) []string {
 	if v.GetReviewCompleteness() != pb.ReviewCompleteness_REVIEW_COMPLETENESS_SUFFICIENT {
 		gates = append(gates, GateCompleteness)
 	}
-	if !in.AdjudicationAvailable {
+	if !in.AdjudicationAvailable || in.AdjudicationCompleted < in.AdjudicationRequested {
 		gates = append(gates, GateAdjudication)
 	}
 	// Named separately from confidence so the record says why it was capped.

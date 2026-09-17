@@ -124,6 +124,7 @@ When your provider supports arguments, you can skip the interactive prompts:
 | `--verify-command <cmd>` | Gate run once over a fix batch; without a usable gate nothing is committed |
 | `--commit` | Authorizes one commit of the verified batch; requires `--mode fix` and a passing gate |
 | `--repository-check` | Authorizes running the repository's own `check` recipe as the gate |
+| `--adjudicator-command` | A command that performs an independent review; repeatable for a panel of reviewers |
 | `--max-iterations N` | Maximum iterations (default: 5) |
 | `--auto-loop` | Continue while iterations still change the verdict |
 | `--research online\|offline\|frozen:<path>` | Use bounded current-landscape research, disable network research, or load a pinned research bundle |
@@ -139,6 +140,20 @@ A finding whose file the batch touched is recorded as `fixed`. It becomes `verif
 The gate runs inside the same boundary the fixer does: it may build in the worktree, and it cannot reach your working tree, the review's own record, or the repository's history. Under `--unsafe` there is no boundary, for the gate as for every role, and a check recipe can reach all three. A check that stages or commits is refused — that history belongs to the supervisor and to the one commit it is authorized to make.
 
 `--commit` is authorized separately from `--mode fix`, and makes at most one commit per verified batch, on the worktree's own branch, naming the findings it closes. A batch that edited outside the reviewed scope is refused whole.
+
+### Independent Review
+
+A pass needs a second review that reached the same conclusion without seeing the first. `--adjudicator-command` is that reviewer, and it is repeatable: each occurrence is another reviewer, and the `--adjudicator-arg` flags that follow it belong to it.
+
+```bash
+--adjudicator-command="claude" --adjudicator-arg="-p" --adjudicator-arg="<prompt>" \
+--adjudicator-command="codex"  --adjudicator-arg="exec" --adjudicator-arg="<prompt>" \
+--adjudicator-fresh
+```
+
+Asking for several is asking for all of them. The run records how many were asked for and how many answered, and a reviewer that did not answer leaves the adjudication gate unmet rather than quietly shrinking the panel. The strictest verdict among them stands.
+
+The engine counts reviewers; it does not classify them. What makes two reviewers independent is that you chose two different commands — there is no table of provider names here, and nothing to configure to use one model rather than another.
 
 ### Confinement
 
