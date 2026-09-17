@@ -107,6 +107,10 @@ type Collected struct {
 	// run is going to change them. Evidence is checked against the bytes that
 	// were reviewed, and in fix mode the file on disk is no longer those.
 	UnitBodies map[string][]byte
+	// Range reports that the scope named a revision range. The inventory is then
+	// the whole of the scope rather than everything under one path, which is
+	// what a fix batch has to stay inside of.
+	Range bool
 }
 
 // Collector resolves a caller's target spec into a fingerprinted target, the

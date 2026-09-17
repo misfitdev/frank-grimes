@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"hash"
 	"io"
 	"io/fs"
 	"os"
@@ -17,6 +18,7 @@ import (
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
+	"github.com/misfitdev/frank-grimes/internal/git"
 )
 
 // maxUnitLabel is the contract's bound on TargetUnit.label.
@@ -54,7 +56,7 @@ func (c TargetCollector) Collect(ctx context.Context, spec TargetSpec) (*Collect
 	)
 	switch spec.Kind {
 	case pb.TargetKind_TARGET_KIND_CODE:
-		out, err = c.collectCode(spec)
+		out, err = c.collectCode(ctx, spec)
 	case pb.TargetKind_TARGET_KIND_DOCUMENT:
 		out, err = c.collectDocument(spec)
 	case pb.TargetKind_TARGET_KIND_IDEA:
@@ -99,6 +101,99 @@ func collected(target *pb.Target, units []*pb.TargetUnit, contentPath string) *C
 	}
 }
 
+// asRange decides whether the scope names a revision range rather than a path,
+// and returns the range it resolved to.
+//
+// What is on disk wins: an operator who names a file gets that file, whatever
+// it is called. A scope that reads as both is refused rather than guessed at,
+// because the two readings select different files and the run record would not
+// say which was meant.
+func (c TargetCollector) asRange(ctx context.Context, spec TargetSpec) (*git.Range, error) {
+	// Every range spelling contains it, and no other scope is even a candidate,
+	// so nothing below runs for an ordinary path.
+	if !strings.Contains(spec.Scope, "..") {
+		return nil, nil
+	}
+	repo, err := git.Open(ctx, spec.Root)
+	if err != nil {
+		return nil, nil
+	}
+	resolved, err := repo.ResolveRange(ctx, spec.Scope)
+	if err != nil {
+		return nil, nil
+	}
+	if _, err := os.Lstat(filepath.Join(spec.Root, spec.Scope)); err == nil {
+		return nil, fmt.Errorf(
+			"%q names both a path in the repository and the revision range %s; "+
+				"write ./%s for the path, or the resolved range for the commits",
+			spec.Scope, resolved, spec.Scope)
+	}
+	return &resolved, nil
+}
+
+// collectRange resolves a target from the files a range of commits changed.
+//
+// The range selects which files are under review; the bytes are the ones in the
+// tree. A review that fixes what it finds edits the tree, so an inventory built
+// from an older version of a file would anchor findings to lines no role could
+// read and no gate could run over.
+func (c TargetCollector) collectRange(ctx context.Context, spec TargetSpec, resolved *git.Range) (*Collected, error) {
+	repo, err := git.Open(ctx, spec.Root)
+	if err != nil {
+		return nil, err
+	}
+	rel, err := repo.RangeFiles(ctx, *resolved)
+	if err != nil {
+		return nil, fmt.Errorf("range target %q: %w", spec.Scope, err)
+	}
+	base, err := filepath.Abs(spec.Root)
+	if err != nil {
+		return nil, err
+	}
+
+	var paths []string
+	for _, p := range rel {
+		abs := filepath.Join(base, p)
+		// A file the range changed and something later removed is not reviewable
+		// now, the same as one the range itself deleted.
+		if info, err := os.Lstat(abs); err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		paths = append(paths, abs)
+	}
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("range target %q (%s) changed no file that is still here to review",
+			spec.Scope, resolved)
+	}
+	sort.Strings(paths)
+
+	// The resolved commits seed the fingerprint, so that two ranges over one
+	// unchanged tree are two targets. Without it a review of an earlier range
+	// could be resumed as though it were this one.
+	seed := sha256.New()
+	fmt.Fprintf(seed, "range\x00%s\x00%s\n", resolved.From, resolved.To)
+
+	units, digests, bodies, sum, err := codeUnits(spec, base, paths, seed)
+	if err != nil {
+		return nil, err
+	}
+
+	// Scope carries the resolved commits and display carries what the operator
+	// wrote. "HEAD^..HEAD" names a different change after every commit, and the
+	// record has to say which one this was.
+	out := collected(&pb.Target{
+		Root:              spec.Root,
+		Scope:             resolved.String(),
+		FingerprintSha256: sum,
+		Display:           truncate(spec.Scope),
+		Kind:              pb.TargetKind_TARGET_KIND_CODE,
+	}, units, base)
+	out.UnitDigests = digests
+	out.UnitBodies = bodies
+	out.Range = true
+	return out, nil
+}
+
 // collectCode fingerprints every file under the target path and makes each one
 // a unit.
 //
@@ -106,9 +201,15 @@ func collected(target *pb.Target, units []*pb.TargetUnit, contentPath string) *C
 // that silently skipped a generated or ignored file would report coverage it
 // does not have. Only .git and the engine's own .grimes directory are skipped,
 // neither being part of any target.
-func (c TargetCollector) collectCode(spec TargetSpec) (*Collected, error) {
+func (c TargetCollector) collectCode(ctx context.Context, spec TargetSpec) (*Collected, error) {
 	if spec.Root == "" {
 		return nil, fmt.Errorf("a code target needs a repository root")
+	}
+	switch rangeSpec, err := c.asRange(ctx, spec); {
+	case err != nil:
+		return nil, err
+	case rangeSpec != nil:
+		return c.collectRange(ctx, spec, rangeSpec)
 	}
 	abs, base, err := contained(spec.Root, spec.Scope)
 	if err != nil {
@@ -154,32 +255,9 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*Collected, error) {
 	}
 	sort.Strings(paths)
 
-	sum := sha256.New()
-	units := make([]*pb.TargetUnit, 0, len(paths))
-	digests := make(map[string][]byte, len(paths))
-	var bodies map[string][]byte
-	if spec.KeepBodies {
-		bodies = make(map[string][]byte, len(paths))
-	}
-	for _, p := range paths {
-		rel, err := filepath.Rel(base, p)
-		if err != nil {
-			return nil, err
-		}
-		rel = filepath.ToSlash(rel)
-		content, err := os.ReadFile(p)
-		if err != nil {
-			return nil, fmt.Errorf("code target %q: %w", spec.Scope, err)
-		}
-		body := sha256.Sum256(content)
-		// Path and content digest both enter the fingerprint, so renaming a file
-		// or editing it are each a different target.
-		fmt.Fprintf(sum, "%s\x00%s\n", rel, hex.EncodeToString(body[:]))
-		units = append(units, unit(rel, rel))
-		digests[rel] = append([]byte(nil), body[:]...)
-		if bodies != nil {
-			bodies[rel] = content
-		}
+	units, digests, bodies, sum, err := codeUnits(spec, base, paths, sha256.New())
+	if err != nil {
+		return nil, err
 	}
 
 	// The scope itself: a tree when it names a directory, one file when it names
@@ -188,13 +266,46 @@ func (c TargetCollector) collectCode(spec TargetSpec) (*Collected, error) {
 	out := collected(&pb.Target{
 		Root:              spec.Root,
 		Scope:             spec.Scope,
-		FingerprintSha256: sum.Sum(nil),
+		FingerprintSha256: sum,
 		Display:           truncate(spec.Scope),
 		Kind:              pb.TargetKind_TARGET_KIND_CODE,
 	}, units, abs)
 	out.UnitDigests = digests
 	out.UnitBodies = bodies
 	return out, nil
+}
+
+// codeUnits reads each path and folds it into the inventory and the
+// fingerprint. seed carries whatever already identifies the target beyond its
+// files, so that two targets holding identical bytes are still distinguishable.
+func codeUnits(spec TargetSpec, base string, paths []string, seed hash.Hash) (
+	units []*pb.TargetUnit, digests, bodies map[string][]byte, sum []byte, err error) {
+	units = make([]*pb.TargetUnit, 0, len(paths))
+	digests = make(map[string][]byte, len(paths))
+	if spec.KeepBodies {
+		bodies = make(map[string][]byte, len(paths))
+	}
+	for _, p := range paths {
+		rel, err := filepath.Rel(base, p)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+		rel = filepath.ToSlash(rel)
+		content, err := os.ReadFile(p)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("code target %q: %w", spec.Scope, err)
+		}
+		body := sha256.Sum256(content)
+		// Path and content digest both enter the fingerprint, so renaming a file
+		// or editing it are each a different target.
+		fmt.Fprintf(seed, "%s\x00%s\n", rel, hex.EncodeToString(body[:]))
+		units = append(units, unit(rel, rel))
+		digests[rel] = append([]byte(nil), body[:]...)
+		if bodies != nil {
+			bodies[rel] = content
+		}
+	}
+	return units, digests, bodies, seed.Sum(nil), nil
 }
 
 // contained resolves a code scope against its root and refuses one that leaves

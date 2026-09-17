@@ -54,22 +54,28 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	var fix *fixRun
 	if mode == pb.Mode_MODE_FIX {
 		var err error
-		if fix, err = e.prepareFix(ctx, spec.Scope); err != nil {
+		if fix, err = e.prepareFix(ctx); err != nil {
 			return nil, err
 		}
 		spec.Root = fix.tree.Dir
 		spec.KeepBodies = true
 	}
 
+	// Before collection, because what a continued fix run collects is the scope
+	// its first iteration resolved, not whatever the spelling means now.
+	ledger, err := e.Ledger.Load(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("ledger: %w", err)
+	}
+	spec = pinned(fix, ledger, spec)
+
 	collected, err := e.Collector.Collect(ctx, spec)
 	if err != nil {
 		return nil, fmt.Errorf("collect: %w", err)
 	}
 	target := collected.Target
-
-	ledger, err := e.Ledger.Load(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("ledger: %w", err)
+	if fix != nil {
+		fix.adopt(collected)
 	}
 
 	iteration, err := e.resume(ctx, target, ledger)

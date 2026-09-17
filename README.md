@@ -117,7 +117,7 @@ When your provider supports arguments, you can skip the interactive prompts:
 
 | Option | Description |
 |--------|-------------|
-| `target` | What to grind: a file, a directory, `.` for the whole repository, a description, or "this". Written last: it ends the options |
+| `target` | What to grind: a file, a directory, `.` for the whole repository, a revision range such as `HEAD^..HEAD`, a description, or "this". Written last: it ends the options |
 | `--categories COR,SEC,REL` | Restrict routing to these canonical categories |
 | `--mode report\|fix` | `report` documents only and edits nothing (default); `fix` applies fixes, then verifies |
 | `--verify-command <cmd>` | Gate run once over a fix batch; without a usable gate nothing is committed |
@@ -176,12 +176,42 @@ Research is bounded and evidence-led: official documentation and security adviso
 # Grind the whole repository, report only
 /frank-grimes:grind --mode report .
 
+# Grind what the last commit changed
+/frank-grimes:grind HEAD^..HEAD
+
+# Grind what a branch contributed since it diverged
+/frank-grimes:grind main...topic
+
 # Grind with auto-loop enabled
 /frank-grimes:grind ./src/api --auto-loop
 
 # Grind an architecture proposal
 /frank-grimes:grind "The proposal to use MongoDB for our financial transaction system"
 ```
+
+### Reviewing a range of commits
+
+A target may be a revision range instead of a path. Both of git's spellings work:
+`A..B` is what B has that A does not, and `A...B` is what B has since the two
+diverged.
+
+The range decides **which files** are under review. The bytes are the ones in the
+tree, not the versions at either end of the range, because a fix run edits the
+tree and a gate runs over it. Two consequences worth knowing:
+
+- The inventory is the files the range changed, so coverage is measured against
+  what the review was asked about. A path target over the same repository counts
+  every file in it, which is why a review of recent changes used to cap at
+  limited completeness.
+- A file the range deleted is not a unit. There are no bytes to review and no
+  line for a finding to anchor to. Nor is a file that something later removed.
+
+The run record names the commits the range resolved to, not the spelling. A
+review of `HEAD^..HEAD` is a review of two particular commits, and the record has
+to say which.
+
+A scope that is both a path on disk and a valid range is refused rather than
+guessed at. Write `./that-path` for the path.
 
 ## The Grimes Grind Process
 

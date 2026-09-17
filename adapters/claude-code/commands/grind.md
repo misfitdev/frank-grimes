@@ -96,7 +96,7 @@ Execute a Grimes Grind on the target using the grimey methodology.
     ```
   - If "Something else" is selected (or the user writes a custom answer), ask them to describe the target and use their response as the scope.
   - **Scope resolution:**
-    - "Recent changes" → run `git diff HEAD --name-only` for uncommitted work and `git diff HEAD^ HEAD --name-only` for what the last commit introduced, since a tree that is clean because the work was just committed has no uncommitted work to show. Use both sets, and on a repository whose only commit is its first, the second command has no parent to compare against and the first set is all there is. Resolve what they name to an artifact set the way Phase 1 requires
+    - "Recent changes" → the target argument takes a revision range, so pass `HEAD^..HEAD` (or a wider range) directly. For work that is not committed yet, run `git diff HEAD --name-only`. On a repository whose only commit is its first there is no parent to range against. Resolve what you have the way Phase 1 requires
     - "Whole repo" → use the repository root as the target
     - Custom → use the provided path/description as the target
 

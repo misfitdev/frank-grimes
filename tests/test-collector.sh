@@ -965,6 +965,301 @@ assert_eq "$CODE" "1" "an unknown target kind is refused"
 rm -rf "$WS"
 
 echo ""
+echo "--- A revision range is a target, and its inventory is what the range changed ---"
+
+# A repository whose second commit touches one of three files. What separates a
+# range target from a path target is the denominator: a review asked about the
+# change must not be measured against files the change never touched.
+ranged() {
+    local dir
+    dir="$(mktemp -d "$BINDIR/range.XXXXXX")"
+    mkdir -p "$dir/src"
+    printf 'first\n' >"$dir/src/a.sh"
+    printf 'second\n' >"$dir/src/b.sh"
+    printf '# project\n' >"$dir/README.md"
+    git -C "$dir" init --quiet --initial-branch=main
+    git -C "$dir" config user.email "test@example.invalid"
+    git -C "$dir" config user.name "Test"
+    git -C "$dir" add -A
+    git -C "$dir" commit --quiet --message "first"
+    printf 'first, edited\n' >"$dir/src/a.sh"
+    git -C "$dir" add -A
+    git -C "$dir" commit --quiet --message "second"
+    echo "$dir"
+}
+
+WS="$(ranged)"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. \
+    --provider-command="$FAKES/provider-green.sh" --format=prototext 'HEAD^..HEAD' 2>&1)"
+CODE=$?
+set -e
+# A verdict code, not an error code: the range became a target and the run
+# reached a decision over it.
+if [[ "$CODE" != "1" && "$CODE" != "2" ]]; then
+    pass "a revision range resolves to a target"
+else
+    fail "a revision range was refused as a target: $OUT"
+fi
+# One file changed by the range, out of three in the repository. A path target
+# over the same tree would record three, which is the shortfall this fixes.
+assert_eq "$(units_in "$WS")" "1" "the inventory holds only the files the range changed"
+if show_inventory "$WS" | grep -q 'src/a.sh'; then
+    pass "the inventory names the file the range changed"
+else
+    fail "the inventory does not name the file the range changed"
+fi
+if show_inventory "$WS" | grep -qE 'src/b.sh|README.md'; then
+    fail "the inventory names a file the range never touched"
+else
+    pass "the inventory omits the files the range never touched"
+fi
+# The spelling names a different change after every commit, so the record keeps
+# the commits it resolved to and shows the operator what they wrote.
+FROM="$(git -C "$WS" rev-parse HEAD^)"
+TO="$(git -C "$WS" rev-parse HEAD)"
+if grep -qE "scope: +\"$FROM\.\.$TO\"" <<<"$OUT"; then
+    pass "the record names the commits the range resolved to"
+else
+    fail "the record does not name the resolved commits"
+fi
+if grep -qE 'display: +"HEAD\^\.\.HEAD"' <<<"$OUT"; then
+    pass "the record keeps the spelling the operator wrote"
+else
+    fail "the record does not keep the operator's spelling"
+fi
+rm -rf "$WS"
+
+# Two targets over one unchanged tree: without the commits in the fingerprint a
+# review of an earlier range could be resumed as though it were a later one.
+# Both ranges change the same one file, so the unit set and the digest of what
+# is on disk are identical across them. Only the commits tell them apart.
+WS="$(ranged)"
+printf 'first, edited again\n' >"$WS/src/a.sh"
+git -C "$WS" add -A
+git -C "$WS" commit --quiet --message "third"
+set +e
+ONE="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-green.sh" \
+    --format=prototext 'HEAD~2..HEAD~1' 2>&1)"
+set -e
+rm -rf "$WS/.grimes"
+set +e
+TWO="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-green.sh" \
+    --format=prototext 'HEAD~1..HEAD' 2>&1)"
+set -e
+FP_ONE="$(sed -nE 's/^ *fingerprint_sha256: +"(.*)"$/\1/p' <<<"$ONE" | head -1)"
+FP_TWO="$(sed -nE 's/^ *fingerprint_sha256: +"(.*)"$/\1/p' <<<"$TWO" | head -1)"
+if [[ -n "$FP_ONE" && "$FP_ONE" != "$FP_TWO" ]]; then
+    pass "two ranges over one tree are two targets"
+else
+    fail "two ranges fingerprinted alike (${FP_ONE:-nothing})"
+fi
+rm -rf "$WS"
+
+# The symmetric spelling is what a branch under review actually contributed, so
+# it is taken from where the two diverged and not from the other tip.
+WS="$(ranged)"
+git -C "$WS" checkout --quiet -b topic "HEAD^"
+printf 'topic\n' >"$WS/src/b.sh"
+git -C "$WS" add -A
+git -C "$WS" commit --quiet --message "topic"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-green.sh" \
+    --format=prototext 'main...topic' 2>&1)"
+set -e
+BASE="$(git -C "$WS" merge-base main topic)"
+if grep -qE "scope: +\"$BASE\.\." <<<"$OUT"; then
+    pass "a symmetric range starts where the two diverged"
+else
+    fail "a symmetric range did not start at the merge base"
+fi
+# main's own commit is not part of what topic contributed.
+if show_inventory "$WS" | grep -q 'src/a.sh'; then
+    fail "a symmetric range counted the other branch's change"
+else
+    pass "a symmetric range omits the other branch's change"
+fi
+rm -rf "$WS"
+
+WS="$(ranged)"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-green.sh" \
+    --format=prototext 'HEAD..HEAD' 2>&1)"
+CODE=$?
+set -e
+assert_eq "$CODE" "1" "a range that changed nothing is refused"
+if grep -q 'changed no file' <<<"$OUT"; then
+    pass "and the refusal says the range changed nothing"
+else
+    fail "the refusal does not say the range changed nothing"
+fi
+rm -rf "$WS"
+
+# A file the range deleted has no bytes to review and no line to anchor to.
+# Counting it would inflate the denominator with a unit nothing can examine.
+WS="$(ranged)"
+git -C "$WS" rm --quiet "src/b.sh"
+git -C "$WS" commit --quiet --message "remove b"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-green.sh" \
+    --format=prototext 'HEAD^..HEAD' 2>&1)"
+CODE=$?
+set -e
+assert_eq "$CODE" "1" "a range holding only a deletion is refused"
+rm -rf "$WS"
+
+WS="$(ranged)"
+printf 'kept\n' >"$WS/src/c.sh"
+git -C "$WS" add -A
+git -C "$WS" commit --quiet --message "add c"
+git -C "$WS" rm --quiet "src/b.sh"
+git -C "$WS" commit --quiet --message "drop b"
+set +e
+(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-green.sh" \
+    --format=prototext 'HEAD~2..HEAD' >/dev/null 2>&1)
+set -e
+if show_inventory "$WS" | grep -q 'src/c.sh'; then
+    pass "a file the range added is a unit"
+else
+    fail "a file the range added is not a unit"
+fi
+if show_inventory "$WS" | grep -q 'src/b.sh'; then
+    fail "a file the range deleted was counted as a unit"
+else
+    pass "a file the range deleted is not a unit"
+fi
+rm -rf "$WS"
+
+# Deleted by the range and put back afterwards. The bytes on disk are not what
+# the range produced, so reviewing them would credit the range with a file it
+# removed. What the range did decides this, not what happens to be there now.
+WS="$(ranged)"
+git -C "$WS" rm --quiet "src/b.sh"
+git -C "$WS" commit --quiet --message "drop b"
+printf 'b, restored by someone else\n' >"$WS/src/b.sh"
+git -C "$WS" add -A
+git -C "$WS" commit --quiet --message "put b back"
+set +e
+(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-green.sh" \
+    --format=prototext 'HEAD~2..HEAD~1' >/dev/null 2>&1)
+set -e
+if show_inventory "$WS" | grep -q 'src/b.sh'; then
+    fail "a file the range deleted was reviewed because it exists again"
+else
+    pass "a file the range deleted is not a unit even when it exists again"
+fi
+rm -rf "$WS"
+
+# Changed by the range and removed by a later commit. The range does not call it
+# deleted, but there is nothing on disk to review, anchor a finding in, or run a
+# gate over, so it cannot be part of the denominator either.
+WS="$(ranged)"
+printf 'first, edited twice\n' >"$WS/src/a.sh"
+printf 'second, edited\n' >"$WS/src/b.sh"
+git -C "$WS" add -A
+git -C "$WS" commit --quiet --message "touch a and b"
+git -C "$WS" rm --quiet "src/a.sh"
+git -C "$WS" commit --quiet --message "drop a later"
+set +e
+(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-green.sh" \
+    --format=prototext 'HEAD~2..HEAD~1' >/dev/null 2>&1)
+set -e
+if show_inventory "$WS" | grep -q 'src/b.sh'; then
+    pass "a file the range changed and that is still here is a unit"
+else
+    fail "a file the range changed and that is still here is not a unit"
+fi
+if show_inventory "$WS" | grep -q 'src/a.sh'; then
+    fail "a file removed after the range was counted as a unit"
+else
+    pass "a file removed after the range is not a unit"
+fi
+rm -rf "$WS"
+
+# A review directory inside the repository. git names a range's files from the
+# repository root, and the collector joins them onto the directory it was given:
+# taken root-relative, every one of them would resolve to a path that is not
+# there and the range would look empty.
+WS="$(ranged)"
+set +e
+OUT="$(cd "$WS/src" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-green.sh" \
+    --format=prototext 'HEAD^..HEAD' 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" != "1" ]]; then
+    pass "a range resolves from a subdirectory of the repository"
+else
+    fail "a range resolved to nothing from a subdirectory: $OUT"
+fi
+if show_inventory "$WS/src" | grep -qE 'id: +"a.sh"'; then
+    pass "and its units are named relative to the directory under review"
+else
+    fail "and its units are named relative to the directory under review"
+fi
+rm -rf "$WS"
+
+echo ""
+echo "--- A scope that reads two ways is refused rather than guessed at ---"
+
+# Path and range select different files, so a scope that is both would make the
+# run record silent about which was meant.
+WS="$(ranged)"
+printf 'a file with an unfortunate name\n' >"$WS/HEAD^..HEAD"
+git -C "$WS" add -A
+git -C "$WS" commit --quiet --message "add it"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-green.sh" \
+    --format=prototext 'HEAD^..HEAD' 2>&1)"
+CODE=$?
+set -e
+assert_eq "$CODE" "1" "a scope that is both a path and a range is refused"
+if grep -q 'names both' <<<"$OUT"; then
+    pass "and the refusal names both readings"
+else
+    fail "the refusal does not name both readings"
+fi
+rm -rf "$WS"
+
+# What is on disk wins, so an ordinary path containing dots is still a path.
+WS="$(ranged)"
+mkdir -p "$WS/v1..v2"
+printf 'ordinary\n' >"$WS/v1..v2/notes.sh"
+git -C "$WS" add -A
+git -C "$WS" commit --quiet --message "add a dotted directory"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-green.sh" \
+    --format=prototext 'v1..v2' 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" != "1" ]]; then
+    pass "a path whose name contains dots is still a path"
+else
+    fail "a path whose name contains dots was not reviewed: $OUT"
+fi
+if show_inventory "$WS" | grep -q 'notes.sh'; then
+    pass "and its files are the inventory"
+else
+    fail "the dotted path resolved to something else"
+fi
+rm -rf "$WS"
+
+WS="$(ranged)"
+set +e
+OUT="$(cd "$WS" && "$GRIMES" run --dir=. --provider-command="$FAKES/provider-green.sh" \
+    --format=prototext 'nosuchref..HEAD' 2>&1)"
+CODE=$?
+set -e
+assert_eq "$CODE" "1" "a range naming no commit is refused"
+# Refused as the path it is not, rather than reviewed as some other target.
+if grep -qE 'nosuchref' <<<"$OUT"; then
+    pass "and the refusal names what could not be resolved"
+else
+    fail "the refusal does not name what could not be resolved"
+fi
+rm -rf "$WS"
+
+echo ""
+
 echo "========================================"
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"

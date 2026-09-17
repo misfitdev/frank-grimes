@@ -1,9 +1,9 @@
 // Package git runs the git commands a fix supervisor needs and nothing else.
 //
-// It is the only place in the repository that shells out to git. Nothing here
-// reads history: a review is about the bytes in front of it, and a supervisor
-// only has to put its edits somewhere isolated and, if they earn it, commit
-// them once.
+// It is the only place in the repository that shells out to git. History is
+// read only to decide which files a target covers: a review is still about the
+// bytes in front of it, and a range selects the files, never an older version
+// of them.
 package git
 
 import (
