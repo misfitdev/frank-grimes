@@ -42,6 +42,13 @@ const WorkPassPath = GrimesDir + "/work/report.pass"
 // Derived rather than random so that the role and the engine agree on it
 // without passing it back, and so a run that is asked for the same pass twice
 // names it the same way.
+//
+// Two passes that could overlap must not share one. Nothing here enforces that;
+// what does is that a run identity carries the process that made it, and that
+// the roles inside a run are spawned one after another. A change that made
+// several roles of one kind run at once, or that let two processes be given the
+// same run identity, would put two live passes behind one name, and the claim
+// each of them makes on a report would look to the other like its own.
 func PassToken(runID, role string, iteration uint32) string {
 	sum := sha256.Sum256(fmt.Appendf(nil, "%s\x00%s\x00%d", runID, role, iteration))
 	return hex.EncodeToString(sum[:8])
