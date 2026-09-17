@@ -61,7 +61,7 @@ Starts a Grimes Grind. If invoked without arguments, prompts for scope. Reports 
 **Examples:**
 ```bash
 /frank-grimes:grind ./src/auth.ts
-/frank-grimes:grind . --mode report
+/frank-grimes:grind --mode report .
 /frank-grimes:grind "Review this architecture" --max-iterations 3 --auto-loop
 /frank-grimes:grind ./src/api --mode fix --verify-command "just check"
 /frank-grimes:grind this --auto-loop

@@ -453,18 +453,18 @@ echo "--- Documented Flags ---"
 
 REFUSED_FLAGS=("--scope")
 for flag in "${REFUSED_FLAGS[@]}"; do
-    FOUND=$(grep -rlF -- "$flag " \
+    # A command line, in any order: the flag can be written before the target or
+    # after it, and the invocation may be the slash command or the engine. What
+    # this must not match is another command's flag of the same name, which is
+    # why the line has to name one of ours.
+    OFFERED=$(grep -rnE -- \
+        "(grind|grimes run)([[:space:]].*)?[[:space:]]${flag}([[:space:]=]|\$)" \
         "$PROJECT_ROOT/README.md" \
         "$PROJECT_ROOT/adapters" \
-        "$PROJECT_ROOT/docs" 2>/dev/null |
-        grep -v '/audit/' |
-        xargs -r grep -lF -- "grind $flag" 2>/dev/null || true)
-    ALSO=$(grep -rn -- "$flag recent-changes\|$flag whole-repo" \
-        "$PROJECT_ROOT/README.md" "$PROJECT_ROOT/adapters" "$PROJECT_ROOT/docs" 2>/dev/null |
-        grep -v '/audit/' || true)
-    if [[ -n "$FOUND$ALSO" ]]; then
+        "$PROJECT_ROOT/docs" 2>/dev/null | grep -v '/audit/' || true)
+    if [[ -n "$OFFERED" ]]; then
         fail "the engine refuses $flag, and it is documented as usable"
-        echo "$FOUND$ALSO"
+        echo "$OFFERED"
     else
         pass "no document offers $flag, which the engine refuses"
     fi
