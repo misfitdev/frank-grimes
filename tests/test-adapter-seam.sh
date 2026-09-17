@@ -162,20 +162,49 @@ assert_eq "$EMPTY_CODE" "0" "an untouched project allows exit"
 echo ""
 echo "--- Recent changes means what a clean tree cannot show ---"
 
-# A tree is clean precisely because the work was just committed, and the two
-# working-tree diffs are then empty: an adapter that asks only those resolves a
-# review of the last commit to nothing.
+# A tree is clean precisely because the work was just committed, and the
+# working-tree diff is then empty: an adapter that asks only that resolves a
+# review of the last commit to nothing. The range is what a clean tree can still
+# answer, and it is a target the engine takes directly.
 GRIND_CMD="$PROJECT_ROOT/adapters/claude-code/commands/grind.md"
-if grep -qF 'git diff HEAD^ HEAD' "$GRIND_CMD"; then
+if grep -qF 'HEAD^..HEAD' "$GRIND_CMD"; then
     pass "the adapter asks what the last commit introduced"
 else
     fail "the adapter asks what the last commit introduced"
 fi
-if grep -qF 'no parent to compare against' "$GRIND_CMD"; then
+if grep -qF 'no parent to range against' "$GRIND_CMD"; then
     pass "and says what that means on a repository with one commit"
 else
     fail "and says what that means on a repository with one commit"
 fi
+# What the range cannot see. Asking only the range would miss work in progress.
+if grep -qF 'git diff HEAD --name-only' "$GRIND_CMD"; then
+    pass "and still asks for work that is not committed yet"
+else
+    fail "and still asks for work that is not committed yet"
+fi
+# The engine has to accept what the adapter is told to pass. Run somewhere
+# disposable: a run leaves state behind, and the sandbox is what the documented
+# sequence below is asserted against.
+SCRATCH="$(mktemp -d)"
+printf 'first\n' >"$SCRATCH/a.sh"
+git -C "$SCRATCH" init --quiet --initial-branch=main
+git -C "$SCRATCH" config user.email "test@example.invalid"
+git -C "$SCRATCH" config user.name "Test"
+git -C "$SCRATCH" add -A
+git -C "$SCRATCH" commit --quiet --message "first"
+printf 'second\n' >"$SCRATCH/a.sh"
+git -C "$SCRATCH" add -A
+git -C "$SCRATCH" commit --quiet --message "second"
+RANGE_OUT="$(grimes run --dir="$SCRATCH" --provider-command=/usr/bin/true 'HEAD^..HEAD' 2>&1 || true)"
+# The provider returns nothing, so the run fails at the provider. What matters
+# is that it got that far: the range resolved to a target.
+if grep -qE 'not implemented|no such file|code target' <<<"$RANGE_OUT"; then
+    fail "the engine refuses the range the adapter offers: $RANGE_OUT"
+else
+    pass "the engine accepts the range the adapter offers"
+fi
+rm -rf "$SCRATCH"
 
 echo ""
 echo "--- The documented commands produce a record the engine accepts ---"

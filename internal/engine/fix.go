@@ -30,12 +30,16 @@ var ErrBatchOutOfScope = errors.New("the batch changed files outside the reviewe
 // directory would share it, which is the same collision two reviews over one
 // directory already have.
 type fixRun struct {
-	repo   *git.Repo
-	tree   *git.Worktree
-	scope  string
-	gate   *pb.Verification
-	closed []string
-	commit string
+	repo *git.Repo
+	tree *git.Worktree
+	// inScope reports whether a changed path is one the review resolved. Taken
+	// from the collected target, since what bounds a batch differs by how the
+	// scope was named: everything under a path, or exactly the files a range
+	// changed.
+	inScope func(string) bool
+	gate    *pb.Verification
+	closed  []string
+	commit  string
 }
 
 // prepareFix puts the batch somewhere the operator's own working tree is not.
@@ -44,7 +48,7 @@ type fixRun struct {
 // dirty tree means the bytes the operator is looking at are not the bytes this
 // would review, and a fix run that silently reviewed HEAD instead would be
 // answering a question nobody asked.
-func (e *Engine) prepareFix(ctx context.Context, scope string) (*fixRun, error) {
+func (e *Engine) prepareFix(ctx context.Context) (*fixRun, error) {
 	repo, err := git.Open(ctx, e.Dir)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrFixNeedsRepository, err)
@@ -59,7 +63,7 @@ func (e *Engine) prepareFix(ctx context.Context, scope string) (*fixRun, error) 
 		if err != nil {
 			return nil, err
 		}
-		return &fixRun{repo: repo, tree: tree, scope: scope}, nil
+		return &fixRun{repo: repo, tree: tree}, nil
 	}
 
 	// .grimes is the review's own, not the operator's work.
@@ -77,7 +81,7 @@ func (e *Engine) prepareFix(ctx context.Context, scope string) (*fixRun, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &fixRun{repo: repo, tree: tree, scope: scope}, nil
+	return &fixRun{repo: repo, tree: tree}, nil
 }
 
 func fixBranch(runID string) string { return "grimes/fix-" + contracts.RunSlug(runID) }
@@ -107,7 +111,7 @@ func (e *Engine) settle(ctx context.Context, f *fixRun, ledger *pb.Ledger, itera
 	if len(changed) == 0 {
 		return nil
 	}
-	if outside := outOfScope(changed, f.scope); len(outside) > 0 {
+	if outside := outOfScope(changed, f.inScope); len(outside) > 0 {
 		return fmt.Errorf("%w: %s", ErrBatchOutOfScope, strings.Join(outside, ", "))
 	}
 
@@ -166,11 +170,29 @@ func editedFindings(ledger *pb.Ledger, changed []string) []string {
 	return ids
 }
 
+// adopt takes the bound on a batch from what collection resolved.
+//
+// A range target's scope is not a path, so a batch is bounded by the inventory
+// itself: the files the range changed are the whole of what was reviewed, and
+// an edit to any other file is an edit to something no role examined.
+func (f *fixRun) adopt(c *Collected) {
+	if !c.Range {
+		scope := c.Target.GetScope()
+		f.inScope = func(p string) bool { return underPath(p, scope) }
+		return
+	}
+	units := make(map[string]bool, len(c.Inventory.GetUnits()))
+	for _, u := range c.Inventory.GetUnits() {
+		units[u.GetId()] = true
+	}
+	f.inScope = func(p string) bool { return units[p] }
+}
+
 // outOfScope names the changed paths the review never resolved.
-func outOfScope(changed []string, scope string) []string {
+func outOfScope(changed []string, in func(string) bool) []string {
 	var outside []string
 	for _, p := range changed {
-		if inScope(p, scope) {
+		if in(p) {
 			continue
 		}
 		outside = append(outside, p)
@@ -179,7 +201,7 @@ func outOfScope(changed []string, scope string) []string {
 	return outside
 }
 
-func inScope(path, scope string) bool {
+func underPath(path, scope string) bool {
 	scope = strings.TrimSuffix(filepath.Clean(scope), "/")
 	if scope == "." || scope == "" {
 		return true

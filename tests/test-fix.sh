@@ -346,6 +346,55 @@ assert_match "$OUT" 'kind code' \
 rm -rf "$REPO"
 
 echo ""
+echo "--- A range target bounds a batch by what the range changed ---"
+
+# A repository whose last commit touches one file. The range is the scope, so a
+# batch is bounded by the files it changed rather than by a path prefix.
+ranged_repository() {
+    local dir
+    dir="$(repository)"
+    # shellcheck disable=SC2016 # the text is the target's content
+    printf 'rm -rf ./build/*\n# second\n' >"$dir/src/app.sh"
+    git -C "$dir" add -A
+    git -C "$dir" commit --quiet --message "second"
+    echo "$dir"
+}
+
+run_range_fix() {
+    local dir="$1"
+    shift
+    "$GRIMES" run --dir="$dir" --mode=fix \
+        --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+        "$@" --format=prototext 'HEAD^..HEAD' 2>&1 || true
+}
+
+REPO="$(ranged_repository)"
+BEFORE="$(cat "$REPO/src/app.sh")"
+OUT="$(run_range_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true")"
+assert_match "$OUT" 'fix_batch' "a fix run over a range records what it did"
+assert_match "$OUT" 'status: +FINDING_STATUS_VERIFIED' \
+    "a fix inside the range is verified"
+if [[ "$(cat "$REPO/src/app.sh")" == "$BEFORE" ]]; then
+    pass "the operator's own working tree is left byte-identical"
+else
+    fail "the operator's own working tree was written"
+fi
+rm -rf "$REPO"
+
+# The file the batch strays into is inside the repository, and a path target
+# over the whole tree would have it in scope. What puts it outside here is that
+# the range never touched it.
+REPO="$(ranged_repository)"
+OUT="$(run_range_fix "$REPO" --provider-command="$FAKES/fixer-strays.sh" --verify-command="true")"
+assert_match "$OUT" 'outside the reviewed scope' \
+    "a batch editing a file the range never changed is refused"
+assert_match "$OUT" 'README.md' \
+    "and the refusal names what it edited"
+assert_no_match "$OUT" 'legacy_color' \
+    "a refused batch produces no result"
+rm -rf "$REPO"
+
+echo ""
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"
 [[ "$FAILED" -eq 0 ]] || exit 1
