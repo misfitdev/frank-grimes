@@ -458,7 +458,7 @@ for flag in "${REFUSED_FLAGS[@]}"; do
     # this must not match is another command's flag of the same name, which is
     # why the line has to name one of ours.
     OFFERED=$(grep -rnE -- \
-        "(^|[^[:alnum:]_-])(grind|grimes run)([[:space:]].*)?[[:space:]]${flag}([[:space:]=]|\$)" \
+        "(^|[^[:alnum:]_-])(grind|grimes run)([[:space:]].*)?[[:space:]]${flag}([^[:alnum:]_-]|\$)" \
         "$PROJECT_ROOT/README.md" \
         "$PROJECT_ROOT/adapters" \
         "$PROJECT_ROOT/docs" 2>/dev/null | grep -v '/audit/' || true)
