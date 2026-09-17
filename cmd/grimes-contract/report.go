@@ -691,16 +691,12 @@ func claimPass(reportPath, pass string) error {
 	// candidates. Whoever creates the file owns the report.
 	f, err := os.OpenFile(passPath(reportPath), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err == nil {
-		defer f.Close()
-		if _, err := f.WriteString(pass); err != nil {
-			return err
-		}
-		return f.Sync()
+		return writePass(f, pass)
 	}
 	if !errors.Is(err, os.ErrExist) {
 		return err
 	}
-	held, err := readPass(reportPath)
+	held, _, err := readPass(reportPath)
 	if err != nil {
 		return err
 	}
@@ -714,16 +710,37 @@ func claimPass(reportPath, pass string) error {
 		reportPath)
 }
 
-// readPass returns the pass that opened the report, or empty when none did.
-func readPass(reportPath string) (string, error) {
+// writePass records the pass in the marker it just created, reporting every
+// way that can fail. A marker that was not written names nobody, and the caller
+// is about to write candidates against it.
+func writePass(f *os.File, pass string) error {
+	if _, err := f.WriteString(pass); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
+}
+
+// readPass returns the pass that opened the report and whether a marker is
+// there at all.
+//
+// The two are different answers. A marker that exists and is empty belongs to a
+// pass that created it and has not written to it yet, which is a moment every
+// claim passes through; reading that as no marker would let another pass take
+// the report out from under it.
+func readPass(reportPath string) (pass string, exists bool, err error) {
 	data, err := os.ReadFile(passPath(reportPath))
 	if errors.Is(err, os.ErrNotExist) {
-		return "", nil
+		return "", false, nil
 	}
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
-	return strings.TrimSpace(string(data)), nil
+	return strings.TrimSpace(string(data)), true, nil
 }
 
 // sealablePass refuses to deliver candidates that belong to a pass other than
@@ -734,11 +751,14 @@ func readPass(reportPath string) (string, error) {
 // pass is the abandoned one, and stamping this run's identity onto it would
 // deliver findings this pass never made.
 func sealablePass(reportPath, pass string) error {
-	held, err := readPass(reportPath)
+	held, exists, err := readPass(reportPath)
 	if err != nil {
 		return err
 	}
-	if held == "" || held == pass {
+	// No marker is the documented sequence; a marker naming this pass is its
+	// own. An empty one is a claim in progress, and sealing here would take the
+	// report and the marker with it.
+	if !exists || (held != "" && held == pass) {
 		return nil
 	}
 	return fmt.Errorf(

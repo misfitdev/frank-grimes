@@ -71,6 +71,38 @@ func TestAnEmptyMarkerIsNotAnUnclaimedReport(t *testing.T) {
 	}
 }
 
+// A marker exists before the pass that made it has written to it: every claim
+// passes through that moment. Sealing there would take the report and the
+// marker with it, out from under the pass that was claiming them.
+func TestAClaimInProgressIsNotSealedOutFromUnderIt(t *testing.T) {
+	report := filepath.Join(t.TempDir(), "report.textproto")
+	if err := os.WriteFile(passPath(report), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	err := sealablePass(report, "another-pass")
+
+	if err == nil {
+		t.Fatal("a pass sealed a report another pass was in the middle of claiming")
+	}
+	if !strings.Contains(err.Error(), "another pass") {
+		t.Errorf("error = %v, want it to name the other pass", err)
+	}
+}
+
+// The pass that holds the marker seals its own report, which is the ordinary
+// end of every pass.
+func TestThePassThatClaimedItSealsIt(t *testing.T) {
+	report := filepath.Join(t.TempDir(), "report.textproto")
+	if err := claimPass(report, "mine"); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := sealablePass(report, "mine"); err != nil {
+		t.Errorf("the pass that opened the report was refused its own seal: %v", err)
+	}
+}
+
 // Outside a pass there is nothing to claim: that is the documented sequence,
 // where a review builds its report before the run that carries it.
 func TestOutsideAPassNothingIsClaimed(t *testing.T) {
