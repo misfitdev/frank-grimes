@@ -196,13 +196,30 @@ git -C "$SCRATCH" commit --quiet --message "first"
 printf 'second\n' >"$SCRATCH/a.sh"
 git -C "$SCRATCH" add -A
 git -C "$SCRATCH" commit --quiet --message "second"
-RANGE_OUT="$(grimes run --dir="$SCRATCH" --provider-command=/usr/bin/true 'HEAD^..HEAD' 2>&1 || true)"
-# The provider returns nothing, so the run fails at the provider. What matters
-# is that it got that far: the range resolved to a target.
-if grep -qE 'not implemented|no such file|code target' <<<"$RANGE_OUT"; then
-    fail "the engine refuses the range the adapter offers: $RANGE_OUT"
-else
+# A provider that leaves a mark. Asserting the absence of particular errors
+# would pass for every error nobody thought of, including the engine not
+# running at all; what is wanted is evidence that the range became a target and
+# a role was spawned against it. The mark goes in the work directory, which the
+# engine has already made and is the only one here a spawned role may write:
+# creating it would be refused by the boundary.
+cat >"$SCRATCH/provider.sh" <<'PROVIDER'
+#!/usr/bin/env bash
+set -euo pipefail
+echo spawned >.grimes/work/adapter-seam-sentinel
+PROVIDER
+chmod +x "$SCRATCH/provider.sh"
+grimes run --dir="$SCRATCH" --provider-command="$SCRATCH/provider.sh" 'HEAD^..HEAD' >/dev/null 2>&1 || true
+if [[ -f "$SCRATCH/.grimes/work/adapter-seam-sentinel" ]]; then
     pass "the engine accepts the range the adapter offers"
+else
+    fail "the engine never reached a provider for the range the adapter offers"
+fi
+# The units it resolved are the range's, not the whole repository's.
+if grimes-contract decode-report --type=TargetInventory \
+    "$SCRATCH/.grimes/inventory.pb" 2>/dev/null | grep -qE 'id: +"a.sh"'; then
+    pass "and the range resolved to the file those commits changed"
+else
+    fail "and the range resolved to the file those commits changed"
 fi
 rm -rf "$SCRATCH"
 
