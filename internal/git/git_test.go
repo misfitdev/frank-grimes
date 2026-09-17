@@ -302,6 +302,39 @@ func TestTheEnvironmentCannotRedirectWhichRepositoryIsUsed(t *testing.T) {
 	}
 }
 
+// Configuration carried in the environment is configuration for whatever git
+// runs next. git exports it to subprocesses whenever the operator passed -c to
+// an outer command, and what it can change here is which edits status admits
+// to: this list is what the batch is credited with and what its scope is judged
+// on, so a change it does not mention is a change nothing accounted for.
+func TestTheEnvironmentCannotDecideWhichEditsAreSeen(t *testing.T) {
+	ctx := context.Background()
+	r := repo(t)
+	head, _ := r.Head(ctx)
+	w, err := r.AddWorktree(ctx, filepath.Join(t.TempDir(), "fix"), "grimes/fix-7", head)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A mode change and nothing else, which core.fileMode decides the
+	// visibility of.
+	if err := os.Chmod(filepath.Join(w.Dir, "app.sh"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "core.fileMode")
+	t.Setenv("GIT_CONFIG_VALUE_0", "false")
+
+	changed, err := w.Changed(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := strings.Join(changed, " "); !strings.Contains(got, "app.sh") {
+		t.Errorf("an edit the batch made went unreported; got %q", got)
+	}
+}
+
 func TestRemoveTakesTheWorktreeAndItsBranch(t *testing.T) {
 	ctx := context.Background()
 	r := repo(t)

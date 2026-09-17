@@ -327,6 +327,11 @@ func run(ctx context.Context, dir string, args ...string) (string, error) {
 // Anything running inside a git hook has these exported, and grimes is run from
 // one. Left inherited, the directory this package is so careful about would not
 // be the repository the command reached.
+//
+// The GIT_CONFIG_ family goes with them, by prefix. git exports it whenever the
+// operator passed -c to an outer command, and it decides which edits status
+// admits to: core.fileMode=false hides a mode change outright. That list is
+// what the batch is credited with and what its scope is judged on.
 var repoSelection = []string{
 	"GIT_DIR",
 	"GIT_WORK_TREE",
@@ -343,7 +348,7 @@ func withoutRepoSelection(env []string) []string {
 	out := env[:0:0]
 	for _, kv := range env {
 		name, _, _ := strings.Cut(kv, "=")
-		if slices.Contains(repoSelection, name) {
+		if slices.Contains(repoSelection, name) || strings.HasPrefix(name, "GIT_CONFIG_") {
 			continue
 		}
 		out = append(out, kv)
