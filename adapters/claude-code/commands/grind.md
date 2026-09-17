@@ -64,8 +64,8 @@ Execute a Grimes Grind on the target using the grimey methodology.
 # Report on a single file
 /frank-grimes:grind ./src/auth.go
 
-# Recent changes, report only
-/frank-grimes:grind --scope recent-changes --mode report
+# The whole repository, report only
+/frank-grimes:grind --mode report .
 
 # Fix mode with an explicit gate, committing only if it passes
 /frank-grimes:grind ./src/api --mode fix --verify-command "just check" --commit
@@ -89,14 +89,14 @@ Execute a Grimes Grind on the target using the grimey methodology.
   - options:
     ```
     [
-      { label: "Recent changes", description: "Review files changed in the last commit or currently staged/unstaged (git diff)" },
+      { label: "Recent changes", description: "Review what the last commit introduced, plus anything staged or unstaged now" },
       { label: "Whole repo", description: "Scan the entire repository" },
       { label: "Something else", description: "I'll describe the target (file path, code snippet, architecture, etc.)" }
     ]
     ```
   - If "Something else" is selected (or the user writes a custom answer), ask them to describe the target and use their response as the scope.
   - **Scope resolution:**
-    - "Recent changes" → run `git diff HEAD` and `git diff --staged` to identify changed files; target those files
+    - "Recent changes" → run `git diff HEAD --name-only` for uncommitted work and `git diff HEAD^ HEAD --name-only` for what the last commit introduced, since a tree that is clean because the work was just committed has no uncommitted work to show. Use both sets, and on a repository whose only commit is its first, the second command has no parent to compare against and the first set is all there is. Resolve what they name to an artifact set the way Phase 1 requires
     - "Whole repo" → use the repository root as the target
     - Custom → use the provided path/description as the target
 

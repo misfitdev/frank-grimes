@@ -222,8 +222,14 @@ func TestParseRunResearchModes(t *testing.T) {
 // A flag that is parsed and ignored is worse than one that is refused: the
 // caller believes they asked for something.
 func TestParseRunRejectsUnimplementedScope(t *testing.T) {
-	if _, err := parseRun(baseArgs("--scope", "whole-repo")); err == nil {
+	_, err := parseRun(baseArgs("--scope", "whole-repo"))
+	if err == nil {
 		t.Fatal("want an error for --scope while collection cannot honour it")
+	}
+	// The refusal is what a caller reads after following documentation that no
+	// longer mentions the flag; it has to say what to write instead.
+	if !strings.Contains(err.Error(), "the target argument is the scope") {
+		t.Errorf("error = %v, want it to name what to pass instead", err)
 	}
 	// The default must not trip the same check.
 	if _, err := parseRun(baseArgs()); err != nil {

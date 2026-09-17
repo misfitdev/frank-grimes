@@ -49,8 +49,7 @@ The colour is derived from the verdict tuple, never asserted. See the skill for 
 Starts a Grimes Grind. If invoked without arguments, prompts for scope. Reports by default.
 
 **Arguments:**
-- `target` (optional) - What to grind: file path, directory, code snippet, or description. Skips the scope question.
-- `--scope recent-changes|whole-repo` (optional) - Shorthand scope. Skips the scope question.
+- `target` (optional) - What to grind: file path, directory, `.` for the whole repository, code snippet, or description. Skips the scope question. The target is the scope; there is no separate scope flag.
 - `--categories COR,SEC,REL` (optional) - Restrict routing to these canonical categories. Default: the skill routes 5-8 itself.
 - `--mode report|fix` (optional) - `report` documents findings and edits nothing (default); `fix` applies fixes and then runs a verification gate. Skips the mode question.
 - `--verify-command <cmd>` (optional) - Command used to verify a fix batch. Without a usable gate, fix mode edits but never commits.
@@ -62,7 +61,7 @@ Starts a Grimes Grind. If invoked without arguments, prompts for scope. Reports 
 **Examples:**
 ```bash
 /frank-grimes:grind ./src/auth.ts
-/frank-grimes:grind --scope recent-changes --mode report
+/frank-grimes:grind --mode report .
 /frank-grimes:grind "Review this architecture" --max-iterations 3 --auto-loop
 /frank-grimes:grind ./src/api --mode fix --verify-command "just check"
 /frank-grimes:grind this --auto-loop

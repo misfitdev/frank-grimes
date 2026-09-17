@@ -446,6 +446,30 @@ else
     pass "no adapter or hook decides a verdict"
 fi
 
+# A flag the engine refuses must not be documented as one a caller can use.
+# --scope was advertised in four places and rejected in all of them, which a
+# live run found the hard way.
+echo "--- Documented Flags ---"
+
+REFUSED_FLAGS=("--scope")
+for flag in "${REFUSED_FLAGS[@]}"; do
+    # A command line, in any order: the flag can be written before the target or
+    # after it, and the invocation may be the slash command or the engine. What
+    # this must not match is another command's flag of the same name, which is
+    # why the line has to name one of ours.
+    OFFERED=$(grep -rnE -- \
+        "(^|[^[:alnum:]_-])(grind|grimes run)([[:space:]].*)?[[:space:]]${flag}([^[:alnum:]_-]|\$)" \
+        "$PROJECT_ROOT/README.md" \
+        "$PROJECT_ROOT/adapters" \
+        "$PROJECT_ROOT/docs" 2>/dev/null | grep -v '/audit/' || true)
+    if [[ -n "$OFFERED" ]]; then
+        fail "the engine refuses $flag, and it is documented as usable"
+        echo "$OFFERED"
+    else
+        pass "no document offers $flag, which the engine refuses"
+    fi
+done
+
 echo ""
 
 # SKILL.md is the sole normative methodology. A second copy in an adapter or a
@@ -462,6 +486,7 @@ NORMATIVE_MARKERS=(
     'Route exactly'
     'Derive `RED` from'
     'A check that cannot fail distinguishes nothing'
+    'name the narrowest artifact that contains them'
 )
 
 for marker in "${NORMATIVE_MARKERS[@]}"; do

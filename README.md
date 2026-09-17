@@ -117,8 +117,7 @@ When your provider supports arguments, you can skip the interactive prompts:
 
 | Option | Description |
 |--------|-------------|
-| `target` | What to grind (file path, directory, description, or "this") |
-| `--scope recent-changes\|whole-repo` | Shorthand scope |
+| `target` | What to grind: a file, a directory, `.` for the whole repository, a description, or "this". Written last: it ends the options |
 | `--categories COR,SEC,REL` | Restrict routing to these canonical categories |
 | `--mode report\|fix` | `report` documents only and edits nothing (default); `fix` applies fixes, then verifies |
 | `--verify-command <cmd>` | Gate run once over a fix batch; without a usable gate nothing is committed |
@@ -174,8 +173,8 @@ Research is bounded and evidence-led: official documentation and security adviso
 # Grind a specific file
 /frank-grimes:grind ./src/auth.py
 
-# Grind recent changes, report only
-/frank-grimes:grind --scope recent-changes --mode report
+# Grind the whole repository, report only
+/frank-grimes:grind --mode report .
 
 # Grind with auto-loop enabled
 /frank-grimes:grind ./src/api --auto-loop
