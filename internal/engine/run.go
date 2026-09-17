@@ -146,6 +146,19 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		return nil, err
 	}
 
+	// Before the batch is credited with anything. A repair is earned by a claim
+	// that survived an attack, so the attack has to have happened before the
+	// engine decides which findings the batch closed; and before the gate,
+	// which is about the repair rather than about the claim.
+	//
+	// It is also the last moment the claims are attackable: a finding the batch
+	// touched is fixed by the time settle returns, and a fixed finding is not a
+	// claim anyone is asked about.
+	check, err := e.refute(ctx, ledger, spec, collected, iteration)
+	if err != nil {
+		return nil, err
+	}
+
 	// The gate runs where the batch is, which in report mode is the review
 	// directory nothing edited.
 	gateDir := e.Dir
@@ -167,14 +180,6 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		if err := e.settle(ctx, fix, ledger, iteration); err != nil {
 			return nil, err
 		}
-	}
-
-	// Before either derivation reads the ledger: both tuples have to be over the
-	// same findings, and a claim's standing under attack is part of the finding
-	// rather than of the verdict that reads it.
-	check, err := e.refute(ctx, ledger, spec, collected, iteration)
-	if err != nil {
-		return nil, err
 	}
 
 	candidates := candidatesOf(ledger)

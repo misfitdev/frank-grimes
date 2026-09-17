@@ -139,6 +139,14 @@ func (e *Engine) settle(ctx context.Context, f *fixRun, ledger *pb.Ledger, itera
 	}
 
 	edited := editedFindings(ledger, changed)
+	// A batch credited with nothing has closed nothing: the files it touched
+	// carry no finding this run may count, or the only claims there were broken
+	// by a context that did not form them. The edits stay in the worktree to be
+	// read; a commit is the strongest form of crediting, and there is nothing
+	// here to credit.
+	if len(edited) == 0 {
+		return nil
+	}
 	for _, id := range edited {
 		if _, err := contracts.Transition(ledger, id, pb.FindingStatus_FINDING_STATUS_FIXED,
 			contracts.TransitionOpts{Iteration: iteration, Actor: actorName}); err != nil {
@@ -170,11 +178,17 @@ func (e *Engine) settle(ctx context.Context, f *fixRun, ledger *pb.Ledger, itera
 	return nil
 }
 
-// editedFindings names the open findings anchored in a file this batch touched.
+// editedFindings names the open findings anchored in a file this batch touched
+// that a refutation pass did not break.
 //
 // Derived rather than reported: a fixer naming what it fixed would be grading
 // its own work, and what is actually known is which files changed. That is what
 // the skill calls edited, and it is the gate that turns it into verified.
+//
+// A broken claim is left out. The gate is about the repair, not about the
+// defect: an edit that compiles is not evidence there was something to repair,
+// and a claim a second context refused to uphold has not earned one. The edit
+// itself stands in the worktree for the operator to read, credited to nothing.
 func editedFindings(ledger *pb.Ledger, changed []string) []string {
 	touched := make(map[string]bool, len(changed))
 	for _, p := range changed {
@@ -183,6 +197,9 @@ func editedFindings(ledger *pb.Ledger, changed []string) []string {
 	var ids []string
 	for id, f := range ledger.GetFindings() {
 		if !Open(f.GetStatus()) {
+			continue
+		}
+		if provenanceOf(f) == pb.FindingProvenance_FINDING_PROVENANCE_REFUTED {
 			continue
 		}
 		if touched[f.GetLocation().GetAnchor().GetRepoLine().GetPath().GetValue()] {
