@@ -89,6 +89,7 @@ func (a ProviderAdjudicator) Adjudicate(ctx context.Context, target *pb.Target, 
 	}
 	out, err := a.Provider.Review(ctx, Request{
 		Role:        RoleAdjudicator,
+		RunID:       a.RunID,
 		Target:      target,
 		ContentPath: contentPath,
 		Claimed:     claimed,
@@ -96,7 +97,11 @@ func (a ProviderAdjudicator) Adjudicate(ctx context.Context, target *pb.Target, 
 	if err != nil {
 		return nil, err
 	}
-	raw, err := envelope.ExtractReport(string(out.Raw))
+	body, ok := delivered(out)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrProviderOutput, missingEnvelope(out))
+	}
+	raw, err := envelope.ExtractReport(string(body))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrProviderOutput, err)
 	}
@@ -104,8 +109,16 @@ func (a ProviderAdjudicator) Adjudicate(ctx context.Context, target *pb.Target, 
 	if err := contracts.UnmarshalCanonical(raw, second); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrProviderOutput, err)
 	}
-	// The adjudicator names the target it judged; a tuple over a different
-	// artifact is not a second opinion on this one.
+	// The adjudicator names the run it answered and the target it judged. A
+	// tuple over a different artifact is not a second opinion on this one, and
+	// one reached for an earlier run is not a second opinion reached now:
+	// adjudication is what GREEN turns on, and the engine stamps its own run
+	// onto the review it returns, so an answer from elsewhere would leave
+	// nothing in the record to show it had come from there.
+	if second.GetRunId() != a.RunID {
+		return nil, fmt.Errorf("%w: adjudication belongs to run %q, this is run %q",
+			ErrProviderOutput, second.GetRunId(), a.RunID)
+	}
 	if !bytes.Equal(second.GetTargetFingerprintSha256(), target.GetFingerprintSha256()) {
 		return nil, fmt.Errorf("%w: adjudication names a different target", ErrProviderOutput)
 	}

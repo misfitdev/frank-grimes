@@ -147,7 +147,7 @@ rm -rf "$WS"
 echo ""
 echo "--- Invalid provider output fails closed ---"
 
-for fake in provider-garbage provider-noenvelope provider-exit7; do
+for fake in provider-garbage provider-noenvelope provider-exit7 provider-sealed-but-silent provider-silent; do
     WS="$(workspace)"
     CODE="$(exit_code "$WS" --provider-command="$FAKES/$fake.sh")"
     assert_eq "$CODE" "1" "$fake fails the run"
@@ -158,6 +158,159 @@ for fake in provider-garbage provider-noenvelope provider-exit7; do
     fi
     rm -rf "$WS"
 done
+
+# A provider that exits cleanly says nothing further about itself, so what it
+# wrote is the only account of why the run failed. Without it the operator
+# cannot tell a provider that reviewed and then described its work from one
+# that never ran a review at all.
+WS="$(workspace)"
+OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-sealed-but-silent.sh" \
+    --format=prototext src 2>&1 || true)"
+assert_match "$OUT" 'no report envelope' "a provider that sealed nothing to stdout fails the run"
+assert_match "$OUT" 'exited cleanly' "and the refusal says the provider did not itself fail"
+assert_match "$OUT" 'I found one issue' "and quotes what the provider put on stdout"
+# Where an agent CLI leaves its account of what it did.
+assert_match "$OUT" 'report seal' "and quotes what the provider put on stderr"
+assert_match "$OUT" "provider's own stdout" "and says where a report has to arrive"
+rm -rf "$WS"
+
+# Nothing to quote, which is itself the answer: the provider never spoke.
+WS="$(workspace)"
+OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-silent.sh" \
+    --format=prototext src 2>&1 || true)"
+assert_match "$OUT" 'no output at all' "a silent provider is reported as having written nothing"
+assert_no_match "$OUT" 'ending:' "and nothing is quoted back that it did not write"
+rm -rf "$WS"
+
+echo ""
+echo "--- A sealed report is delivered by the contract CLI, not by what a model says ---"
+
+# The failure this closes: a provider reviews, seals, and then summarises its
+# work. The envelope existed, inside that CLI's own transcript, and never
+# reached the engine. Delivery is now something the contract CLI did.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-seals-then-talks.sh" --format=prototext)"
+assert_no_match "$OUT" 'no report envelope' \
+    "a provider that sealed and then talked is not rejected"
+assert_match "$OUT" 'candidates_examined: +4' \
+    "and the report it sealed is the one the engine read"
+if [[ -f "$WS/.grimes/ledger.pb" ]]; then
+    pass "and the run reached a ledger"
+else
+    fail "the run reached no ledger"
+fi
+# Nothing may outlive the pass that sealed it: a later iteration that sealed
+# nothing would otherwise collect this one and re-report its findings.
+if compgen -G "$WS/.grimes/work/*.envelope" >/dev/null; then
+    fail "the sealed envelope outlived the pass that wrote it"
+else
+    pass "the sealed envelope does not outlive its pass"
+fi
+rm -rf "$WS"
+
+# An envelope named for some other pass is not this pass's report. Left
+# collectable, it would answer a request nobody made it for.
+# Marked bytes rather than a real report: what is under test is whether the
+# engine reaches for a file this pass did not write, and an engine that does
+# reach for it fails on the contents instead, which is a different refusal.
+WS="$(workspace)"
+mkdir -p "$WS/.grimes/work"
+{
+    echo "GRIMES_REPORT_PROTOBUF_V2_BEGIN"
+    echo "bm90IHRoaXMgcGFzcydzIHJlcG9ydA=="
+    echo "GRIMES_REPORT_PROTOBUF_V2_END"
+} >"$WS/.grimes/work/0000000000000000.envelope"
+OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-noenvelope.sh" \
+    --format=prototext src 2>&1 || true)"
+assert_match "$OUT" 'no report envelope' \
+    "an envelope belonging to another pass is not collected"
+if [[ -f "$WS/.grimes/work/0000000000000000.envelope" ]]; then
+    pass "and another pass's envelope is left where it was"
+else
+    fail "another pass's envelope was consumed"
+fi
+rm -rf "$WS"
+
+# An adjudicator is a spawned role like any other, and its verdict reaches the
+# engine the same way. A reviewer that sealed and then described its verdict
+# has still reviewed; losing it would read as a reviewer that did not answer.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-seals-then-talks.sh" \
+    --adjudicator-fresh --format=prototext)"
+assert_match "$OUT" 'requested: +1' "one reviewer was asked for"
+if [[ "$(grep -cE '^    reviewer_id:' <<<"$OUT")" == "1" ]]; then
+    pass "an adjudicator that sealed and then talked is counted as having answered"
+else
+    fail "an adjudicator that sealed and then talked is counted as having answered"
+fi
+assert_no_match "$OUT" 'unmet_gates: +"adjudication"' \
+    "and the adjudication gate is met"
+rm -rf "$WS"
+
+# A role can put something other than a file where the engine collects. This
+# read happens after the process has been waited on, so nothing else would have
+# interrupted it.
+WS="$(workspace)"
+set +e
+"$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-fifo-envelope.sh" src \
+    >/dev/null 2>&1 &
+FIFO_PID=$!
+WAITED=0
+while kill -0 "$FIFO_PID" 2>/dev/null && [[ "$WAITED" -lt 30 ]]; do
+    sleep 1
+    WAITED=$((WAITED + 1))
+done
+if kill -0 "$FIFO_PID" 2>/dev/null; then
+    kill -9 "$FIFO_PID" 2>/dev/null
+    wait "$FIFO_PID" 2>/dev/null
+    CODE=124
+else
+    wait "$FIFO_PID"
+    CODE=$?
+fi
+set -e
+if [[ "$CODE" == "124" ]]; then
+    fail "the engine waited on a pipe a role left where its report goes"
+else
+    pass "a role that left a pipe where its report goes does not hold the engine"
+fi
+assert_eq "$CODE" "1" "and the run fails for want of a report"
+rm -rf "$WS"
+
+# Sealed and then dead. The envelope was delivered but never collected, and a
+# repeat of this run, role and iteration computes the same path.
+WS="$(workspace)"
+CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-seals-then-fails.sh")"
+assert_eq "$CODE" "1" "a provider that sealed and then died fails the run"
+if compgen -G "$WS/.grimes/work/*.envelope" >/dev/null; then
+    fail "a failed pass left its sealed report for the next one to collect"
+else
+    pass "a failed pass leaves no sealed report behind"
+fi
+# The retry has to produce its own answer rather than inherit one.
+OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-noenvelope.sh" \
+    --format=prototext src 2>&1 || true)"
+assert_match "$OUT" 'no report envelope' "and a retry is not answered by it"
+rm -rf "$WS"
+
+# A verdict reached for another run, over bytes that happen to match. The
+# fingerprint admits it; the run is what does not.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-other-run.sh" \
+    --adjudicator-fresh --format=prototext)"
+assert_match "$OUT" 'requested: +1' "a reviewer answering for another run was still asked for"
+if [[ "$(grep -cE '^    reviewer_id:' <<<"$OUT")" == "0" ]]; then
+    pass "and its verdict is not counted as an answer"
+else
+    fail "a verdict reached for another run was admitted"
+fi
+assert_match "$OUT" 'unmet_gates: +"adjudication"' \
+    "and the run is left without adjudication"
+assert_no_match "$OUT" 'decision: +DECISION_PASS' \
+    "so it cannot carry the run to a pass"
+rm -rf "$WS"
 
 echo ""
 echo "--- Output and time are bounded ---"

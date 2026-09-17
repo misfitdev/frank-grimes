@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
@@ -81,6 +82,46 @@ func (e *Exec) confined(req engine.Request) ([]string, error) {
 	return e.Confine.Wrap(p, e.Command)
 }
 
+// collectSealed takes the report this pass sealed, if it sealed one.
+//
+// Read and removed here rather than left for the engine, because the same defer
+// that clears an abandoned pass would clear this too. Nothing is interpreted:
+// the bytes go back untouched, and the engine decides whether they answer its
+// request.
+func (e *Exec) collectSealed(req engine.Request) []byte {
+	root, err := filepath.Abs(e.Dir)
+	if err != nil {
+		return nil
+	}
+	pass := contracts.PassToken(req.RunID, roleName(req.Role), req.Iteration)
+	sealed := readSealed(filepath.Join(root, contracts.WorkEnvelopePath(pass)))
+	return sealed
+}
+
+// readSealed returns what is at path, and removes it either way.
+//
+// A role may write this directory, so it may put something other than a file at
+// the path the engine collects from. Opening a FIFO blocks until a writer
+// arrives, and this read happens after Wait: neither the command timeout nor
+// WaitDelay reaches it, so a role that left one behind would hold the engine
+// open for as long as it liked. O_NONBLOCK is what makes the open return, and
+// anything that then refuses to read like a file reads as no report at all.
+func readSealed(path string) []byte {
+	f, err := os.OpenFile(path, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		return nil
+	}
+	defer func() {
+		_ = f.Close()
+		_ = os.Remove(path)
+	}()
+	body, err := io.ReadAll(io.LimitReader(f, DefaultMaxOutputBytes))
+	if err != nil {
+		return nil
+	}
+	return body
+}
+
 // discardAbandoned removes whatever this pass was accumulating, if it is still
 // there when the pass ends.
 //
@@ -103,6 +144,11 @@ func (e *Exec) discardAbandoned(req engine.Request) {
 		return
 	}
 	mine := contracts.PassToken(req.RunID, roleName(req.Role), req.Iteration)
+	// A pass that sealed and then died -- a non-zero exit, a timeout -- never
+	// reached collection, so its envelope is still here. The pass token is the
+	// same for a repeated invocation of this run, role and iteration, and a
+	// retry would collect that report before producing one of its own.
+	_ = os.Remove(filepath.Join(root, contracts.WorkEnvelopePath(mine)))
 	for _, marker := range markers {
 		held, err := os.ReadFile(marker)
 		if err != nil || strings.TrimSpace(string(held)) != mine {
@@ -182,6 +228,10 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = e.Dir
 	cmd.Env = append(baseEnv(e.Env), requestEnv(req)...)
+	// Absolute, so a role that seals from a directory of its own choosing still
+	// delivers where the engine collects. Taken from the Exec rather than the
+	// request, since this is where the child is about to be run.
+	cmd.Env = append(cmd.Env, "GRIMES_WORK_DIR="+absolute(filepath.Join(e.Dir, store.WorkDir)))
 	// A role is given a request, not a conversation. Left inherited, a provider
 	// that decided to prompt would hold the operator's terminal until the
 	// timeout, and read whatever was typed at it in the meantime.
@@ -231,7 +281,11 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	if waitErr != nil {
 		return nil, fmt.Errorf("%w: %v: %s", engine.ErrProviderFailed, waitErr, strings.TrimSpace(stderr.String()))
 	}
-	return &engine.ProviderOutput{Raw: out}, nil
+	return &engine.ProviderOutput{
+		Raw:         out,
+		Diagnostics: strings.TrimSpace(stderr.String()),
+		Sealed:      e.collectSealed(req),
+	}, nil
 }
 
 // boundedBuffer keeps the first limit bytes and counts the rest.
@@ -300,7 +354,13 @@ func requestEnv(req engine.Request) []string {
 	// the engine resolves the two tuples afterwards, which needs nothing shown
 	// to the adjudicator beforehand.
 	if req.Role == engine.RoleAdjudicator {
-		return append(env, "GRIMES_ROLE=adjudicator")
+		// The run it answers under, so the engine can refuse a verdict reached
+		// for some other one. Not knowledge of the first review: it is the
+		// identity of the request, which every other role is given.
+		return append(env,
+			"GRIMES_ROLE=adjudicator",
+			"GRIMES_RUN_ID="+req.RunID,
+		)
 	}
 	// A refuter gets the claims and the run it must answer under. It is given no
 	// inventory and no categories: it is not reviewing the target, and a

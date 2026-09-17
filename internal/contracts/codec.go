@@ -37,6 +37,22 @@ const (
 // written, and it is removed with that file when the report is sealed.
 const WorkPassPath = GrimesDir + "/work/report.pass"
 
+// WorkEnvelopePath is where a sealed report is left for the engine to collect,
+// named by the pass that sealed it.
+//
+// A report reaches the engine on the provider's stdout, which for an agent CLI
+// means a model has to reproduce a base64 block as its last words. Whether it
+// does is a property of that CLI and that model, and the engine holds no
+// per-provider knowledge to predict it. Sealing to a path both halves can
+// compute makes delivery something this binary did rather than something a
+// provider was asked to do.
+//
+// Named by pass, so that a report sealed by an earlier iteration is not
+// collected by a later one that sealed nothing.
+func WorkEnvelopePath(pass string) string {
+	return GrimesDir + "/work/" + pass + ".envelope"
+}
+
 // PassToken names one spawned pass: this run, this role, this iteration.
 //
 // Derived rather than random so that the role and the engine agree on it
