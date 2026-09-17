@@ -971,6 +971,13 @@ message AdjudicationPanel {
     message: "a recorded panel must have asked for at least one reviewer"
     expression: "this.requested > 0u"
   };
+  // A reviewer nobody asked for is a voice in the panel that the count cannot
+  // account for, and the count is the only thing that makes the panel readable.
+  option (buf.validate.message).cel = {
+    id: "panel.no_more_answers_than_requests"
+    message: "a panel cannot hold more reviews than it asked for"
+    expression: "uint(size(this.completed)) <= this.requested"
+  };
 
   uint32 requested = 1;
   repeated IndependentReview completed = 2;
@@ -1098,6 +1105,28 @@ message GrimesResult {
     expression:
       "this.legacy_color != 1 || !has(this.adjudication) || "
       "uint(size(this.adjudication.completed)) >= this.adjudication.requested"
+  };
+  // The strictest reviewer is the one whose verdict stood, so a panel holding a
+  // block did not resolve to anything softer. Stated for the two decisions that
+  // withhold; a panel of passes resolves to a pass by the same rule.
+  option (buf.validate.message).cel = {
+    id: "result.panel_resolves_to_its_strictest"
+    message: "the review that stood must be the strictest one that answered"
+    expression:
+      "!has(this.adjudication) || !has(this.independent_review) || "
+      "(this.adjudication.completed.exists(r, r.verdict.decision == 1)"
+      " ? this.independent_review.verdict.decision == 1"
+      " : (this.adjudication.completed.exists(r, r.verdict.decision == 2)"
+      " ? this.independent_review.verdict.decision == 2 : true))"
+  };
+  // An uncertain reviewer is not made certain by a confident one beside it, and
+  // a rule that read only the review that stood would let the panel hide it.
+  option (buf.validate.message).cel = {
+    id: "result.green_needs_every_reviewer_attested"
+    message: "GREEN requires every reviewer that answered to have come from an established context"
+    expression:
+      "this.legacy_color != 1 || !has(this.adjudication) || "
+      "!this.adjudication.completed.exists(r, r.context_origin != 1)"
   };
   option (buf.validate.message).cel = {
     id: "result.panel_names_the_review_that_stood"

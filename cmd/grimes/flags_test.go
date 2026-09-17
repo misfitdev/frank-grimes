@@ -112,6 +112,43 @@ func TestOneReviewerWithArgumentsIsUnchanged(t *testing.T) {
 	}
 }
 
+// A scanner that consumed one token per option would read the reviewer as the
+// value of the boolean flag before it, and the flag package would parse the
+// same arguments without complaint: the panel would simply be gone.
+func TestAReviewerAfterABooleanFlagIsStillARequestedReviewer(t *testing.T) {
+	cfg, err := parseRun([]string{
+		"--provider-command", "/bin/true",
+		"--auto-loop", "--adjudicator-command=claude", "src",
+	})
+	if err != nil {
+		t.Fatalf("parseRun: %v", err)
+	}
+
+	if len(cfg.AdjudicatorCommands) != 1 {
+		t.Fatalf("reviewers = %q, want one", cfg.AdjudicatorCommands)
+	}
+	if !cfg.AutoLoop {
+		t.Error("the boolean flag before it lost its own meaning")
+	}
+}
+
+// Two reviewers running the same command are one reviewer asked twice. The
+// count would say two, and what makes a second opinion second is that it came
+// from somewhere else.
+func TestTheSameReviewerTwiceIsRefused(t *testing.T) {
+	_, err := parseRun(baseArgs(
+		"--adjudicator-command", "claude",
+		"--adjudicator-command", "claude",
+	))
+
+	if err == nil {
+		t.Fatal("want an error for a repeated reviewer command")
+	}
+	if !strings.Contains(err.Error(), "asked twice") {
+		t.Errorf("error = %v, want it to say the reviewer was asked twice", err)
+	}
+}
+
 func TestParseRunCommitRequiresFixMode(t *testing.T) {
 	_, err := parseRun(baseArgs("--commit"))
 	if err == nil {

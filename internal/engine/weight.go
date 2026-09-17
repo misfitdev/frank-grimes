@@ -1,14 +1,8 @@
 package engine
 
 import (
-	"github.com/misfitdev/frank-grimes/internal/adjudicate"
-
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 )
-
-func resolveWith(independent pb.Decision) pb.Decision {
-	return adjudicate.Resolve(pb.Decision_DECISION_PASS, independent)
-}
 
 // count tallies only weighted findings.
 //

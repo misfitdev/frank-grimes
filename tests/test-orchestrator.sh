@@ -362,7 +362,7 @@ echo "--- A panel is every reviewer that was asked for ---"
 WS="$(workspace)"
 OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-green.sh" \
     --adjudicator-command="$FAKES/adjudicator-pass.sh" \
-    --adjudicator-command="$FAKES/adjudicator-pass.sh" \
+    --adjudicator-command="$FAKES/adjudicator-agrees.sh" \
     --adjudicator-fresh --format=prototext)"
 assert_match "$OUT" 'requested: +2' "a panel records how many reviewers it asked for"
 if [[ "$(grep -cE '^    reviewer_id:' <<<"$OUT")" == "2" ]]; then
@@ -403,12 +403,23 @@ for ORDER in "pass:block" "block:pass"; do
     rm -rf "$WS"
 done
 
+# The reviewer that answered blocked, and the one that did not answer must not
+# be able to soften that: a shortfall caps a pass, it does not cap a block.
+WS="$(workspace)"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-block.sh" \
+    --adjudicator-command="$FAKES/adjudicator-absent.sh" \
+    --adjudicator-fresh --format=prototext)"
+assert_match "$OUT" 'legacy_color: +LEGACY_COLOR_RED' \
+    "a block from the reviewer that answered survives the one that did not"
+rm -rf "$WS"
+
 # A reviewer whose context nobody established makes the whole panel uncertain,
 # even beside one whose context is known.
 WS="$(workspace)"
 OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-green.sh" \
     --adjudicator-command="$FAKES/adjudicator-pass.sh" \
-    --adjudicator-command="$FAKES/adjudicator-pass.sh" --format=prototext)"
+    --adjudicator-command="$FAKES/adjudicator-agrees.sh" --format=prototext)"
 assert_match "$OUT" 'unmet_gates: +"independent_context"' \
     "an unattested panel is recorded as unknown-origin"
 rm -rf "$WS"

@@ -76,3 +76,29 @@ func TestAPanelThatSaysNothingDoesNotConfirmAPass(t *testing.T) {
 		t.Error("a pass survived a panel that decided nothing")
 	}
 }
+
+// A reviewer that blocked found something, and a primary that was already
+// withholding for its own reason does not make that finding go away. Without
+// this, asking for one more reviewer than answered would weaken the block the
+// first one gave.
+func TestABlockFromAReviewerSurvivesAWithholdingPrimary(t *testing.T) {
+	for _, primary := range every {
+		if got := Resolve(primary, pb.Decision_DECISION_BLOCK); got != pb.Decision_DECISION_BLOCK {
+			t.Errorf("Resolve(%v, block) = %v", primary, got)
+		}
+	}
+}
+
+// The rule it must not break: nothing a reviewer says relaxes a primary that
+// was not a pass.
+func TestNothingAReviewerSaysRelaxesAWithholdingPrimary(t *testing.T) {
+	for _, primary := range []pb.Decision{pb.Decision_DECISION_BLOCK, pb.Decision_DECISION_CONDITIONAL} {
+		for _, independent := range every {
+			got := Resolve(primary, independent)
+			if rank(got) < rank(primary) {
+				t.Errorf("Resolve(%v, %v) = %v, which is less strict than the primary",
+					primary, independent, got)
+			}
+		}
+	}
+}

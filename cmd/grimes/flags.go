@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
@@ -71,20 +72,31 @@ func rejectSwallowedFlags(fs *flag.FlagSet, args []string) error {
 // was written after. Scanning the arguments is what recovers it, the same way
 // rejectSwallowedFlags recovers how a value was written.
 //
+// Only these two options are read here, and only they consume the token after
+// them. A scanner that consumed one token per option would swallow whatever
+// followed a boolean flag: --auto-loop --adjudicator-command=x reads as
+// --auto-loop taking the reviewer as its value, and the panel disappears with
+// the flag package none the wiser.
+//
 // One command with its arguments parses to exactly what it did before a panel
 // was possible.
 func adjudicators(args []string) ([][]string, error) {
 	var panel [][]string
 	for i := 0; i < len(args); i++ {
-		name, value, joined := flagValue(args, &i)
+		name, value, ok := adjudicatorOption(args, &i)
+		if !ok {
+			continue
+		}
 		switch name {
 		case "adjudicator-command":
-			if !joined && value == "" {
-				return nil, fmt.Errorf("%w: --adjudicator-command needs a command", errUsage)
-			}
 			fields := strings.Fields(value)
 			if len(fields) == 0 {
 				return nil, fmt.Errorf("%w: --adjudicator-command needs a command", errUsage)
+			}
+			if at := indexOfCommand(panel, fields); at >= 0 {
+				return nil, fmt.Errorf(
+					"--adjudicator-command %q is already reviewer %d; two reviewers that run the same command are one reviewer asked twice",
+					value, at+1)
 			}
 			panel = append(panel, fields)
 		case "adjudicator-arg":
@@ -97,23 +109,40 @@ func adjudicators(args []string) ([][]string, error) {
 	return panel, nil
 }
 
-// flagValue reads one option and its value at args[*i], advancing i past a
-// value written as a separate token. Anything that is not an option reads as no
-// option at all.
-func flagValue(args []string, i *int) (name, value string, joined bool) {
+// adjudicatorOption reads one of the two options this scanner knows at
+// args[*i], advancing i past a value written as a separate token. Every other
+// token, option or not, is left exactly where it was.
+func adjudicatorOption(args []string, i *int) (name, value string, ok bool) {
 	tok := args[*i]
 	if !strings.HasPrefix(tok, "-") {
 		return "", "", false
 	}
-	name = strings.TrimLeft(tok, "-")
-	if n, v, ok := strings.Cut(name, "="); ok {
-		return n, v, true
+	name, value, joined := strings.TrimLeft(tok, "-"), "", false
+	if n, v, cut := strings.Cut(name, "="); cut {
+		name, value, joined = n, v, true
 	}
-	if *i+1 < len(args) {
-		*i++
-		return name, args[*i], false
+	if name != "adjudicator-command" && name != "adjudicator-arg" {
+		return "", "", false
 	}
-	return name, "", false
+	if joined {
+		return name, value, true
+	}
+	if *i+1 >= len(args) {
+		return name, "", true
+	}
+	*i++
+	return name, args[*i], true
+}
+
+// indexOfCommand reports where an identical reviewer command already sits in
+// the panel.
+func indexOfCommand(panel [][]string, want []string) int {
+	for i, have := range panel {
+		if slices.Equal(have, want) {
+			return i
+		}
+	}
+	return -1
 }
 
 type config struct {

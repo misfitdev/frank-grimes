@@ -290,9 +290,10 @@ A reviewer cannot confirm its own acquittal. A pass decision requires a second r
 | pass | pass | `pass` stands; GREEN remains reachable |
 | pass | conditional | `conditional`, YELLOW |
 | pass | block | `block`, RED |
-| conditional or block | anything | the primary decision stands, never relaxed |
+| conditional | block | `block`, RED: the stricter of the two, as everywhere else |
+| conditional or block | anything less strict | the primary decision stands, never relaxed |
 
-An independent pass never upgrades a primary `block` or `conditional`. Adjudication can only remove confidence, never manufacture it.
+An independent pass never upgrades a primary `block` or `conditional`. Adjudication can only remove confidence, never manufacture it. It does not follow that a primary decision is beyond reach in the other direction: a reviewer that blocks has found something, and what it found does not stop counting because the primary was already withholding.
 
 **When adjudication is unavailable.** Record `Independent adjudication: not available`, set `review_confidence = low`, and treat `pass` as unreachable: the verdict caps at `conditional`/YELLOW. A provider that cannot furnish a separately identified context cannot produce GREEN. Absence of a second opinion is not agreement.
 

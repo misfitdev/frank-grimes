@@ -5422,11 +5422,12 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\n" +
 	"selectedBy:\xce\x03\xbaH\xca\x03\x1a\xf2\x01\n" +
 	"$verification.passed_requires_success\x12Mpassed verification requires command, zero exit, output digest, and timestamp\x1a{this.status != 1 || (this.command != '' && this.exit_code == 0 && size(this.output_sha256) == 32 && has(this.completed_at))\x1a\xd2\x01\n" +
-	"%verification.selection_matches_status\x12fa gate that ran records which rule selected it, and an unavailable one records that it was unavailable\x1aA(this.status == 3 || this.status == 4) == (this.selected_by == 4)\"\xe9\x01\n" +
+	"%verification.selection_matches_status\x12fa gate that ran records which rule selected it, and an unavailable one records that it was unavailable\x1aA(this.status == 3 || this.status == 4) == (this.selected_by == 4)\"\xf5\x02\n" +
 	"\x11AdjudicationPanel\x12\x1c\n" +
 	"\trequested\x18\x01 \x01(\rR\trequested\x12@\n" +
-	"\tcompleted\x18\x02 \x03(\v2\".frank_grimes.v2.IndependentReviewR\tcompleted:t\xbaHq\x1ao\n" +
-	"\x1cpanel.requested_at_least_one\x12:a recorded panel must have asked for at least one reviewer\x1a\x13this.requested > 0u\"\xc1\x03\n" +
+	"\tcompleted\x18\x02 \x03(\v2\".frank_grimes.v2.IndependentReviewR\tcompleted:\xff\x01\xbaH\xfb\x01\x1ao\n" +
+	"\x1cpanel.requested_at_least_one\x12:a recorded panel must have asked for at least one reviewer\x1a\x13this.requested > 0u\x1a\x87\x01\n" +
+	"#panel.no_more_answers_than_requests\x122a panel cannot hold more reviews than it asked for\x1a,uint(size(this.completed)) <= this.requested\"\xc1\x03\n" +
 	"\x11IndependentReview\x12\x1e\n" +
 	"\x06run_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x05runId\x12(\n" +
 	"\vreviewer_id\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\n" +
@@ -5464,7 +5465,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tB\x18\xbaH\x15r\x13\n" +
 	"\x11.grimes/ledger.pbR\x04path\x12,\n" +
 	"\rdigest_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\fdigestSha256\x121\n" +
-	"\x14oscillation_detected\x18\x03 \x01(\bR\x13oscillationDetected\"\xad&\n" +
+	"\x14oscillation_detected\x18\x03 \x01(\bR\x13oscillationDetected\"\xb9+\n" +
 	"\fGrimesResult\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
 	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x12\x1e\n" +
@@ -5494,7 +5495,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\rrefuter_check\x18\x14 \x01(\x0e2\x1d.frank_grimes.v2.RefuterCheckB\b\xbaH\x05\x82\x01\x02\x10\x01R\frefuterCheck\x12)\n" +
 	"\vconfinement\x18\x15 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\vconfinement\x126\n" +
 	"\tfix_batch\x18\x16 \x01(\v2\x19.frank_grimes.v2.FixBatchR\bfixBatch\x12F\n" +
-	"\fadjudication\x18\x17 \x01(\v2\".frank_grimes.v2.AdjudicationPanelR\fadjudication:\xc0\x1b\xbaH\xbc\x1b\x1ad\n" +
+	"\fadjudication\x18\x17 \x01(\v2\".frank_grimes.v2.AdjudicationPanelR\fadjudication:\xcc \xbaH\xc8 \x1ad\n" +
 	"\x18result.orchestrator_only\x12/only the orchestrator may emit the final result\x1a\x17this.producer_role == 3\x1a\x88\x01\n" +
 	"!result.report_has_no_verification\x122report mode records verification as not applicable\x1a/this.mode != 1 || this.verification.status == 4\x1a\x94\x03\n" +
 	"#result.report_completion_is_derived\x12hthe completion state must be the one the colour, iteration, bound, exhaustion, and new P0/P1 count imply\x1a\x82\x02this.mode != 1 || this.completion_state == (this.legacy_color == 1 ? 2 : this.iteration >= this.max_iterations ? 4 : (this.iteration > 1 && this.marginal_yield.new_p0_p1 == 0u) ? (this.unmet_gates.exists(g, g == 'coverage' || g == 'refutation') ? 6 : 2) : 1)\x1a\xac\x03\n" +
@@ -5502,7 +5503,9 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"$result.commit_requires_a_passed_gate\x129a batch may be committed only when the gate it ran passed\x1a^!has(this.fix_batch) || size(this.fix_batch.commit_sha1) == 0 || this.verification.status == 1\x1aw\n" +
 	"$result.fix_batch_belongs_to_fix_mode\x12'only a fix-mode run records a fix batch\x1a&!has(this.fix_batch) || this.mode == 2\x1a\x99\x02\n" +
 	"#result.short_panel_is_an_unmet_gate\x12[a run that got fewer reviewers than it asked for must report the adjudication gate as unmet\x1a\x94\x01!has(this.adjudication) || uint(size(this.adjudication.completed)) >= this.adjudication.requested || this.unmet_gates.exists(g, g == 'adjudication')\x1a\xe3\x01\n" +
-	"\"result.green_needs_the_whole_panel\x12@GREEN requires every reviewer the run asked for to have answered\x1a{this.legacy_color != 1 || !has(this.adjudication) || uint(size(this.adjudication.completed)) >= this.adjudication.requested\x1a\xce\x01\n" +
+	"\"result.green_needs_the_whole_panel\x12@GREEN requires every reviewer the run asked for to have answered\x1a{this.legacy_color != 1 || !has(this.adjudication) || uint(size(this.adjudication.completed)) >= this.adjudication.requested\x1a\x90\x03\n" +
+	"&result.panel_resolves_to_its_strictest\x12=the review that stood must be the strictest one that answered\x1a\xa6\x02!has(this.adjudication) || !has(this.independent_review) || (this.adjudication.completed.exists(r, r.verdict.decision == 1) ? this.independent_review.verdict.decision == 1 : (this.adjudication.completed.exists(r, r.verdict.decision == 2) ? this.independent_review.verdict.decision == 2 : true))\x1a\xf6\x01\n" +
+	"*result.green_needs_every_reviewer_attested\x12TGREEN requires every reviewer that answered to have come from an established context\x1arthis.legacy_color != 1 || !has(this.adjudication) || !this.adjudication.completed.exists(r, r.context_origin != 1)\x1a\xce\x01\n" +
 	"(result.panel_names_the_review_that_stood\x12?a panel that answered must carry the review whose verdict stood\x1aa!has(this.adjudication) || size(this.adjudication.completed) == 0 || has(this.independent_review)\x1a\xf0\x03\n" +
 	"(result.green_is_independent_and_verified\x12xGREEN requires an independent matching pass from a context the engine spawned, no oscillation, and required verification\x1a\xc9\x02this.legacy_color != 1 || (has(this.independent_review) && this.independent_review.verdict.decision == 3 && this.independent_review.context_origin == 1 && this.independent_review.target_fingerprint_sha256 == this.target.fingerprint_sha256 && !this.ledger.oscillation_detected && (this.mode == 1 || this.verification.status == 1))\x1a\xa9\x02\n" +
 	" result.green_requires_pass_tuple\x12YGREEN requires decision=pass, low residual risk, high confidence, sufficient completeness\x1a\xa9\x01this.legacy_color != 1 || (this.verdict.decision == 3 && this.verdict.residual_risk == 4 && this.verdict.review_confidence == 1 && this.verdict.review_completeness == 1)\x1aw\n" +

@@ -2,6 +2,7 @@ package engine
 
 import (
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
+	"github.com/misfitdev/frank-grimes/internal/adjudicate"
 )
 
 // Tags a provider may attach to a finding that remove it from verdict weight.
@@ -106,8 +107,12 @@ func Derive(in DeriveInput) Derived {
 	counts := count(in.Candidates)
 
 	decision := decide(in, counts)
-	if in.AdjudicationAvailable && decision == pb.Decision_DECISION_PASS {
-		decision = resolveWith(in.IndependentDecision)
+	// Applied whatever the primary reached, not only to a pass. A reviewer that
+	// blocked said so, and a shortfall that had already capped the primary at
+	// conditional would otherwise swallow it: asking for one more reviewer
+	// would have weakened the answer the first one gave.
+	if in.AdjudicationAvailable {
+		decision = adjudicate.Resolve(decision, in.IndependentDecision)
 	}
 
 	v := &pb.Verdict{

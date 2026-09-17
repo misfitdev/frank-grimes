@@ -8,12 +8,20 @@ import pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
 // Adjudication can only remove confidence, never manufacture it: an
 // independent pass leaves a primary block or conditional exactly where it was,
 // and a primary pass falls to whatever the independent review decided.
+//
+// A block is the exception in the other direction. A reviewer that blocks has
+// found something, and what it found does not stop counting because the primary
+// was already withholding for a reason of its own — a run that asked for a
+// second opinion and got a block must not report less than a block.
 func Resolve(primary, independent pb.Decision) pb.Decision {
+	if independent == pb.Decision_DECISION_BLOCK {
+		return pb.Decision_DECISION_BLOCK
+	}
 	if primary != pb.Decision_DECISION_PASS {
 		return primary
 	}
 	switch independent {
-	case pb.Decision_DECISION_PASS, pb.Decision_DECISION_CONDITIONAL, pb.Decision_DECISION_BLOCK:
+	case pb.Decision_DECISION_PASS, pb.Decision_DECISION_CONDITIONAL:
 		return independent
 	default:
 		return pb.Decision_DECISION_CONDITIONAL
