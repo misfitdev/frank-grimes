@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -183,7 +184,7 @@ func cmdReportAdd(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := claimPass(*file); err != nil {
+	if err := claimPass(*file, os.Getenv("GRIMES_PASS")); err != nil {
 		return err
 	}
 	report.Candidates = append(report.Candidates, candidate)
@@ -216,7 +217,7 @@ func cmdReportSeal(args []string) error {
 
 	// Before anything is built from it: a report another pass opened is not
 	// this pass's to deliver.
-	if err := sealablePass(*file); err != nil {
+	if err := sealablePass(*file, os.Getenv("GRIMES_PASS")); err != nil {
 		return err
 	}
 	// The engine exports the request it is making when it invokes a provider, so
@@ -437,7 +438,7 @@ func cmdReportCover(args []string) error {
 	if err := contracts.Validate(report.GetCoverage()); err != nil {
 		return err
 	}
-	if err := claimPass(*file); err != nil {
+	if err := claimPass(*file, os.Getenv("GRIMES_PASS")); err != nil {
 		return err
 	}
 	if err := saveReport(*file, report); err != nil {
@@ -483,7 +484,7 @@ func cmdReportStop(args []string) error {
 		return err
 	}
 	report.CategoryStops = append(report.CategoryStops, stop)
-	if err := claimPass(*file); err != nil {
+	if err := claimPass(*file, os.Getenv("GRIMES_PASS")); err != nil {
 		return err
 	}
 	if err := saveReport(*file, report); err != nil {
@@ -580,7 +581,7 @@ func cmdReportAcquit(args []string) error {
 		return err
 	}
 	report.Acquittals = append(report.Acquittals, acquittal)
-	if err := claimPass(*file); err != nil {
+	if err := claimPass(*file, os.Getenv("GRIMES_PASS")); err != nil {
 		return err
 	}
 	if err := saveReport(*file, report); err != nil {
@@ -674,24 +675,43 @@ func passPath(reportPath string) string {
 // that will carry it is the documented sequence, and the run that seals it
 // adopts what it finds. What this stops is the other case, where a pass died
 // before sealing and the next pass delivers its candidates as its own.
-func claimPass(reportPath string) error {
-	pass := os.Getenv("GRIMES_PASS")
+func claimPass(reportPath, pass string) error {
 	if pass == "" {
 		return nil
+	}
+	// The report's own directory, which a role that builds its report in a
+	// scratch directory of its own does not have yet. WriteAtomic makes it for
+	// the report; the marker beside it needs the same.
+	if err := os.MkdirAll(filepath.Dir(passPath(reportPath)), 0o755); err != nil {
+		return err
+	}
+	// Exclusive create rather than read-then-write: two passes spawned into one
+	// review directory would otherwise both find no marker, both write, and the
+	// one whose write landed second would own a report holding the other's
+	// candidates. Whoever creates the file owns the report.
+	f, err := os.OpenFile(passPath(reportPath), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err == nil {
+		defer f.Close()
+		if _, err := f.WriteString(pass); err != nil {
+			return err
+		}
+		return f.Sync()
+	}
+	if !errors.Is(err, os.ErrExist) {
+		return err
 	}
 	held, err := readPass(reportPath)
 	if err != nil {
 		return err
 	}
-	if held == "" {
-		return contracts.WriteAtomic(passPath(reportPath), []byte(pass))
+	if held == pass {
+		return nil
 	}
-	if held != pass {
-		return fmt.Errorf(
-			"%s holds candidates another pass opened and did not seal; remove it or seal it there",
-			reportPath)
-	}
-	return nil
+	// An empty marker is one a pass created and did not live to write. It is
+	// claimed by somebody; it is not claimed by this pass.
+	return fmt.Errorf(
+		"%s holds candidates another pass opened and did not seal; remove it or seal it there",
+		reportPath)
 }
 
 // readPass returns the pass that opened the report, or empty when none did.
@@ -713,12 +733,12 @@ func readPass(reportPath string) (string, error) {
 // before the run existed, and this run carries it. A report claimed by another
 // pass is the abandoned one, and stamping this run's identity onto it would
 // deliver findings this pass never made.
-func sealablePass(reportPath string) error {
+func sealablePass(reportPath, pass string) error {
 	held, err := readPass(reportPath)
 	if err != nil {
 		return err
 	}
-	if held == "" || held == os.Getenv("GRIMES_PASS") {
+	if held == "" || held == pass {
 		return nil
 	}
 	return fmt.Errorf(
