@@ -81,6 +81,31 @@ func (e *Exec) confined(req engine.Request) ([]string, error) {
 	return e.Confine.Wrap(p, e.Command)
 }
 
+// discardAbandoned removes the report this pass was accumulating, if it is
+// still there when the pass ends.
+//
+// A sealed report clears itself, so anything left is a pass that did not get
+// that far. Only this pass's own leftovers are touched: the file records which
+// pass opened it, and one opened outside any pass is the documented sequence
+// where a review builds its report before the run that carries it.
+func (e *Exec) discardAbandoned(req engine.Request) {
+	root, err := filepath.Abs(e.Dir)
+	if err != nil {
+		return
+	}
+	report := filepath.Join(root, store.ReportPath)
+	pass := filepath.Join(root, store.ReportPath+".pass")
+	held, err := os.ReadFile(pass)
+	if err != nil {
+		return
+	}
+	if strings.TrimSpace(string(held)) != contracts.PassToken(req.RunID, roleName(req.Role), req.Iteration) {
+		return
+	}
+	_ = os.Remove(report)
+	_ = os.Remove(pass)
+}
+
 // lookup reports where the role's command will be found, resolving it the way
 // the spawned process will.
 //
@@ -124,6 +149,12 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	if err != nil {
 		return nil, err
 	}
+
+	// A pass that does not come back leaves whatever it was accumulating, and
+	// the file outlives the process. Cleared here rather than before the next
+	// spawn, because only this pass knows the leftovers are its own: a report
+	// built before the run began belongs to whoever built it.
+	defer e.discardAbandoned(req)
 
 	timeout := e.Timeout
 	if timeout <= 0 {
@@ -218,6 +249,19 @@ func (b *boundedBuffer) String() string {
 	return b.buf.String()
 }
 
+// roleName is how a role is written into the environment and into the token
+// that names its pass.
+func roleName(r engine.Role) string {
+	switch r {
+	case engine.RoleAdjudicator:
+		return "adjudicator"
+	case engine.RoleRefuter:
+		return "refuter"
+	default:
+		return "primary"
+	}
+}
+
 func requestEnv(req engine.Request) []string {
 	env := []string{
 		// Absolute, like the content path and for the same reason: a provider
@@ -235,6 +279,10 @@ func requestEnv(req engine.Request) []string {
 		// cannot see the artifact cannot form an opinion of its own, and zero
 		// knowledge is about the first report, not the target.
 		"GRIMES_TARGET_CONTENT=" + req.ContentPath,
+		// Which pass this is. The contract CLI stamps it on the report it is
+		// accumulating, so a pass that died before sealing cannot have its
+		// candidates delivered by the next one.
+		"GRIMES_PASS=" + contracts.PassToken(req.RunID, roleName(req.Role), req.Iteration),
 	}
 	// The claimed tuple is deliberately withheld. An independent review that is
 	// shown the conclusion it is meant to reach is anchored by construction;

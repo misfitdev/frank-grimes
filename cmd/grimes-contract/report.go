@@ -20,7 +20,7 @@ import (
 
 // DefaultReportPath is where a report accumulates, inside the one directory a
 // spawned role is allowed to write.
-const DefaultReportPath = store.WorkDir + "/report.textproto"
+const DefaultReportPath = store.ReportPath
 
 // cmdReport builds a provider report one candidate at a time.
 //
@@ -183,6 +183,9 @@ func cmdReportAdd(args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := claimPass(*file); err != nil {
+		return err
+	}
 	report.Candidates = append(report.Candidates, candidate)
 	if err := saveReport(*file, report); err != nil {
 		return err
@@ -208,6 +211,12 @@ func cmdReportSeal(args []string) error {
 	disproved := fs.Uint("disproved", 0, "candidates the self-grind disproved")
 	raw := fs.Bool("raw", false, "write canonical bytes instead of the envelope")
 	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	// Before anything is built from it: a report another pass opened is not
+	// this pass's to deliver.
+	if err := sealablePass(*file); err != nil {
 		return err
 	}
 	// The engine exports the request it is making when it invokes a provider, so
@@ -329,6 +338,9 @@ func cmdReportSeal(args []string) error {
 	if err := os.Remove(*file); err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("clearing the sealed report: %w", err)
 	}
+	if err := os.Remove(passPath(*file)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("clearing the sealed report: %w", err)
+	}
 	return nil
 }
 
@@ -425,6 +437,9 @@ func cmdReportCover(args []string) error {
 	if err := contracts.Validate(report.GetCoverage()); err != nil {
 		return err
 	}
+	if err := claimPass(*file); err != nil {
+		return err
+	}
 	if err := saveReport(*file, report); err != nil {
 		return err
 	}
@@ -468,6 +483,9 @@ func cmdReportStop(args []string) error {
 		return err
 	}
 	report.CategoryStops = append(report.CategoryStops, stop)
+	if err := claimPass(*file); err != nil {
+		return err
+	}
 	if err := saveReport(*file, report); err != nil {
 		return err
 	}
@@ -562,6 +580,9 @@ func cmdReportAcquit(args []string) error {
 		return err
 	}
 	report.Acquittals = append(report.Acquittals, acquittal)
+	if err := claimPass(*file); err != nil {
+		return err
+	}
 	if err := saveReport(*file, report); err != nil {
 		return err
 	}
@@ -640,6 +661,71 @@ func cmdReportShow(args []string) error {
 
 // loadReport reads the in-progress report without validating it: it is
 // incomplete by construction until seal fills in the run-level fields.
+// passPath is where the pass that opened a report is recorded, beside it.
+func passPath(reportPath string) string {
+	return reportPath + ".pass"
+}
+
+// claimPass records which pass is accumulating this report, and refuses to add
+// to one that another pass opened.
+//
+// A pass is a role the engine spawned, named by GRIMES_PASS. Outside one there
+// is no pass to record: a review that builds a report before starting the run
+// that will carry it is the documented sequence, and the run that seals it
+// adopts what it finds. What this stops is the other case, where a pass died
+// before sealing and the next pass delivers its candidates as its own.
+func claimPass(reportPath string) error {
+	pass := os.Getenv("GRIMES_PASS")
+	if pass == "" {
+		return nil
+	}
+	held, err := readPass(reportPath)
+	if err != nil {
+		return err
+	}
+	if held == "" {
+		return contracts.WriteAtomic(passPath(reportPath), []byte(pass))
+	}
+	if held != pass {
+		return fmt.Errorf(
+			"%s holds candidates another pass opened and did not seal; remove it or seal it there",
+			reportPath)
+	}
+	return nil
+}
+
+// readPass returns the pass that opened the report, or empty when none did.
+func readPass(reportPath string) (string, error) {
+	data, err := os.ReadFile(passPath(reportPath))
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(data)), nil
+}
+
+// sealablePass refuses to deliver candidates that belong to a pass other than
+// this one.
+//
+// An unclaimed report is the documented sequence: a review accumulated it
+// before the run existed, and this run carries it. A report claimed by another
+// pass is the abandoned one, and stamping this run's identity onto it would
+// deliver findings this pass never made.
+func sealablePass(reportPath string) error {
+	held, err := readPass(reportPath)
+	if err != nil {
+		return err
+	}
+	if held == "" || held == os.Getenv("GRIMES_PASS") {
+		return nil
+	}
+	return fmt.Errorf(
+		"%s was opened by another pass and never sealed; its candidates are not this pass's to deliver",
+		reportPath)
+}
+
 func loadReport(path string) (*pb.ProviderReport, error) {
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {

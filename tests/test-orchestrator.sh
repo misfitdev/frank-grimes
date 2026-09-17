@@ -355,6 +355,50 @@ fi
 rm -rf "$WS"
 
 echo ""
+echo "--- A pass delivers only what it opened ---"
+
+# The first pass adds a P0 and dies without sealing. The engine clears what its
+# own pass left, so the next one finds nothing to inherit.
+WS="$(workspace)"
+run_grimes "$WS" --provider-command="$FAKES/provider-abandons.sh" >/dev/null
+if [[ ! -f "$WS/.grimes/work/report.textproto" ]]; then
+    pass "a pass that died leaves no report behind"
+else
+    fail "a pass that died leaves no report behind"
+fi
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-in-place.sh" --format=prototext)"
+assert_match "$OUT" 'total: +1' "the next pass delivers only its own candidate"
+assert_no_match "$OUT" 'open_p0' "and not the P0 the abandoned pass had opened"
+rm -rf "$WS"
+
+# With the report left in place by hand, the refusal is what stands between one
+# pass's candidates and another pass's report.
+WS="$(workspace)"
+mkdir -p "$WS/.grimes/work"
+printf 'someone-elses-pass' >"$WS/.grimes/work/report.textproto.pass"
+: >"$WS/.grimes/work/report.textproto"
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-in-place.sh" --format=prototext)"
+assert_match "$OUT" 'another pass' \
+    "a report another pass opened cannot be added to"
+assert_no_match "$OUT" 'legacy_color' "and the run produces no result"
+rm -rf "$WS"
+
+# A pass that adds nothing still seals whatever it finds, which is how an
+# abandoned report reaches a record without anyone reporting its candidates.
+WS="$(workspace)"
+mkdir -p "$WS/.grimes/work"
+(cd "$WS" && GRIMES_PASS=someone-elses-pass GRIMES_TARGET_ROOT="$WS" GRIMES_TARGET_KIND=code \
+    "$BINDIR/grimes-contract" report add --category=SEC --severity=P0 --blast=systemic \
+    --likelihood=likely --path=src/app.sh --tier=E2 --claim="a claim nobody sealed" \
+    --quote="$(grep -m1 -E '[^[:space:]]' "$WS/src/app.sh")" \
+    --disproof-action="tried" --disproof-exit=1 --disproof-output="still there" >/dev/null)
+OUT="$(run_grimes "$WS" --provider-command="$FAKES/provider-bare-seal.sh" --format=prototext)"
+assert_match "$OUT" 'not this pass' \
+    "a report another pass opened is not sealed by the pass that found it"
+assert_no_match "$OUT" 'legacy_color' "and that run produces no result either"
+rm -rf "$WS"
+
+echo ""
 echo "--- A panel is every reviewer that was asked for ---"
 
 # Two reviewers, both of which answer. The record says so, and neither the
