@@ -250,10 +250,18 @@ func ranInside(r *pb.Reproduction, against *Collected) error {
 		return nil
 	}
 	cwd := cmd.ExecutedCommand.GetCwd().GetValue()
-	if _, _, err := contained(root, cwd); err != nil {
-		return fmt.Errorf("%w: the command ran in %q, outside the target", ErrProviderOutput, cwd)
+	if _, _, err := contained(root, cwd); err == nil {
+		return nil
 	}
-	return nil
+	// In fix mode there are two places the target is: the worktree, and the
+	// copy taken before the batch that the roles after the fixing one read. A
+	// command in either observed the target; one in neither did not.
+	if against.ReviewedRoot != "" {
+		if _, _, err := contained(against.ReviewedRoot, cwd); err == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("%w: the command ran in %q, outside the target", ErrProviderOutput, cwd)
 }
 
 func kindName(k pb.TargetKind) string {

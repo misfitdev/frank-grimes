@@ -60,6 +60,9 @@ func (bubblewrap) Wrap(p Policy, argv []string) ([]string, error) {
 	for _, r := range p.ReadPaths {
 		out = append(out, "--ro-bind", r, r)
 	}
+	for _, r := range p.ReadDirs {
+		out = append(out, "--ro-bind", r, r)
+	}
 	// Last, over the tmpfs: what the role keeps inside the review's directory.
 	for _, w := range p.WriteDirs {
 		if p.inGrimes(w) {

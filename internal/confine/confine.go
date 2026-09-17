@@ -30,6 +30,11 @@ type Policy struct {
 	// of that directory is unreadable: the ledger, the result, the loop state,
 	// and the copies staged for other roles.
 	ReadPaths []string
+	// ReadDirs are directories under Root/.grimes this role was handed whole.
+	// A role reads the target through its own files, so a copy of it is a tree
+	// rather than a list: naming each file would mean knowing, before the role
+	// runs, which ones it decides to open.
+	ReadDirs []string
 	// WriteDirs are the directories this role may write, empty when it should
 	// write nothing. Directories rather than files because a record is written
 	// through a temporary file and a rename, which a single-file mount refuses.
@@ -63,6 +68,13 @@ func (p Policy) resolve() (Policy, error) {
 			return Policy{}, err
 		}
 		out.ReadPaths = append(out.ReadPaths, got)
+	}
+	for _, r := range p.ReadDirs {
+		got, err := resolvePath(r, "readable directory")
+		if err != nil {
+			return Policy{}, err
+		}
+		out.ReadDirs = append(out.ReadDirs, got)
 	}
 	for _, w := range p.WriteDirs {
 		got, err := resolvePath(w, "writable directory")

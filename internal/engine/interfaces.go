@@ -67,7 +67,11 @@ type Request struct {
 	ClaimsPath string
 	// WriteRoot is the worktree a fixing role may change. Empty for every role
 	// that is only reading, which is all of them outside fix mode.
-	WriteRoot  string
+	WriteRoot string
+	// Root is the directory this role resolves unit ids against. Empty means
+	// the target's own, which is every role outside fix mode and the fixing
+	// role inside it; the roles after that one are given the reviewed copy.
+	Root       string
 	Mode       pb.Mode
 	Iteration  uint32
 	Categories []pb.Category
@@ -116,6 +120,10 @@ type Collected struct {
 	// run is going to change them. Evidence is checked against the bytes that
 	// were reviewed, and in fix mode the file on disk is no longer those.
 	UnitBodies map[string][]byte
+	// ReviewedRoot is a copy of the target as it stood before a fixing role
+	// touched it, set only in fix mode. The roles after that one read it
+	// instead of the worktree, and resolve their unit ids against it.
+	ReviewedRoot string
 	// Range reports that the scope named a revision range. The inventory is then
 	// the whole of the scope rather than everything under one path, which is
 	// what a fix batch has to stay inside of.
@@ -144,10 +152,20 @@ type EvidenceBroker interface {
 	Admit(ctx context.Context, c *pb.CandidateFinding, against *Collected) (*pb.CandidateFinding, error)
 }
 
+// Handoff is where a role reads the target and what its unit ids are relative
+// to. The two differ only in fix mode, where a role after the fixing one reads
+// a copy taken before the batch: its content path is inside that copy, and so
+// is the root it resolves ids against.
+type Handoff struct {
+	ContentPath string
+	// Root is empty when it is the target's own.
+	Root string
+}
+
 // Adjudicator obtains a second verdict reached without sight of the first.
 // A nil review with a nil error means adjudication was unavailable.
 type Adjudicator interface {
-	Adjudicate(ctx context.Context, target *pb.Target, contentPath string, claimed *pb.Verdict) (*pb.IndependentReview, error)
+	Adjudicate(ctx context.Context, target *pb.Target, at Handoff, claimed *pb.Verdict) (*pb.IndependentReview, error)
 }
 
 // Refuter puts claims to a context that did not form them and reports what
@@ -156,7 +174,7 @@ type Adjudicator interface {
 // An error means the pass did not happen. That is not the same as every claim
 // surviving one, and the verdict reads the difference.
 type Refuter interface {
-	Refute(ctx context.Context, target *pb.Target, contentPath, claimsPath string) (map[string]*pb.RefutationAttempt, error)
+	Refute(ctx context.Context, target *pb.Target, at Handoff, claimsPath string) (map[string]*pb.RefutationAttempt, error)
 }
 
 // GateRunner runs the verification command once over a batch.

@@ -432,6 +432,53 @@ fi
 rm -rf "$REPO"
 
 echo ""
+echo "--- A role after the fixing one reads what was reviewed ---"
+
+# The whole point of the mode is that the primary changes the target, so by the
+# time anything else runs the bytes on disk are the repair. A reviewer shown
+# those is judging work nobody asked it about: it would find no defect where
+# one was reported, and the disagreement would be an artefact of the order the
+# roles ran in.
+REPO="$(repository)"
+REVIEWED="$(cat "$REPO/src/app.sh")"
+OUT="$("$GRIMES" run --dir="$REPO" --mode=fix \
+    --adjudicator-command="$FAKES/adjudicator-quotes-target.sh" --adjudicator-fresh \
+    --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true" \
+    --format=prototext src 2>&1 || true)"
+SAW="$(cat "$REPO/.grimes/work/adjudicator-saw" 2>/dev/null || true)"
+if [[ -n "$SAW" ]]; then
+    pass "the adjudicator read the target it was judging"
+else
+    fail "the adjudicator read nothing (it must, or what follows proves nothing)"
+fi
+if [[ "$SAW" == "$REVIEWED" ]]; then
+    pass "and what it read is the bytes the review was about"
+else
+    fail "the adjudicator was shown the batch, not what was reviewed"
+fi
+# The fixer still edited: the copy is beside the worktree, not instead of it.
+TREE="$(worktree_of "$OUT")"
+if [[ -n "$TREE" && "$(cat "$TREE/src/app.sh")" != "$REVIEWED" ]]; then
+    pass "while the fixing role still changed the worktree"
+else
+    fail "while the fixing role still changed the worktree"
+fi
+assert_match "$OUT" 'status: +FINDING_STATUS_VERIFIED' \
+    "and the batch is still verified"
+rm -rf "$REPO"
+
+# A run's reviewed bytes are its own. Left behind, the next iteration would
+# hand its roles a copy of a target that has since moved.
+REPO="$(repository)"
+run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true" >/dev/null
+if [[ -d "$REPO/.grimes/reviewed" ]]; then
+    fail "the reviewed copy outlived the run that took it"
+else
+    pass "the reviewed copy does not outlive the run"
+fi
+rm -rf "$REPO"
+
+echo ""
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"
 [[ "$FAILED" -eq 0 ]] || exit 1

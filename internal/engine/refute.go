@@ -35,7 +35,7 @@ func (r ProviderRefuter) contextOrigin() pb.ContextOrigin {
 // Refute runs one pass and returns what it did, keyed by the ref the engine
 // issued. Refs the engine did not issue are dropped: a refuter that answers a
 // question nobody asked has answered nothing about this review.
-func (r ProviderRefuter) Refute(ctx context.Context, target *pb.Target, contentPath, claimsPath string) (map[string]*pb.RefutationAttempt, error) {
+func (r ProviderRefuter) Refute(ctx context.Context, target *pb.Target, reads Handoff, claimsPath string) (map[string]*pb.RefutationAttempt, error) {
 	if r.Provider == nil {
 		return nil, fmt.Errorf("no refuter configured")
 	}
@@ -43,7 +43,8 @@ func (r ProviderRefuter) Refute(ctx context.Context, target *pb.Target, contentP
 		Role:        RoleRefuter,
 		RunID:       r.RunID,
 		Target:      target,
-		ContentPath: contentPath,
+		ContentPath: reads.ContentPath,
+		Root:        reads.Root,
 		ClaimsPath:  claimsPath,
 	})
 	if err != nil {
@@ -117,12 +118,12 @@ func (e *Engine) refute(ctx context.Context, ledger *pb.Ledger, spec TargetSpec,
 
 	// Staged only once there is a pass to hand it to: a run with no refuter has
 	// no reason to recollect the target or to leave a copy behind.
-	contentPath, err := e.handoff(ctx, spec, collected, RoleRefuter)
+	reads, err := e.handoff(ctx, spec, collected, RoleRefuter)
 	if err != nil {
 		return none, err
 	}
 
-	ctrl, err := controlFor(e.Dir, contentPath, claims, e.RunID, iteration)
+	ctrl, err := controlFor(e.Dir, reads.ContentPath, claims, e.RunID, iteration)
 	if err != nil {
 		// A pass the engine cannot grade is a pass whose word it has no reason
 		// to take, so it is not run at all.
@@ -141,7 +142,7 @@ func (e *Engine) refute(ctx context.Context, ledger *pb.Ledger, spec TargetSpec,
 	}
 	defer func() { _ = e.Claims.Discard(ctx, path) }()
 
-	attempts, err := e.Refuter.Refute(ctx, target, contentPath, path)
+	attempts, err := e.Refuter.Refute(ctx, target, reads, path)
 	if err != nil {
 		// A refutation that did not happen is not a finding that survived one.
 		// The verdict caps itself on the absence instead, the way it does for a
