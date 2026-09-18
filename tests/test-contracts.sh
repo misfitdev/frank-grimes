@@ -678,6 +678,50 @@ for group in report refute; do
 done
 
 echo ""
+echo "--- A report that could not be delivered says so ---"
+
+# Delivery is by pass. Without one there is nothing to collect the report
+# under, and a role that runs the contract CLI through a shell of its own
+# making can lose the environment without noticing. Silent, the run fails much
+# later for want of an envelope and nothing connects the two.
+WORK="$(mktemp -d)"
+mkdir -p "$WORK/.grimes/work"
+(
+    cd "$WORK" || exit 1
+    "$BIN" report add --category=SEC --severity=P2 --blast=local_component \
+        --likelihood=unlikely --path=a.sh --tier=E2 --claim="c" --quote="q" >/dev/null
+    "$BIN" report stop --category=SEC --condition=marginal-yield --probes=2 >/dev/null
+) || fail "the report the seal below is given could not be built"
+
+UNDELIVERED="$(mktemp)"
+set +e
+(
+    cd "$WORK" || exit 1
+    env -u GRIMES_PASS "$BIN" report seal --target-root=/repo --target-scope=a.sh \
+        --iteration=1 --routed=SEC --examined=1 --disproved=0 --summary="s" >/dev/null
+) 2>"$UNDELIVERED"
+CODE=$?
+set -e
+# Still a success: a report built before any run carries no pass, and that is
+# the documented sequence rather than a mistake.
+assert_eq "$CODE" "0" "sealing without a pass still succeeds"
+# Both halves, because the warning makes two claims and a check for either
+# alone would pass with the other one gone: that it was not delivered, and
+# where the report did go instead.
+if grep -q 'not delivered to the engine' "$UNDELIVERED"; then
+    pass "and says the report was not delivered"
+else
+    fail "sealing without a pass did not say the report was undelivered"
+fi
+if grep -q 'written to stdout only' "$UNDELIVERED"; then
+    pass "and says where the report went instead"
+else
+    fail "sealing without a pass did not say where the report went"
+fi
+rm -f "$UNDELIVERED"
+rm -rf "$WORK"
+
+echo ""
 echo "========================================"
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"

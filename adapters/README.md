@@ -102,7 +102,7 @@ Current-landscape audits need an explicit research mode. The Claude Code adapter
 
 A `pass` decision requires a second review that never saw the first. The Claude Code adapter ships this as the `grimey-verifier` subagent, which runs in its own context and receives only the target identity. It is not shown the verdict it is adjudicating: a reviewer given the conclusion it was asked to reach independently is anchored before it starts.
 
-Providers that cannot furnish a separately identified context must record `Independent adjudication: not available`, set `review_confidence=low`, and cap the verdict at `conditional`/YELLOW. GREEN is unreachable without confirmation. Silence is not agreement. OpenCode and Codex have no equivalent bundled today, so grinds there cap at YELLOW unless you run the second review yourself in a fresh session, without telling it the first verdict, and resolve the two afterwards.
+What an unavailable adjudication costs a verdict is the skill's to say; see "Independent Adjudication" in `skills/frank-grimes/SKILL.md`. What this directory decides is whether a provider can furnish one at all. OpenCode and Codex ship no bundled verifier of their own, but they no longer need one: the engine spawns each role as its own process, so an adjudicator can be any CLI you name, and a different one from the reviewer. See `roles.md`.
 
 The verifier is denied `Write` and `Edit` at the tool layer. `Bash` remains available because a review that cannot execute the repository's own analyzers produces weaker evidence than the review it is checking, and would bias toward confirming a pass. That leaves shell as a mutation path no tool allowlist can close; it is constrained by the agent's instructions rather than by configuration.
 

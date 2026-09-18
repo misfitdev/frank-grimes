@@ -684,6 +684,34 @@ assert_match "$OUT" 'commit_sha1' \
 rm -rf "$REPO"
 
 echo ""
+echo "--- A gate may walk the repository it is checking ---"
+
+# The worktree sits inside the review's own directory, so a tool that looks
+# upward for its configuration -- buf, golangci-lint and go all do -- stats that
+# directory on the way past. Denied outright it returns EPERM rather than
+# ENOENT, and those tools treat it as fatal. A boundary that breaks the checks
+# the review depends on has stopped being a boundary and started being a fault.
+#
+# Metadata only. A tool that recurses into the review's own directory still
+# cannot, and that stays refused: the grant that would let it list what is in
+# there turns out to hand over the contents as well.
+REPO="$(repository)"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" \
+    --verify-command="stat .. >/dev/null")"
+assert_match "$OUT" 'status: +VERIFICATION_STATUS_PASSED' \
+    "a gate that walks the repository is not defeated by the review's own directory"
+rm -rf "$REPO"
+
+# What the walk must still not reach. The ledger is the record of the review
+# the gate is part of; a gate that could read it could be written to agree.
+REPO="$(repository)"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" \
+    --verify-command="cat ../ledger.pb >/dev/null 2>&1 && exit 1; exit 0")"
+assert_match "$OUT" 'status: +VERIFICATION_STATUS_PASSED' \
+    "and still cannot read the review's own record"
+rm -rf "$REPO"
+
+echo ""
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"
 [[ "$FAILED" -eq 0 ]] || exit 1

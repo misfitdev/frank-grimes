@@ -224,6 +224,50 @@ fi
 rm -rf "$SCRATCH"
 
 echo ""
+echo "--- Every flag the documentation offers is one the engine has ---"
+
+# The validate.sh check catches a flag we refuse. This catches one that was
+# never there, which is the same drift from the other side: a worked example
+# rots when a flag is renamed, and nothing about reading it says so.
+# A worked invocation runs over many lines, so the flags are collected from the
+# whole of one rather than from the line that names the command. awk holds the
+# block open until a line does not continue. The command has to open the line:
+# grind.md says "grind" in nearly every sentence, and prose naming a flag is not
+# an invocation offering one.
+#
+# Quoted values are dropped first: a provider's own flags travel inside
+# --provider-arg="...", and they are that provider's to have, not ours.
+DOCUMENTED=$(find "$PROJECT_ROOT/README.md" "$PROJECT_ROOT/adapters" "$PROJECT_ROOT/docs" \
+    -type f -name '*.md' -print0 2>/dev/null |
+    xargs -0 awk '/^[[:space:]]*(grimes run|\/frank-grimes:grind)/ { inside = 1 }
+               inside { print }
+               inside && !/\\$/ { inside = 0 }' 2>/dev/null |
+    sed 's/"[^"]*"//g' |
+    grep -oE -- '--[a-z][a-z-]+' | sort -u || true)
+if [[ -z "$DOCUMENTED" ]]; then
+    fail "no documented flags were found; this check would pass on anything"
+else
+    pass "the documentation offers flags to check ($(wc -w <<<"$DOCUMENTED" | tr -d ' ') of them)"
+fi
+UNKNOWN=""
+for flag in $DOCUMENTED; do
+    # Asked of the engine itself. An unknown flag is named by the flag package,
+    # whatever else the invocation gets wrong after it.
+    # Captured before it is matched: pipefail turns the SIGPIPE that grep -q
+    # sends into a failed pipeline, and the match would never be seen.
+    SAID="$(grimes run "$flag" 2>&1 || true)"
+    # The flag package reports it with one dash, whatever it was given.
+    if grep -q "not defined: -${flag#--}" <<<"$SAID"; then
+        UNKNOWN="$UNKNOWN $flag"
+    fi
+done
+if [[ -n "$UNKNOWN" ]]; then
+    fail "the documentation offers flags the engine does not have:$UNKNOWN"
+else
+    pass "and the engine has every one of them"
+fi
+
+echo ""
 echo "--- The documented commands produce a record the engine accepts ---"
 
 # Run the sequence grind.md specifies, with the report a review would build.

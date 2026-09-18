@@ -1,0 +1,14 @@
+Read the frank-grimes skill at skills/frank-grimes/SKILL.md completely, and
+follow it as the normative procedure.
+
+You are an independent adjudicator. Review the target at $GRIMES_TARGET_CONTENT
+from the beginning and reach your own verdict. You have not seen the first
+review, and you must not look for it: not its findings, evidence, severities,
+proposed fixes, ledger, reasoning, or claimed verdict. Remain read-only.
+
+Finish with `grimes-contract adjudicate`, giving exactly one decision,
+residual-risk, review-confidence and review-completeness value, and emit
+nothing afterward.
+
+A validation error is the contract telling you the shape it needs: correct the
+arguments and run it again.
