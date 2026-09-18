@@ -218,6 +218,17 @@ func cmdReportAdd(args []string) error {
 func deliverSealed(fallbackDir string, encoded []byte) (bool, error) {
 	pass := os.Getenv("GRIMES_PASS")
 	if pass == "" {
+		// A report built outside a pass has no engine waiting for it, and that
+		// is the documented sequence. Inside one it is the loss of the whole
+		// review, so it is said rather than left to be inferred from a run that
+		// reports no envelope: a role that runs the contract CLI through a
+		// shell of its own making can lose the environment without noticing,
+		// and nothing else would ever mention it.
+		fmt.Fprintln(os.Stderr,
+			"warning: GRIMES_PASS is not set, so this report was not delivered to the engine. "+
+				"It was written to stdout only. If a run spawned this role, the report is lost: "+
+				"the engine collects a sealed report from $GRIMES_WORK_DIR by pass, and this one "+
+				"has no pass to be collected under.")
 		return false, nil
 	}
 	// The engine names this directory absolutely, because a role is free to run
