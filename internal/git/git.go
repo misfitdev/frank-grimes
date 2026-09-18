@@ -11,6 +11,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -85,9 +86,41 @@ func (r *Repo) Clean(ctx context.Context, ignore ...string) error {
 		return err
 	}
 	if strings.TrimSpace(out) != "" {
-		return fmt.Errorf("%w:\n%s", ErrNotClean, strings.TrimSpace(out))
+		return fmt.Errorf("%w:\n%s\n\n%s", ErrNotClean, strings.TrimSpace(out), howToClean())
 	}
 	return nil
+}
+
+// howToClean names the ways out of a dirty tree, including the one an operator
+// is most likely to reach for and least likely to be told about.
+//
+// A fix run reviews the commit its worktree was made from, so uncommitted work
+// means the bytes in front of the operator are not the bytes under review. That
+// is worth refusing, but the refusal is only useful if it says what to do:
+// tooling that writes into the repository is not the operator's work and not
+// something the run should be asked to judge.
+func howToClean() string {
+	var b strings.Builder
+	b.WriteString("Commit or stash the work, or, for files that belong to tooling rather " +
+		"than to the review, add them to .gitignore or .git/info/exclude.")
+	// Only where someone tried it. Said always, it is noise; said here, it is
+	// the answer to why an exclusion that was set appeared to be ignored.
+	if configuredInEnvironment() {
+		b.WriteString("\n\nGit configuration in the environment (GIT_CONFIG_*) is not used: " +
+			"it can decide which edits git admits to, and a run that let it would " +
+			"report a batch by what it was told to see. An exclude file named that " +
+			"way has no effect here; .git/info/exclude does.")
+	}
+	return b.String()
+}
+
+func configuredInEnvironment() bool {
+	for _, kv := range os.Environ() {
+		if name, _, _ := strings.Cut(kv, "="); strings.HasPrefix(name, "GIT_CONFIG_") {
+			return true
+		}
+	}
+	return false
 }
 
 // Worktree is an isolated checkout a fix batch is applied in.

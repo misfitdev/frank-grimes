@@ -224,6 +224,40 @@ assert_match "$OUT" 'uncommitted changes' \
     "a fix run against a dirty tree is refused"
 assert_no_match "$OUT" 'legacy_color' \
     "and produces no result"
+# A refusal an operator cannot act on is one they will work around.
+assert_match "$OUT" 'git/info/exclude' \
+    "and the refusal says what to do about it"
+rm -rf "$REPO"
+
+# Untracked tooling state is the ordinary case: the provider itself writes into
+# the repository, so a second run is refused by the leavings of the first.
+REPO="$(repository)"
+mkdir -p "$REPO/.toolstate"
+printf 'left by the provider\n' >"$REPO/.toolstate/session.json"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true")"
+assert_match "$OUT" 'uncommitted changes' \
+    "an untracked directory leaves the tree dirty"
+printf '.toolstate/\n' >>"$REPO/.git/info/exclude"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true")"
+assert_no_match "$OUT" 'uncommitted changes' \
+    "and excluding it in the repository lets the run proceed"
+rm -rf "$REPO"
+
+# An exclusion passed through the environment is not honoured, deliberately:
+# the same mechanism decides which edits git admits to. An operator who reached
+# for it has to be told, or the exclusion looks ignored for no reason.
+REPO="$(repository)"
+mkdir -p "$REPO/.toolstate"
+printf 'left by the provider\n' >"$REPO/.toolstate/session.json"
+EXCLUDES="$(mktemp)"
+printf '.toolstate/\n' >"$EXCLUDES"
+OUT="$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.excludesFile GIT_CONFIG_VALUE_0="$EXCLUDES" \
+    run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true")"
+assert_match "$OUT" 'uncommitted changes' \
+    "an exclude file named in the environment does not clean the tree"
+assert_match "$OUT" 'GIT_CONFIG' \
+    "and the refusal says the environment was not used"
+rm -f "$EXCLUDES"
 rm -rf "$REPO"
 
 echo ""
