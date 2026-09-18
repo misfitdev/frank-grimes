@@ -160,6 +160,26 @@ Every role runs inside a boundary the engine builds from the run itself: it may 
 
 The built-in mechanism is `sandbox-exec` on macOS and `bubblewrap` on Linux, and it needs no configuration. Elsewhere, supply one with `--sandbox-command` (`srt`, `firejail`, a container runner) or waive it with `--unsafe`. Whatever is in force is proved before the first role spawns: a canary attempts exactly the reads and writes the boundary forbids, and a mechanism that lets either through refuses the run rather than reporting findings gathered under a boundary that was not there.
 
+#### A provider that sandboxes itself
+
+On macOS, a role fails to start with `sandbox_apply: Operation not permitted`
+when the provider sandboxes the commands *it* runs. Seatbelt refuses a nested
+`sandbox_apply` as soon as the outer profile carries a single `deny` rule, and
+this one always does.
+
+Turn the provider's own sandbox off and let the engine's stand. These two
+Seatbelt profiles cannot nest, and the engine's is the one that bounds what a
+role can do to the review. For `codex exec` that is
+`--dangerously-bypass-approvals-and-sandbox`, whose own help says it is
+"intended solely for running in environments that are externally sandboxed" —
+which is what this is.
+
+Reaching for `--unsafe` instead waives the wrong boundary: the provider ends up
+confined only by itself, and the run records that it was unconfined, which caps
+`review_confidence` and leaves `decision` alone. An unconfined run can still
+find something real; it just cannot vouch for the artifacts it drew its
+conclusions from.
+
 
 ### Current-Landscape Research
 
