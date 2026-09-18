@@ -60,6 +60,14 @@ func profile(p Policy) string {
 	// applies.
 	fmt.Fprintf(&b, "(deny file-write* (subpath %s))\n", quote(p.grimesDir()))
 	fmt.Fprintf(&b, "(deny file-read* (subpath %s))\n", quote(p.grimesDir()))
+	// Metadata only, and after the deny so it wins. A role and a gate both run
+	// inside the repository, and the tools they run walk it: buf, golangci-lint
+	// and go all stat every entry they pass. Denied outright, lstat returns
+	// EPERM rather than ENOENT and those tools treat it as fatal, so the review
+	// directory's existence breaks the checks the review depends on. What is
+	// being kept from them is the contents -- the ledger, the result, the copies
+	// staged for other roles -- and those stay unreadable.
+	fmt.Fprintf(&b, "(allow file-read-metadata (subpath %s))\n", quote(p.grimesDir()))
 	for _, r := range p.ReadPaths {
 		fmt.Fprintf(&b, "(allow file-read* (literal %s))\n", quote(r))
 	}
