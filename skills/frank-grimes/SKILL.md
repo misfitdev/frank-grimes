@@ -342,6 +342,8 @@ When the gate exits nonzero, record `verification: failed` with the E1 record an
 
 A finding moves to `fixed` when edited and to `verified` only when the gate passed after the edit. Report the count of verified closures, never the count of files touched.
 
+A claim earns a repair by surviving the attack of Phase 6, so the attack comes first: a finding broken by a context that did not form it is not credited with the edit made for it, whatever the gate then says. The gate is evidence about the repair, not about the defect — an edit that compiles is not evidence there was something to repair. The edit still stands and is still reported; it closes nothing.
+
 ### Target lineage
 
 A fix changes the bytes the review was raised against, so the ledger has to survive a change the review itself made, and only that one.

@@ -432,6 +432,164 @@ fi
 rm -rf "$REPO"
 
 echo ""
+echo "--- A role after the fixing one reads what was reviewed ---"
+
+# The whole point of the mode is that the primary changes the target, so by the
+# time anything else runs the bytes on disk are the repair. A reviewer shown
+# those is judging work nobody asked it about: it would find no defect where
+# one was reported, and the disagreement would be an artefact of the order the
+# roles ran in.
+REPO="$(repository)"
+REVIEWED="$(cat "$REPO/src/app.sh")"
+OUT="$("$GRIMES" run --dir="$REPO" --mode=fix \
+    --adjudicator-command="$FAKES/adjudicator-quotes-target.sh" --adjudicator-fresh \
+    --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true" \
+    --format=prototext src 2>&1 || true)"
+SAW="$(cat "$REPO/.grimes/work/adjudicator-saw" 2>/dev/null || true)"
+if [[ -n "$SAW" ]]; then
+    pass "the adjudicator read the target it was judging"
+else
+    fail "the adjudicator read nothing (it must, or what follows proves nothing)"
+fi
+if [[ "$SAW" == "$REVIEWED" ]]; then
+    pass "and what it read is the bytes the review was about"
+else
+    fail "the adjudicator was shown the batch, not what was reviewed"
+fi
+# The fixer still edited: the copy is beside the worktree, not instead of it.
+TREE="$(worktree_of "$OUT")"
+if [[ -n "$TREE" && "$(cat "$TREE/src/app.sh")" != "$REVIEWED" ]]; then
+    pass "while the fixing role still changed the worktree"
+else
+    fail "while the fixing role still changed the worktree"
+fi
+assert_match "$OUT" 'status: +FINDING_STATUS_VERIFIED' \
+    "and the batch is still verified"
+rm -rf "$REPO"
+
+# A run's reviewed bytes are its own. Left behind, the next iteration would
+# hand its roles a copy of a target that has since moved.
+REPO="$(repository)"
+run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true" >/dev/null
+if [[ -d "$REPO/.grimes/reviewed" ]]; then
+    fail "the reviewed copy outlived the run that took it"
+else
+    pass "the reviewed copy does not outlive the run"
+fi
+rm -rf "$REPO"
+
+echo ""
+echo "--- A repair is credited only to a claim that survived an attack ---"
+
+# The fixing role reports a defect and repairs it in one pass, so nothing has
+# tested whether there was a defect to repair. The gate is evidence about the
+# repair: an edit that compiles is not evidence there was something to compile
+# away. A claim a second context broke has not earned one.
+REPO="$(repository)"
+REVIEWED="$(cat "$REPO/src/app.sh")"
+OUT="$("$GRIMES" run --dir="$REPO" --mode=fix \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --refuter-command="$FAKES/refuter-refuted.sh" --refuter-fresh \
+    --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true" --commit \
+    --format=prototext src 2>&1 || true)"
+# Asserted first: a pass that never graded the control raises nothing above
+# unattacked, and every check below would hold without an attack having run.
+assert_match "$OUT" 'refuter_check: +REFUTER_CHECK_PASSED' \
+    "the refutation pass was one the engine could grade"
+assert_match "$OUT" 'provenance: +FINDING_PROVENANCE_REFUTED' \
+    "a claim a second context broke is recorded as broken"
+assert_no_match "$OUT" 'status: +FINDING_STATUS_FIXED' \
+    "and the edit made for it does not make it fixed"
+assert_no_match "$OUT" 'status: +FINDING_STATUS_VERIFIED' \
+    "nor verified, whatever the gate said"
+assert_no_match "$OUT" 'commit_sha1' \
+    "and nothing is committed over it"
+# The edit is still there to read; it is credited to nothing.
+TREE="$(worktree_of "$OUT")"
+if [[ -n "$TREE" && "$(cat "$TREE/src/app.sh")" != "$REVIEWED" ]]; then
+    pass "the edit stands in the worktree for the operator to read"
+else
+    fail "the edit stands in the worktree for the operator to read"
+fi
+rm -rf "$REPO"
+
+# The same run with the claim upheld: the ordering must not cost a real repair
+# its credit.
+REPO="$(repository)"
+OUT="$("$GRIMES" run --dir="$REPO" --mode=fix \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --refuter-command="$FAKES/refuter-upheld.sh" --refuter-fresh \
+    --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true" --commit \
+    --format=prototext src 2>&1 || true)"
+assert_match "$OUT" 'provenance: +FINDING_PROVENANCE_UPHELD' \
+    "a claim that survived the attack is recorded as having survived"
+assert_match "$OUT" 'status: +FINDING_STATUS_VERIFIED' \
+    "and the repair made for it is verified"
+assert_match "$OUT" 'commit_sha1' \
+    "and committed"
+rm -rf "$REPO"
+
+echo ""
+echo "--- The copy is a copy, and what it holds resolves inside it ---"
+
+# A link is copied as a link so the copy keeps the shape the review saw, but a
+# link is read at the far end. One pointing out of the tree would resolve to
+# whatever is there now, and a role reading the copy would be handed live bytes
+# under a name saying they were reviewed.
+REPO="$(repository)"
+OUTSIDE="$(mktemp -d)"
+printf 'not part of any review\n' >"$OUTSIDE/elsewhere.txt"
+mkdir -p "$REPO/lib"
+printf 'shared\n' >"$REPO/lib/shared.sh"
+ln -s "$OUTSIDE/elsewhere.txt" "$REPO/src/escape.txt"
+ln -s "../lib/shared.sh" "$REPO/src/inside.sh"
+git -C "$REPO" add -A
+git -C "$REPO" commit --quiet --message "add links"
+"$GRIMES" run --dir="$REPO" --mode=fix \
+    --adjudicator-command="$FAKES/adjudicator-reports-where.sh" --adjudicator-fresh \
+    --adjudicator-arg=src/escape.txt --adjudicator-arg=src/inside.sh \
+    --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true" \
+    --format=prototext src >/dev/null 2>&1 || true
+WHERE="$(cat "$REPO/.grimes/work/where" 2>/dev/null || true)"
+if [[ -n "$WHERE" ]]; then
+    pass "the role reported where it was pointed"
+else
+    fail "the role reported nothing (it must, or what follows proves nothing)"
+fi
+assert_match "$WHERE" 'absent src/escape.txt' \
+    "a link out of the tree is not carried into the copy"
+assert_match "$WHERE" 'read src/inside.sh=shared' \
+    "and a link within it still resolves, inside the copy"
+assert_no_match "$WHERE" 'not part of any review' \
+    "so nothing outside the review is readable through the copy"
+rm -rf "$REPO" "$OUTSIDE"
+
+# A directory whose name begins with two dots is a name, not an escape. Read as
+# one, a later role is handed the whole copy instead of the path under review.
+REPO="$(repository)"
+mkdir -p "$REPO/..generated"
+printf 'echo generated\n' >"$REPO/..generated/app.sh"
+git -C "$REPO" add -A
+git -C "$REPO" commit --quiet --message "add a dotted directory"
+"$GRIMES" run --dir="$REPO" --mode=fix \
+    --adjudicator-command="$FAKES/adjudicator-reports-where.sh" --adjudicator-fresh \
+    --provider-command="$FAKES/provider-green.sh" \
+    --format=prototext '..generated' >/dev/null 2>&1 || true
+WHERE="$(cat "$REPO/.grimes/work/where" 2>/dev/null || true)"
+assert_match "$WHERE" 'content=.*/\.\.generated' \
+    "a scope whose name begins with dots is the scope the later role is given"
+rm -rf "$REPO"
+
+# The copy leaves out the repository's own directory, so a target inside it is
+# one the later roles would be pointed at and find nothing at.
+REPO="$(repository)"
+OUT="$("$GRIMES" run --dir="$REPO" --mode=fix --kind=code \
+    --provider-command="$FAKES/fixer-repairs.sh" --format=prototext .git 2>&1 || true)"
+assert_match "$OUT" 'not reviewable in fix mode' \
+    "a target the copy cannot carry is refused rather than half-staged"
+rm -rf "$REPO"
+
+echo ""
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"
 [[ "$FAILED" -eq 0 ]] || exit 1

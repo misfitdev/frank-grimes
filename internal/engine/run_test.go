@@ -86,7 +86,7 @@ type fixedAdjudicator struct {
 	err      error
 }
 
-func (f fixedAdjudicator) Adjudicate(_ context.Context, target *pb.Target, _ string, _ *pb.Verdict) (*pb.IndependentReview, error) {
+func (f fixedAdjudicator) Adjudicate(_ context.Context, target *pb.Target, _ Handoff, _ *pb.Verdict) (*pb.IndependentReview, error) {
 	if f.err != nil {
 		return nil, f.err
 	}

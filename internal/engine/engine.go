@@ -83,7 +83,7 @@ func (a ProviderAdjudicator) contextOrigin() pb.ContextOrigin {
 	return pb.ContextOrigin_CONTEXT_ORIGIN_UNKNOWN
 }
 
-func (a ProviderAdjudicator) Adjudicate(ctx context.Context, target *pb.Target, contentPath string, claimed *pb.Verdict) (*pb.IndependentReview, error) {
+func (a ProviderAdjudicator) Adjudicate(ctx context.Context, target *pb.Target, at Handoff, claimed *pb.Verdict) (*pb.IndependentReview, error) {
 	if a.Provider == nil {
 		return nil, fmt.Errorf("no adjudicator configured")
 	}
@@ -91,7 +91,8 @@ func (a ProviderAdjudicator) Adjudicate(ctx context.Context, target *pb.Target, 
 		Role:        RoleAdjudicator,
 		RunID:       a.RunID,
 		Target:      target,
-		ContentPath: contentPath,
+		ContentPath: at.ContentPath,
+		Root:        at.Root,
 		Claimed:     claimed,
 	})
 	if err != nil {

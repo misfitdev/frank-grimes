@@ -63,6 +63,11 @@ func profile(p Policy) string {
 	for _, r := range p.ReadPaths {
 		fmt.Fprintf(&b, "(allow file-read* (literal %s))\n", quote(r))
 	}
+	// A subpath rather than a literal: a literal names one file, and what is
+	// granted here is a tree the role reads its own way through.
+	for _, r := range p.ReadDirs {
+		fmt.Fprintf(&b, "(allow file-read* (subpath %s))\n", quote(r))
+	}
 	// Only what the role is meant to keep inside that directory: its own work.
 	// Everything else it may write is outside, where reads are allowed anyway.
 	for _, w := range p.WriteDirs {

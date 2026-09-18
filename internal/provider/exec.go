@@ -60,6 +60,9 @@ func (e *Exec) confined(req engine.Request) ([]string, error) {
 		return nil, err
 	}
 	p := confine.Policy{Root: root}
+	if req.Root != "" {
+		p.ReadDirs = append(p.ReadDirs, req.Root)
+	}
 	for _, path := range []string{req.ContentPath, req.InventoryPath, req.ClaimsPath} {
 		if path != "" {
 			p.ReadPaths = append(p.ReadPaths, path)
@@ -327,6 +330,18 @@ func roleName(r engine.Role) string {
 	}
 }
 
+// targetRoot is the directory this role resolves unit ids against.
+//
+// The target's own, except for a role handed a copy of it: in fix mode the
+// roles after the fixing one read the bytes as they were reviewed, and a unit
+// id pointed at the worktree instead would open the batch.
+func targetRoot(req engine.Request) string {
+	if req.Root != "" {
+		return req.Root
+	}
+	return req.Target.GetRoot()
+}
+
 func requestEnv(req engine.Request) []string {
 	env := []string{
 		// Absolute, like the content path and for the same reason: a provider
@@ -334,7 +349,7 @@ func requestEnv(req engine.Request) []string {
 		// happens to sit beside it. A unit id is relative to this root, so a
 		// provider that cannot resolve the root cannot read the unit it is
 		// about to cite.
-		"GRIMES_TARGET_ROOT=" + absolute(req.Target.GetRoot()),
+		"GRIMES_TARGET_ROOT=" + absolute(targetRoot(req)),
 		"GRIMES_TARGET_SCOPE=" + req.Target.GetScope(),
 		"GRIMES_TARGET_FINGERPRINT=" + hex(req.Target.GetFingerprintSha256()),
 		// The kind selects what each evidence tier requires of a finding, so a

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -78,6 +80,25 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	target := collected.Target
 	if fix != nil {
 		fix.adopt(collected)
+		// Before the fixing role runs, which is the last moment the worktree
+		// holds what was reviewed.
+		staged, err := stageReviewed(fix.tree.Dir, filepath.Join(e.Dir, ReviewedDir))
+		if err != nil {
+			return nil, err
+		}
+		defer staged.discard()
+		collected.ReviewedRoot = staged.dir
+		// The copy leaves out what belongs to the repository and to the review
+		// itself. A target inside either is one the roles after the fixing one
+		// would be pointed at and find nothing at, which surfaces as a role
+		// failing rather than as a target nobody should have named.
+		if at := inReviewed(collected); at.ContentPath != "" {
+			if _, err := os.Stat(at.ContentPath); err != nil {
+				return nil, fmt.Errorf(
+					"%w: %q is not reviewable in fix mode: it is not carried into the copy the later roles read",
+					ErrFixNeedsRepository, collected.Target.GetScope())
+			}
+		}
 	}
 
 	iteration, err := e.resume(ctx, target, ledger)
@@ -137,6 +158,19 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		return nil, err
 	}
 
+	// Before the batch is credited with anything. A repair is earned by a claim
+	// that survived an attack, so the attack has to have happened before the
+	// engine decides which findings the batch closed; and before the gate,
+	// which is about the repair rather than about the claim.
+	//
+	// It is also the last moment the claims are attackable: a finding the batch
+	// touched is fixed by the time settle returns, and a fixed finding is not a
+	// claim anyone is asked about.
+	check, err := e.refute(ctx, ledger, spec, collected, iteration)
+	if err != nil {
+		return nil, err
+	}
+
 	// The gate runs where the batch is, which in report mode is the review
 	// directory nothing edited.
 	gateDir := e.Dir
@@ -158,14 +192,6 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		if err := e.settle(ctx, fix, ledger, iteration); err != nil {
 			return nil, err
 		}
-	}
-
-	// Before either derivation reads the ledger: both tuples have to be over the
-	// same findings, and a claim's standing under attack is part of the finding
-	// rather than of the verdict that reads it.
-	check, err := e.refute(ctx, ledger, spec, collected, iteration)
-	if err != nil {
-		return nil, err
 	}
 
 	candidates := candidatesOf(ledger)
@@ -245,24 +271,42 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 // fingerprinted, once per role. One with a path of its own cannot be copied
 // that way, so it is recollected and the run refused if its fingerprint moved.
 //
-// In fix mode the target has changed by now, on purpose, and what a later role
-// reads is the batch rather than the bytes the primary reviewed. That can only
-// make the verdict stricter, since the engine takes the stricter of the two
-// decisions either way, and the fingerprint the role answers against is still
-// the reviewed one. Handing it the reviewed bytes instead is fg-dfs.
-func (e *Engine) handoff(ctx context.Context, spec TargetSpec, collected *Collected, role Role) (string, error) {
+// In fix mode the target on disk has changed by now, on purpose. What a later
+// role reads is the copy taken before the batch touched it, so that an
+// adjudicator forms its opinion of what was reviewed and a refuter attacks a
+// claim whose anchor is still there.
+func (e *Engine) handoff(ctx context.Context, spec TargetSpec, collected *Collected, role Role) (Handoff, error) {
 	if len(collected.ContentBytes) == 0 {
 		if e.Mode != pb.Mode_MODE_FIX {
 			if err := e.recheck(ctx, spec, collected); err != nil {
-				return "", err
+				return Handoff{}, err
 			}
+		} else if collected.ReviewedRoot != "" {
+			return inReviewed(collected), nil
 		}
-		return collected.ContentPath, nil
+		return Handoff{ContentPath: collected.ContentPath}, nil
 	}
 	if e.Content == nil {
-		return "", fmt.Errorf("%w: no store for a target with no path of its own", ErrProviderOutput)
+		return Handoff{}, fmt.Errorf("%w: no store for a target with no path of its own", ErrProviderOutput)
 	}
-	return e.Content.Stage(ctx, role, collected.ContentBytes)
+	path, err := e.Content.Stage(ctx, role, collected.ContentBytes)
+	if err != nil {
+		return Handoff{}, err
+	}
+	return Handoff{ContentPath: path}, nil
+}
+
+// inReviewed names the same place inside the copy that was taken before the
+// batch. The scope may be narrower than the root, so the content path is
+// carried across rather than replaced by the copy's own root.
+func inReviewed(collected *Collected) Handoff {
+	at := Handoff{ContentPath: collected.ReviewedRoot, Root: collected.ReviewedRoot}
+	rel, err := filepath.Rel(collected.Target.GetRoot(), collected.ContentPath)
+	if err != nil || rel == "." || !filepath.IsLocal(rel) {
+		return at
+	}
+	at.ContentPath = filepath.Join(collected.ReviewedRoot, rel)
+	return at
 }
 
 // recheck confirms the target still hashes to what collection recorded.
@@ -684,13 +728,13 @@ func (e *Engine) adjudicate(ctx context.Context, spec TargetSpec, collected *Col
 	if len(e.Adjudicators) == 0 {
 		return nil, nil
 	}
-	contentPath, err := e.handoff(ctx, spec, collected, RoleAdjudicator)
+	at, err := e.handoff(ctx, spec, collected, RoleAdjudicator)
 	if err != nil {
 		return nil, err
 	}
 	panel := &pb.AdjudicationPanel{Requested: uint32(len(e.Adjudicators))}
 	for _, a := range e.Adjudicators {
-		review, err := a.Adjudicate(ctx, collected.Target, contentPath, claimed)
+		review, err := a.Adjudicate(ctx, collected.Target, at, claimed)
 		if err != nil {
 			continue
 		}
