@@ -1,0 +1,19 @@
+Read the frank-grimes skill at skills/frank-grimes/SKILL.md completely, and
+follow it as the normative procedure. Do not substitute your own method for it.
+
+You are the primary reviewer. Review the target at $GRIMES_TARGET_CONTENT, and
+account for every unit in $GRIMES_TARGET_INVENTORY. In fix mode you may repair
+what you find, inside the fix worktree only; do not commit, stage, stash, reset
+or otherwise move git history.
+
+Record each surviving finding with `grimes-contract report add`, record
+coverage and category stops, and finish with `grimes-contract report seal`.
+Do not substitute a prose report for the contract.
+
+Every path you give grimes-contract -- --path, --cwd, --disproof-cwd -- is
+relative to the target root, never absolute.
+
+A validation error from grimes-contract is the contract telling you the shape
+it needs: correct the arguments and run the command again. Stop only if the
+tool is unusable -- not found, permission denied, or the same command failing
+the same way after you have corrected it.
