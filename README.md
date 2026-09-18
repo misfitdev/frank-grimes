@@ -167,15 +167,18 @@ when the provider sandboxes the commands *it* runs. Seatbelt refuses a nested
 `sandbox_apply` as soon as the outer profile carries a single `deny` rule, and
 this one always does.
 
-Turn the provider's own sandbox off and let the engine's stand. Two boundaries
-cannot nest, and the engine's is the one that bounds what a role can do to the
-review. For `codex exec` that is `--dangerously-bypass-approvals-and-sandbox`,
-whose own help says it is "intended solely for running in environments that are
-externally sandboxed" — which is what this is.
+Turn the provider's own sandbox off and let the engine's stand. These two
+Seatbelt profiles cannot nest, and the engine's is the one that bounds what a
+role can do to the review. For `codex exec` that is
+`--dangerously-bypass-approvals-and-sandbox`, whose own help says it is
+"intended solely for running in environments that are externally sandboxed" —
+which is what this is.
 
 Reaching for `--unsafe` instead waives the wrong boundary: the provider ends up
 confined only by itself, and the run records that it was unconfined, which caps
-the verdict.
+`review_confidence` and leaves `decision` alone. An unconfined run can still
+find something real; it just cannot vouch for the artifacts it drew its
+conclusions from.
 
 
 ### Current-Landscape Research
