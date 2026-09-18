@@ -170,6 +170,14 @@ func (e *Engine) settle(ctx context.Context, f *fixRun, ledger *pb.Ledger, itera
 	if !e.Commit {
 		return nil
 	}
+	// A commit takes the whole worktree, so a batch that repaired a broken
+	// claim alongside a surviving one would carry the broken repair in a commit
+	// crediting the other. Committing a subset is not the answer either: the
+	// gate passed over the tree entire, and a partial commit is a state nothing
+	// verified.
+	if refutedTouched(ledger, changed) {
+		return nil
+	}
 	sha, err := f.tree.Commit(ctx, commitMessage(edited))
 	if err != nil {
 		return err
@@ -226,6 +234,27 @@ func (f *fixRun) adopt(c *Collected) {
 		units[u.GetId()] = true
 	}
 	f.inScope = func(p string) bool { return units[p] }
+}
+
+// refutedTouched reports whether the batch edited a file holding a claim a
+// context that did not form it broke.
+func refutedTouched(ledger *pb.Ledger, changed []string) bool {
+	touched := make(map[string]bool, len(changed))
+	for _, p := range changed {
+		touched[p] = true
+	}
+	for _, f := range ledger.GetFindings() {
+		if !Open(f.GetStatus()) {
+			continue
+		}
+		if provenanceOf(f) != pb.FindingProvenance_FINDING_PROVENANCE_REFUTED {
+			continue
+		}
+		if touched[f.GetLocation().GetAnchor().GetRepoLine().GetPath().GetValue()] {
+			return true
+		}
+	}
+	return false
 }
 
 // outOfScope names the changed paths the review never resolved.

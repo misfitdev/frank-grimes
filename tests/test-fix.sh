@@ -225,7 +225,7 @@ assert_match "$OUT" 'uncommitted changes' \
 assert_no_match "$OUT" 'legacy_color' \
     "and produces no result"
 # A refusal an operator cannot act on is one they will work around.
-assert_match "$OUT" 'git/info/exclude' \
+assert_match "$OUT" 'Commit or stash the work' \
     "and the refusal says what to do about it"
 rm -rf "$REPO"
 
@@ -255,9 +255,23 @@ OUT="$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.excludesFile GIT_CONFIG_VALUE_0=
     run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true")"
 assert_match "$OUT" 'uncommitted changes' \
     "an exclude file named in the environment does not clean the tree"
-assert_match "$OUT" 'GIT_CONFIG' \
-    "and the refusal says the environment was not used"
+assert_match "$OUT" 'exclude file named in GIT_CONFIG' \
+    "and the refusal says the exclude file it named was not used"
 rm -f "$EXCLUDES"
+rm -rf "$REPO"
+
+# Git configuration in the environment is ordinary -- a credential helper is
+# configured through the same variables. The note answers an operator who named
+# an exclude file, so it must not greet one who did not.
+REPO="$(repository)"
+mkdir -p "$REPO/.toolstate"
+printf 'left by the provider\n' >"$REPO/.toolstate/session.json"
+OUT="$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=credential.helper GIT_CONFIG_VALUE_0=cache \
+    run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true")"
+assert_match "$OUT" 'uncommitted changes' \
+    "a dirty tree is still refused with unrelated git configuration set"
+assert_no_match "$OUT" 'exclude file named in GIT_CONFIG' \
+    "and nothing is said about an exclude file nobody named"
 rm -rf "$REPO"
 
 echo ""
@@ -621,6 +635,52 @@ OUT="$("$GRIMES" run --dir="$REPO" --mode=fix --kind=code \
     --provider-command="$FAKES/fixer-repairs.sh" --format=prototext .git 2>&1 || true)"
 assert_match "$OUT" 'not reviewable in fix mode' \
     "a target the copy cannot carry is refused rather than half-staged"
+rm -rf "$REPO"
+
+echo ""
+echo "--- A commit takes the whole worktree, so it takes none of a mixed batch ---"
+
+# One repair earns its credit and another does not, in a single set of edits.
+# A commit cannot honour both: it carries the tree entire, so the broken
+# repair would ride along in a commit crediting the surviving one. Committing
+# a subset is not the answer either -- the gate passed over the tree as a
+# whole, and a partial commit is a state nothing verified.
+REPO="$(repository)"
+printf 'echo other\n' >"$REPO/src/other.sh"
+git -C "$REPO" add -A
+git -C "$REPO" commit --quiet --message "add a second file"
+OUT="$("$GRIMES" run --dir="$REPO" --mode=fix \
+    --provider-command="$FAKES/fixer-two-files.sh" \
+    --refuter-command="$FAKES/refuter-splits.sh" --refuter-arg=other.sh --refuter-fresh \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --verify-command="true" --commit --format=prototext src 2>&1 || true)"
+assert_match "$OUT" 'refuter_check: +REFUTER_CHECK_PASSED' \
+    "the refutation pass was one the engine could grade"
+assert_match "$OUT" 'provenance: +FINDING_PROVENANCE_UPHELD' \
+    "one claim survived the attack"
+assert_match "$OUT" 'provenance: +FINDING_PROVENANCE_REFUTED' \
+    "and one did not"
+assert_match "$OUT" 'status: +FINDING_STATUS_VERIFIED' \
+    "the surviving claim is still credited with its repair"
+assert_no_match "$OUT" 'commit_sha1' \
+    "but nothing is committed while a broken repair shares the tree"
+rm -rf "$REPO"
+
+# The same batch with both claims upheld: withholding is about the broken one,
+# not about there having been two.
+REPO="$(repository)"
+printf 'echo other\n' >"$REPO/src/other.sh"
+git -C "$REPO" add -A
+git -C "$REPO" commit --quiet --message "add a second file"
+OUT="$("$GRIMES" run --dir="$REPO" --mode=fix \
+    --provider-command="$FAKES/fixer-two-files.sh" \
+    --refuter-command="$FAKES/refuter-splits.sh" --refuter-arg=nothing-matches --refuter-fresh \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --verify-command="true" --commit --format=prototext src 2>&1 || true)"
+assert_no_match "$OUT" 'provenance: +FINDING_PROVENANCE_REFUTED' \
+    "a batch whose claims all survived carries no broken repair"
+assert_match "$OUT" 'commit_sha1' \
+    "and it is committed"
 rm -rf "$REPO"
 
 echo ""
