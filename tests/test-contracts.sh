@@ -638,6 +638,47 @@ fi
 rm -rf "$WORK"
 
 echo ""
+echo "--- Help is a question, not a failure ---"
+
+# A role is told to consult the contract CLI and to stop if a contract command
+# fails. A help request that exits non-zero is those two instructions in
+# collision, and the role stops before reviewing anything.
+for group in report refute; do
+    for ask in --help -h help; do
+        set +e
+        OUT="$("$BIN" "$group" "$ask" 2>/tmp/grimes-help-err)"
+        CODE=$?
+        set -e
+        assert_eq "$CODE" "0" "$group $ask succeeds"
+        if [[ -n "$OUT" ]]; then
+            pass "$group $ask writes its usage to stdout"
+        else
+            fail "$group $ask wrote nothing to stdout"
+        fi
+        if [[ -s /tmp/grimes-help-err ]]; then
+            fail "$group $ask wrote to stderr"
+        else
+            pass "$group $ask writes nothing to stderr"
+        fi
+    done
+done
+rm -f /tmp/grimes-help-err
+
+# Asking for something that is not there is still an error: the point is that
+# help is not one, not that nothing is.
+for group in report refute; do
+    set +e
+    "$BIN" "$group" not-a-subcommand >/dev/null 2>&1
+    CODE=$?
+    set -e
+    if [[ "$CODE" != "0" ]]; then
+        pass "$group with an unknown subcommand still fails"
+    else
+        fail "$group accepted an unknown subcommand"
+    fi
+done
+
+echo ""
 echo "========================================"
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"

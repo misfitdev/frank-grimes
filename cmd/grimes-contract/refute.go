@@ -44,6 +44,11 @@ func cmdRefute(args []string) error {
 		return errors.New(refuteUsage)
 	}
 	switch args[0] {
+	// A role consults this before it uses the group, and a help request that
+	// fails is a role told to stop by its own instructions.
+	case "-h", "--help", "help":
+		fmt.Print(refuteUsage)
+		return nil
 	case "claims":
 		return cmdRefuteClaims(args[1:])
 	case "add":
