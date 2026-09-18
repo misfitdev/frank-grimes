@@ -38,11 +38,11 @@ is not split: a prompt, or any value containing a space, must be one argument.
 grimes run --dir=. --mode=fix \
   --provider-command="opencode run" \
     --provider-arg="-m" --provider-arg="qwen/qwen3.7-plus" \
-    --provider-arg="$(cat prompts/primary.txt)" \
+    --provider-arg="$(cat adapters/prompts/primary.txt)" \
   --adjudicator-command="claude" \
     --adjudicator-arg="-p" \
     --adjudicator-arg="--model" --adjudicator-arg="opus" \
-    --adjudicator-arg="$(cat prompts/adjudicator.txt)" \
+    --adjudicator-arg="$(cat adapters/prompts/adjudicator.txt)" \
   --adjudicator-fresh \
   HEAD^..HEAD
 ```
@@ -54,15 +54,15 @@ grimes run --dir=. --mode=fix \
 grimes run --dir=. \
   --provider-command="codex exec" \
     --provider-arg="--dangerously-bypass-approvals-and-sandbox" \
-    --provider-arg="$(cat prompts/primary.txt)" \
+    --provider-arg="$(cat adapters/prompts/primary.txt)" \
   --refuter-command="opencode run" \
     --refuter-arg="-m" --refuter-arg="qwen/qwen3.7-plus" \
-    --refuter-arg="$(cat prompts/refuter.txt)" --refuter-fresh \
+    --refuter-arg="$(cat adapters/prompts/refuter.txt)" --refuter-fresh \
   --adjudicator-command="claude" \
-    --adjudicator-arg="-p" --adjudicator-arg="$(cat prompts/adjudicator.txt)" \
+    --adjudicator-arg="-p" --adjudicator-arg="$(cat adapters/prompts/adjudicator.txt)" \
   --adjudicator-command="opencode run" \
     --adjudicator-arg="-m" --adjudicator-arg="qwen/qwen3.7-plus" \
-    --adjudicator-arg="$(cat prompts/adjudicator.txt)" \
+    --adjudicator-arg="$(cat adapters/prompts/adjudicator.txt)" \
   --adjudicator-fresh \
   .
 ```

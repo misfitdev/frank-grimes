@@ -487,6 +487,7 @@ NORMATIVE_MARKERS=(
     'Derive `RED` from'
     'A check that cannot fail distinguishes nothing'
     'name the narrowest artifact that contains them'
+    'Independent adjudication: not available'
 )
 
 for marker in "${NORMATIVE_MARKERS[@]}"; do
