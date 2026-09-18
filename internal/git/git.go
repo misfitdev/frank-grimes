@@ -11,6 +11,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -85,9 +86,54 @@ func (r *Repo) Clean(ctx context.Context, ignore ...string) error {
 		return err
 	}
 	if strings.TrimSpace(out) != "" {
-		return fmt.Errorf("%w:\n%s", ErrNotClean, strings.TrimSpace(out))
+		return fmt.Errorf("%w:\n%s\n\n%s", ErrNotClean, strings.TrimSpace(out), howToClean())
 	}
 	return nil
+}
+
+// howToClean names the ways out of a dirty tree, including the one an operator
+// is most likely to reach for and least likely to be told about.
+//
+// A fix run reviews the commit its worktree was made from, so uncommitted work
+// means the bytes in front of the operator are not the bytes under review. That
+// is worth refusing, but the refusal is only useful if it says what to do:
+// tooling that writes into the repository is not the operator's work and not
+// something the run should be asked to judge.
+func howToClean() string {
+	var b strings.Builder
+	b.WriteString("Commit or stash the work. For files that belong to tooling rather " +
+		"than to the review, add them to .git/info/exclude, which is not itself " +
+		"tracked; .gitignore is for a rule the repository should carry, and " +
+		"editing it leaves the tree dirty until that edit is committed.")
+	// Only where someone named an exclude file that way, which is the operator
+	// who has already tried this and been overruled without being told. Said on
+	// the presence of GIT_CONFIG_* alone it would be noise: a credential helper
+	// is configured through the same variables, and that is an ordinary thing
+	// for an environment to carry.
+	if excludesNamedInEnvironment() {
+		b.WriteString("\n\nThe exclude file named in GIT_CONFIG_* was not used. Git " +
+			"configuration from the environment is dropped here, because the same " +
+			"mechanism decides which edits git admits to and a run that honoured it " +
+			"would report a batch by what it had been told to see. Put the rule in " +
+			".git/info/exclude instead.")
+	}
+	return b.String()
+}
+
+// excludesNamedInEnvironment reports whether git configuration in the
+// environment names an exclude file.
+func excludesNamedInEnvironment() bool {
+	for _, kv := range os.Environ() {
+		name, value, _ := strings.Cut(kv, "=")
+		if !strings.HasPrefix(name, "GIT_CONFIG_KEY_") {
+			continue
+		}
+		// git config names are case-insensitive.
+		if strings.EqualFold(value, "core.excludesFile") {
+			return true
+		}
+	}
+	return false
 }
 
 // Worktree is an isolated checkout a fix batch is applied in.
