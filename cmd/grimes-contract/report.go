@@ -34,6 +34,11 @@ func cmdReport(args []string) error {
 		return fmt.Errorf("%s", reportUsage)
 	}
 	switch args[0] {
+	// A role consults this before it uses the group, and a help request that
+	// fails is a role told to stop by its own instructions.
+	case "-h", "--help", "help":
+		fmt.Println(reportUsage)
+		return nil
 	case "add":
 		return cmdReportAdd(args[1:])
 	case "seal":

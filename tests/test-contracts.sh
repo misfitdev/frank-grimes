@@ -52,7 +52,7 @@ if ! command -v go &>/dev/null; then
 fi
 
 BIN="$(mktemp -d)/grimes-contract"
-trap 'rm -rf "$(dirname "$BIN")"' EXIT
+trap 'rm -rf "$(dirname "$BIN")"; rm -f "${HELP_ERR:-}"' EXIT
 
 echo "========================================"
 echo "Contract and Ledger Tests"
@@ -636,6 +636,46 @@ else
     fail "what was delivered is not an envelope"
 fi
 rm -rf "$WORK"
+
+echo ""
+echo "--- Help is a question, not a failure ---"
+
+# A role is told to consult the contract CLI and to stop if a contract command
+# fails. A help request that exits non-zero is those two instructions in
+# collision, and the role stops before reviewing anything.
+HELP_ERR="$(mktemp)"
+for group in report refute; do
+    for ask in --help -h help; do
+        set +e
+        OUT="$("$BIN" "$group" "$ask" 2>"$HELP_ERR")"
+        CODE=$?
+        set -e
+        assert_eq "$CODE" "0" "$group $ask succeeds"
+        if [[ -n "$OUT" ]]; then
+            pass "$group $ask writes its usage to stdout"
+        else
+            fail "$group $ask wrote nothing to stdout"
+        fi
+        if [[ -s "$HELP_ERR" ]]; then
+            fail "$group $ask wrote to stderr"
+        else
+            pass "$group $ask writes nothing to stderr"
+        fi
+    done
+done
+rm -f "$HELP_ERR"
+
+# Asking for something that is not there is still an error: the point is that
+# help is not one, not that nothing is. The code is asserted rather than merely
+# checked for being non-zero, so that a panic or a signal cannot pass for a
+# refusal the command made on purpose.
+for group in report refute; do
+    set +e
+    "$BIN" "$group" not-a-subcommand >/dev/null 2>&1
+    CODE=$?
+    set -e
+    assert_eq "$CODE" "1" "$group with an unknown subcommand fails as an error"
+done
 
 echo ""
 echo "========================================"
