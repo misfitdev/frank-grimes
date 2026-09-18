@@ -705,10 +705,18 @@ set -e
 # Still a success: a report built before any run carries no pass, and that is
 # the documented sequence rather than a mistake.
 assert_eq "$CODE" "0" "sealing without a pass still succeeds"
-if grep -q 'GRIMES_PASS' "$UNDELIVERED"; then
+# Both halves, because the warning makes two claims and a check for either
+# alone would pass with the other one gone: that it was not delivered, and
+# where the report did go instead.
+if grep -q 'not delivered to the engine' "$UNDELIVERED"; then
     pass "and says the report was not delivered"
 else
-    fail "sealing without a pass said nothing about delivery"
+    fail "sealing without a pass did not say the report was undelivered"
+fi
+if grep -q 'written to stdout only' "$UNDELIVERED"; then
+    pass "and says where the report went instead"
+else
+    fail "sealing without a pass did not say where the report went"
 fi
 rm -f "$UNDELIVERED"
 rm -rf "$WORK"
