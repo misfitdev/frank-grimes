@@ -147,8 +147,6 @@ func indexOfCommand(panel [][]string, want []string) int {
 
 type config struct {
 	Target          string
-	Scope           string
-	ScopeSet        bool
 	Categories      []pb.Category
 	Mode            pb.Mode
 	VerifyCommand   string
@@ -188,7 +186,6 @@ var errUsage = errors.New("usage")
 
 func parseRun(args []string) (*config, error) {
 	fs := flag.NewFlagSet("run", flag.ContinueOnError)
-	scope := fs.String("scope", "recent-changes", "recent-changes or whole-repo")
 	categories := fs.String("categories", "", "comma-separated categories to route, e.g. COR,SEC")
 	mode := fs.String("mode", "report", "report or fix")
 	verify := fs.String("verify-command", "", "gate command run once over a fix batch")
@@ -231,8 +228,6 @@ func parseRun(args []string) (*config, error) {
 
 	c := &config{
 		Target:           fs.Arg(0),
-		Scope:            *scope,
-		ScopeSet:         wasSet(fs, "scope"),
 		VerifyCommand:    *verify,
 		Commit:           *commit,
 		RepositoryCheck:  *repoCheck,
@@ -295,18 +290,6 @@ func (c *config) validate() error {
 	if c.MaxIterations > math.MaxUint32 {
 		return fmt.Errorf("--max-iterations must not exceed %d", uint32(math.MaxUint32))
 	}
-	if c.Scope != "recent-changes" && c.Scope != "whole-repo" {
-		return fmt.Errorf("unknown scope %q", c.Scope)
-	}
-	// The collector resolves a target from the positional argument alone, so a
-	// caller asking for a narrower scope would be silently reviewed on a wider
-	// one. Refused until collection can honour it, and refused by name so that
-	// a caller who read it somewhere is told what to write instead.
-	if c.ScopeSet {
-		return fmt.Errorf(
-			"--scope is not implemented; the target argument is the scope: pass a path, " +
-				"a revision range such as HEAD^..HEAD, or . for the whole repository")
-	}
 	// A snapshot is the whole of an external target, and it is meaningless for
 	// the kinds that are read from disk directly.
 	if c.Kind == pb.TargetKind_TARGET_KIND_EXTERNAL && c.Snapshot == "" {
@@ -339,18 +322,6 @@ func (c *config) validate() error {
 		return fmt.Errorf("--provider-command is required")
 	}
 	return nil
-}
-
-// wasSet reports whether a flag was given explicitly, which a default value
-// cannot distinguish on its own.
-func wasSet(fs *flag.FlagSet, name string) bool {
-	found := false
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == name {
-			found = true
-		}
-	})
-	return found
 }
 
 func parseMode(s string) (pb.Mode, error) {
