@@ -369,6 +369,14 @@ START=$(date +%s)
 CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-flood.sh" --max-output-bytes=4096)"
 ELAPSED=$(($(date +%s) - START))
 assert_eq "$CODE" "1" "an unbounded provider fails the run"
+# The bound is adjustable, so the refusal has to say so: an agent CLI asked for
+# a verbose stream reaches a megabyte in normal operation.
+OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-flood.sh" --max-output-bytes=4096 src 2>&1)" || true
+if grep -q -- '--max-output-bytes' <<<"$OUT"; then
+    pass "the refusal names the flag that changes the bound"
+else
+    fail "the refusal does not name --max-output-bytes"
+fi
 if [[ "$ELAPSED" -lt 30 ]]; then
     pass "the output bound trips promptly (${ELAPSED}s)"
 else

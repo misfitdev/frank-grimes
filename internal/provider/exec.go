@@ -278,7 +278,7 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	e.record(req, argv, out, stderr.String(), waitErr)
 
 	if overrun {
-		return nil, fmt.Errorf("%w: provider wrote more than %d bytes", ErrOutputTooLarge, limit)
+		return nil, fmt.Errorf("%w: provider wrote more than %d bytes; raise --max-output-bytes if the role is expected to write this much", ErrOutputTooLarge, limit)
 	}
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return nil, fmt.Errorf("%w: %v", engine.ErrProviderFailed, ctxErr)
