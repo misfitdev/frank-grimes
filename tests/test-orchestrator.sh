@@ -173,13 +173,23 @@ fi
 rm -rf "$WS"
 
 # A pass that worked leaves the same record; diagnosis is not reserved for
-# failure.
+# failure. The run is conditional rather than clean because no adjudicator was
+# asked for, but it reached a verdict, which an operational failure does not.
 WS="$(workspace)"
-"$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-green.sh" src >/dev/null 2>&1 || true
-if [[ -f "$WS/.grimes/work/primary.log" ]]; then
+CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-green.sh")"
+assert_eq "$CODE" "3" "the green run reached a verdict"
+LOG="$WS/.grimes/work/primary.log"
+if [[ -f "$LOG" ]]; then
     pass "a passing role is recorded too"
 else
     fail "a passing role left no record"
+fi
+# Without this the assertion above cannot tell a role that worked from one that
+# did not: both leave a log.
+if grep -q '^exit: 0$' "$LOG" 2>/dev/null; then
+    pass "and the record shows it exited cleanly"
+else
+    fail "the record does not show a clean exit"
 fi
 rm -rf "$WS"
 
