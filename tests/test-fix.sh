@@ -712,6 +712,21 @@ assert_match "$OUT" 'status: +VERIFICATION_STATUS_PASSED' \
 rm -rf "$REPO"
 
 echo ""
+echo "--- The gate runs against a relative --dir ---"
+
+# A boundary is enforced against the path the kernel resolves, so a review
+# directory named relatively has to be resolved before it becomes one. Every
+# other case here passes an absolute --dir, which is how this went unseen.
+REPO="$(repository)"
+OUT="$(cd "$REPO" && "$GRIMES" run --dir=. --mode=fix \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --provider-command="$FAKES/fixer-repairs.sh" \
+    --verify-command="true" --format=prototext src 2>&1 || true)"
+assert_match "$OUT" 'status: +VERIFICATION_STATUS_PASSED' \
+    "a relative --dir reaches the gate"
+rm -rf "$REPO"
+
+echo ""
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"
 [[ "$FAILED" -eq 0 ]] || exit 1
