@@ -1258,8 +1258,6 @@ else
 fi
 rm -rf "$WS"
 
-echo ""
-
 echo "========================================"
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"

@@ -145,6 +145,7 @@ just bench-all    # run the benchmark against every target
 
 ## Conventions & Patterns
 
+- If something does not work, remove it. Do not keep it alive with a refusal, a guard, a doc note, or a validator that polices its absence: an option the engine cannot honour, a field nothing reads, a check that can never fire. `--help` is a contract and lists only what works.
 - A methodology change goes in the skill, never in an adapter copy. `validate.sh` fails the build if a normative marker appears in two files.
 - A contract change requires `just gen` and the regenerated bindings in the same commit.
 - Tests are black-box by default: they run the real script or CLI against fixtures. Go unit tests are permitted only for behaviour a black-box test cannot reach, such as context cancellation, timeouts, output bounds, and pure derivation over a large input space; anything observable through the CLI is asserted there.

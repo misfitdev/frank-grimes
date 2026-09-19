@@ -145,6 +145,55 @@ rm -f "$ENVELOPE"
 rm -rf "$WS"
 
 echo ""
+echo "--- A role's pass is recorded whether or not it succeeded ---"
+
+# The pass worth diagnosing is the one that failed, so the record is written
+# before the failure is returned. No prompt text produces it.
+WS="$(workspace)"
+CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-exit7.sh")"
+assert_eq "$CODE" "1" "a failing provider fails the run"
+LOG="$WS/.grimes/work/primary.log"
+if [[ -f "$LOG" ]]; then
+    pass "the engine recorded the failing pass"
+else
+    fail "no record of the failing pass"
+fi
+# What the role emitted, and what became of it: a record naming neither is not
+# a diagnosis.
+if grep -q 'GRIMES_REPORT_PROTOBUF_V2_BEGIN' "$LOG" 2>/dev/null; then
+    pass "the record holds what the role wrote"
+else
+    fail "the record does not hold what the role wrote"
+fi
+if grep -qE 'exit: .*7' "$LOG" 2>/dev/null; then
+    pass "the record names how the role exited"
+else
+    fail "the record does not name how the role exited"
+fi
+rm -rf "$WS"
+
+# A pass that worked leaves the same record; diagnosis is not reserved for
+# failure. The run is conditional rather than clean because no adjudicator was
+# asked for, but it reached a verdict, which an operational failure does not.
+WS="$(workspace)"
+CODE="$(exit_code "$WS" --provider-command="$FAKES/provider-green.sh")"
+assert_eq "$CODE" "3" "the green run reached a verdict"
+LOG="$WS/.grimes/work/primary.log"
+if [[ -f "$LOG" ]]; then
+    pass "a passing role is recorded too"
+else
+    fail "a passing role left no record"
+fi
+# Without this the assertion above cannot tell a role that worked from one that
+# did not: both leave a log.
+if grep -q '^exit: 0$' "$LOG" 2>/dev/null; then
+    pass "and the record shows it exited cleanly"
+else
+    fail "the record does not show a clean exit"
+fi
+rm -rf "$WS"
+
+echo ""
 echo "--- Invalid provider output fails closed ---"
 
 for fake in provider-garbage provider-noenvelope provider-exit7 provider-sealed-but-silent provider-silent; do
@@ -528,7 +577,9 @@ rm -rf "$WS"
 # of its own still leaves it to the pass that spawned it.
 WS="$(workspace)"
 run_grimes "$WS" --provider-command="$FAKES/provider-abandons-elsewhere.sh" >/dev/null
-LEFT="$(find "$WS/.grimes/work" -type f 2>/dev/null | wc -l | tr -d ' ')"
+# The engine's own role logs live here too; what this is about is the report
+# the role opened and the marker claiming it.
+LEFT="$(find "$WS/.grimes/work" -type f ! -name '*.log' 2>/dev/null | wc -l | tr -d ' ')"
 if [[ "$LEFT" == "0" ]]; then
     pass "a pass that named its own report leaves neither it nor its marker"
 else
