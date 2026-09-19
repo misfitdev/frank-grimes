@@ -71,7 +71,14 @@ func (g ExecGate) Run(ctx context.Context, cwd string) (*pb.Verification, error)
 
 	argv := []string{"/bin/sh", "-c", g.Command}
 	if g.Confine != nil {
-		wrapped, err := g.Confine.Wrap(confine.Policy{Root: g.Root, WriteDirs: g.Writable}, argv)
+		// Resolved here rather than taken as given: Root is the review
+		// directory as the operator spelled it, and a boundary is enforced
+		// against the path the kernel resolves, which a relative one is not.
+		root, err := filepath.Abs(g.Root)
+		if err != nil {
+			return nil, err
+		}
+		wrapped, err := g.Confine.Wrap(confine.Policy{Root: root, WriteDirs: g.Writable}, argv)
 		if err != nil {
 			return nil, err
 		}
