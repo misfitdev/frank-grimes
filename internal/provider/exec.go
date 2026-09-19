@@ -27,8 +27,13 @@ import (
 	"github.com/misfitdev/frank-grimes/internal/store"
 )
 
-// DefaultMaxOutputBytes bounds a single provider's stdout.
-const DefaultMaxOutputBytes = 1 << 20
+// DefaultMaxOutputBytes bounds how much of a role's stdout is retained.
+//
+// Sized for an agent CLI's transcript rather than for a report: the report
+// arrives as a sealed file, and what comes back on stdout is whatever the role
+// said on its way there. Exceeding this drops the oldest bytes; it does not
+// stop the role.
+const DefaultMaxOutputBytes = 16 << 20
 
 // DefaultTimeout bounds a single provider invocation.
 const DefaultTimeout = 10 * time.Minute
@@ -188,8 +193,6 @@ func (e *Exec) lookup() error {
 	return err
 }
 
-var ErrOutputTooLarge = engine.ErrOutputTooLarge
-
 // Review runs the subprocess and returns its stdout.
 func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.ProviderOutput, error) {
 	if len(e.Command) == 0 {
@@ -258,28 +261,21 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 		return nil, fmt.Errorf("%w: %v", engine.ErrProviderFailed, err)
 	}
 
-	// Read one byte past the limit so an exactly-at-limit read is not reported
-	// as an overrun.
-	out, readErr := io.ReadAll(io.LimitReader(stdout, limit+1))
-	overrun := int64(len(out)) > limit
-	if overrun {
-		_ = proc.KillGroup(cmd)
-		// Closed rather than drained: a descendant that left the process group
-		// survives the kill, and draining its output would wait on a writer
-		// that has no reason to stop.
-		_ = stdout.Close()
-	}
+	// Drained rather than bounded by a kill. A role that talks past the limit
+	// is still reviewing, and the bytes over it are not the answer: the report
+	// comes back as a sealed file. Killing here would end a review over its
+	// narration. A role that never stops is ended by the timeout instead.
+	kept := &boundedBuffer{limit: int(limit)}
+	_, readErr := io.Copy(kept, stdout)
+	out := kept.bytes()
 
 	waitErr := cmd.Wait()
 
 	// Before any of the returns below, so that the passes worth diagnosing --
-	// an overrun, a timeout, a non-zero exit -- are the ones that leave a
-	// record rather than the ones that do not.
-	e.record(req, argv, out, stderr.String(), waitErr)
+	// a timeout, a non-zero exit -- are the ones that leave a record rather
+	// than the ones that do not.
+	e.record(req, argv, out, stderr.String(), waitErr, kept.dropped()+stderr.dropped())
 
-	if overrun {
-		return nil, fmt.Errorf("%w: provider wrote more than %d bytes", ErrOutputTooLarge, limit)
-	}
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return nil, fmt.Errorf("%w: %v", engine.ErrProviderFailed, ctxErr)
 	}
@@ -311,13 +307,16 @@ func RoleLog(role engine.Role) string {
 //
 // Best effort. A run that produced a verdict is not failed for want of a note
 // about how it got there.
-func (e *Exec) record(req engine.Request, argv []string, stdout []byte, stderr string, waitErr error) {
+func (e *Exec) record(req engine.Request, argv []string, stdout []byte, stderr string, waitErr error, dropped int) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "=== %s iteration %d: %s\n", roleName(req.Role), req.Iteration, strings.Join(argv, " "))
 	if waitErr != nil {
 		fmt.Fprintf(&b, "exit: %v\n", waitErr)
 	} else {
 		b.WriteString("exit: 0\n")
+	}
+	if dropped > 0 {
+		fmt.Fprintf(&b, "dropped: %d bytes over the retention bound, oldest first\n", dropped)
 	}
 	fmt.Fprintf(&b, "--- stdout (%d bytes) ---\n", len(stdout))
 	b.Write(stdout)
@@ -342,30 +341,52 @@ func (e *Exec) record(req engine.Request, argv []string, stdout []byte, stderr s
 	_, _ = f.WriteString(b.String())
 }
 
-// boundedBuffer keeps the first limit bytes and counts the rest.
+// boundedBuffer keeps the last limit bytes written and counts the rest.
+//
+// The tail rather than the head: the head is where a role was still setting
+// up, and the tail is where it was when whatever happened to it happened.
 type boundedBuffer struct {
-	limit   int
-	buf     bytes.Buffer
-	dropped int
+	limit int
+	buf   bytes.Buffer
+	cut   int
 }
 
 func (b *boundedBuffer) Write(p []byte) (int, error) {
-	// How much is kept has to be decided before the write, since writing moves
-	// the remaining room and would make retained bytes look dropped.
-	kept := min(len(p), max(0, b.limit-b.buf.Len()))
-	if kept > 0 {
-		b.buf.Write(p[:kept])
+	b.buf.Write(p)
+	// Trimmed at twice the bound rather than on every write, which would copy
+	// the whole retained tail each time. What is held is bounded either way.
+	if b.buf.Len() > 2*b.limit {
+		over := b.buf.Len() - b.limit
+		b.buf.Next(over)
+		b.cut += over
 	}
-	b.dropped += len(p) - kept
 	// Report the full length: a short write from a Stderr sink stops the pipe.
 	return len(p), nil
 }
 
-func (b *boundedBuffer) String() string {
-	if b.dropped > 0 {
-		return fmt.Sprintf("%s ... (%d further bytes dropped)", b.buf.String(), b.dropped)
+// bytes returns the retained tail.
+func (b *boundedBuffer) bytes() []byte {
+	body := b.buf.Bytes()
+	if len(body) > b.limit {
+		return body[len(body)-b.limit:]
 	}
-	return b.buf.String()
+	return body
+}
+
+// dropped counts what was written and not retained, including the part not yet
+// trimmed away.
+func (b *boundedBuffer) dropped() int {
+	if over := b.buf.Len() - b.limit; over > 0 {
+		return b.cut + over
+	}
+	return b.cut
+}
+
+func (b *boundedBuffer) String() string {
+	if n := b.dropped(); n > 0 {
+		return fmt.Sprintf("(%d earlier bytes dropped) ... %s", n, b.bytes())
+	}
+	return string(b.bytes())
 }
 
 // roleName is how a role is written into the environment and into the token

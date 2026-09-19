@@ -59,23 +59,54 @@ func TestExecNonZeroExitFailsClosed(t *testing.T) {
 	}
 }
 
-func TestExecOutputBoundExceeded(t *testing.T) {
+// A role that talks past the bound is still reviewing. The bytes over it are
+// not the answer -- the report comes back as a sealed file -- so the pass
+// survives and keeps its tail. Unit-level because the boundary is the retained
+// slice, which the CLI only shows once truncated into a log.
+func TestExecKeepsTheTailAndDoesNotFailOnVolume(t *testing.T) {
+	e := &Exec{
+		Confine:        confine.Unsafe{},
+		Command:        script(t, "head -c 20000 /dev/zero | tr '\\0' 'a'\nprintf 'THE-END'\n"),
+		MaxOutputBytes: 4096,
+	}
+	out, err := e.Review(context.Background(), primaryReq())
+	if err != nil {
+		t.Fatalf("a verbose role was failed for volume: %v", err)
+	}
+	if len(out.Raw) != 4096 {
+		t.Errorf("retained %d bytes, want the bound of 4096", len(out.Raw))
+	}
+	// The end of the stream, not the start: the head is where a role was still
+	// setting up.
+	if !strings.HasSuffix(string(out.Raw), "THE-END") {
+		t.Errorf("retained the wrong end; it ends %q", tailOf(string(out.Raw), 20))
+	}
+}
+
+// A role that never stops is ended by the timeout, which is the only thing that
+// can tell it apart from one still working.
+func TestExecUnboundedOutputEndsAtTheTimeout(t *testing.T) {
 	e := &Exec{
 		Confine:        confine.Unsafe{},
 		Command:        script(t, "yes 0123456789abcdef\n"),
 		MaxOutputBytes: 4096,
+		Timeout:        2 * time.Second,
 	}
 	start := time.Now()
 	_, err := e.Review(context.Background(), primaryReq())
-	if err == nil {
-		t.Fatal("want an error for unbounded provider output")
+	if !errors.Is(err, engine.ErrProviderFailed) {
+		t.Errorf("error = %v, want ErrProviderFailed", err)
 	}
-	if !errors.Is(err, ErrOutputTooLarge) {
-		t.Errorf("error = %v, want ErrOutputTooLarge", err)
+	if elapsed := time.Since(start); elapsed > 30*time.Second {
+		t.Errorf("an unbounded provider ran %v past its timeout", elapsed)
 	}
-	if elapsed := time.Since(start); elapsed > 10*time.Second {
-		t.Errorf("bound took %v to trip; it should short-circuit", elapsed)
+}
+
+func tailOf(s string, n int) string {
+	if len(s) > n {
+		return s[len(s)-n:]
 	}
+	return s
 }
 
 func TestExecOutputExactlyAtBoundSucceeds(t *testing.T) {

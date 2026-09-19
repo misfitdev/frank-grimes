@@ -5,42 +5,42 @@ import (
 	"testing"
 )
 
-func TestBoundedBufferCountsOnlyDroppedBytes(t *testing.T) {
+// The tail is what is kept, so a case is named by which bytes survive rather
+// than by how many. Every write is distinct, so retaining the wrong end reads
+// as the wrong characters rather than as the right count.
+func TestBoundedBufferKeepsTheTail(t *testing.T) {
 	for _, c := range []struct {
-		name    string
-		limit   int
-		writes  []int
-		keep    int
-		dropped int
+		name   string
+		limit  int
+		writes []string
+		want   string
 	}{
-		{"straddles the limit in one write", 10, []int{15}, 10, 5},
-		{"fits entirely", 10, []int{4}, 4, 0},
-		{"exactly at the limit", 10, []int{10}, 10, 0},
-		{"fills then overflows", 10, []int{6, 9}, 10, 5},
-		{"already full", 10, []int{10, 7}, 10, 7},
-		{"many small writes", 5, []int{2, 2, 2, 2}, 5, 3},
+		{"fits entirely", 10, []string{"abcd"}, "abcd"},
+		{"exactly at the limit", 4, []string{"abcd"}, "abcd"},
+		{"straddles the limit in one write", 4, []string{"abcdefg"}, "defg"},
+		{"fills then overflows", 4, []string{"ab", "cdef"}, "cdef"},
+		{"already full", 3, []string{"abc", "defg"}, "efg"},
+		{"many small writes", 5, []string{"ab", "cd", "ef", "gh"}, "defgh"},
+		{"far past the trim threshold", 2, []string{strings.Repeat("x", 50) + "yz"}, "yz"},
 	} {
 		b := &boundedBuffer{limit: c.limit}
 		total := 0
-		for _, n := range c.writes {
-			w, err := b.Write([]byte(strings.Repeat("x", n)))
+		for _, w := range c.writes {
+			n, err := b.Write([]byte(w))
 			if err != nil {
 				t.Fatalf("%s: Write: %v", c.name, err)
 			}
-			if w != n {
-				t.Errorf("%s: Write returned %d, want %d; a short write stops the pipe", c.name, w, n)
+			if n != len(w) {
+				t.Errorf("%s: Write returned %d, want %d; a short write stops the pipe", c.name, n, len(w))
 			}
-			total += n
+			total += len(w)
 		}
-		if b.buf.Len() != c.keep {
-			t.Errorf("%s: retained %d bytes, want %d", c.name, b.buf.Len(), c.keep)
+		if got := string(b.bytes()); got != c.want {
+			t.Errorf("%s: retained %q, want %q", c.name, got, c.want)
 		}
-		if b.dropped != c.dropped {
-			t.Errorf("%s: reported %d dropped, want %d", c.name, b.dropped, c.dropped)
-		}
-		if b.buf.Len()+b.dropped != total {
+		if len(b.bytes())+b.dropped() != total {
 			t.Errorf("%s: retained %d + dropped %d != %d written",
-				c.name, b.buf.Len(), b.dropped, total)
+				c.name, len(b.bytes()), b.dropped(), total)
 		}
 	}
 }

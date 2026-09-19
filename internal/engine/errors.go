@@ -13,6 +13,5 @@ var (
 	ErrForgedFindingID = errors.New("finding id does not match its own fingerprint")
 	ErrStaleState      = errors.New("loop state belongs to a different target")
 	ErrLedgerTarget    = errors.New("ledger belongs to a different target")
-	ErrOutputTooLarge  = errors.New("provider output exceeded the byte bound")
 	ErrTargetChanged   = errors.New("the target changed during the review")
 )
