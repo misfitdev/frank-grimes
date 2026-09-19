@@ -272,6 +272,11 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 
 	waitErr := cmd.Wait()
 
+	// Before any of the returns below, so that the passes worth diagnosing --
+	// an overrun, a timeout, a non-zero exit -- are the ones that leave a
+	// record rather than the ones that do not.
+	e.record(req, argv, out, stderr.String(), waitErr)
+
 	if overrun {
 		return nil, fmt.Errorf("%w: provider wrote more than %d bytes", ErrOutputTooLarge, limit)
 	}
@@ -289,6 +294,52 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 		Diagnostics: strings.TrimSpace(stderr.String()),
 		Sealed:      e.collectSealed(req),
 	}, nil
+}
+
+// RoleLog names where a role's pass is recorded, under the work directory the
+// role itself may write to.
+func RoleLog(role engine.Role) string {
+	return store.WorkDir + "/" + roleName(role) + ".log"
+}
+
+// record appends one pass to the role's log.
+//
+// Both streams are already bounded by the caller, so this writes what the
+// engine kept rather than everything the role emitted. Appended rather than
+// truncated: a role runs once per iteration, and a pass is read against the
+// ones before it.
+//
+// Best effort. A run that produced a verdict is not failed for want of a note
+// about how it got there.
+func (e *Exec) record(req engine.Request, argv []string, stdout []byte, stderr string, waitErr error) {
+	var b strings.Builder
+	fmt.Fprintf(&b, "=== %s iteration %d: %s\n", roleName(req.Role), req.Iteration, strings.Join(argv, " "))
+	if waitErr != nil {
+		fmt.Fprintf(&b, "exit: %v\n", waitErr)
+	} else {
+		b.WriteString("exit: 0\n")
+	}
+	fmt.Fprintf(&b, "--- stdout (%d bytes) ---\n", len(stdout))
+	b.Write(stdout)
+	if len(stdout) > 0 && !strings.HasSuffix(string(stdout), "\n") {
+		b.WriteString("\n")
+	}
+	b.WriteString("--- stderr ---\n")
+	b.WriteString(stderr)
+	if stderr != "" && !strings.HasSuffix(stderr, "\n") {
+		b.WriteString("\n")
+	}
+
+	path := filepath.Join(e.Dir, RoleLog(req.Role))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = f.WriteString(b.String())
 }
 
 // boundedBuffer keeps the first limit bytes and counts the rest.

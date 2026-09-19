@@ -96,6 +96,17 @@ engine collects the file first and falls back to stdout, so a role that seals
 and then describes its work in prose is not penalised for it. That is the
 ordinary behaviour of an agent CLI, and it needs no prompting against.
 
+## What a long review needs
+
+`--provider-timeout` defaults to ten minutes. A review of a multi-commit range
+does not finish in ten, and a role killed mid-review surfaces as `no report
+envelope`, which names the report rather than the timeout. Give it `45m` or more.
+
+Every pass is recorded under `.grimes/work/`, one file per role, appended across
+iterations: the command, how it exited, its stdout and its stderr. Written
+whether the pass succeeded or failed. Nothing in a role prompt produces it, so
+there is no logging instruction to compose and none to get wrong.
+
 ## What the engine gives a role
 
 Every role is told what it is reviewing and where it may write:
