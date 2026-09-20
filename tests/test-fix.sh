@@ -727,6 +727,36 @@ assert_match "$OUT" 'status: +VERIFICATION_STATUS_PASSED' \
 rm -rf "$REPO"
 
 echo ""
+echo "--- A worktree add that fails leaves nothing for the next run ---"
+
+# git registers the worktree before running the repository's post-checkout
+# hook, so a hook that fails leaves the registration without the directory.
+# Left there, every later run is refused a path it never made.
+REPO="$(repository)"
+printf '#!/bin/sh\nexit 1\n' >"$REPO/.git/hooks/post-checkout"
+chmod +x "$REPO/.git/hooks/post-checkout"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh")"
+if grep -q 'creating the worktree' <<<"$OUT"; then
+    pass "a hook that fails, fails the run"
+else
+    fail "the failing hook did not fail the run"
+fi
+
+# The run that matters is the next one, after the operator clears what the
+# failure left. The directory goes; the registration is what outlives it, and a
+# run that found the directory would reopen it instead of adding one.
+rm -f "$REPO/.git/hooks/post-checkout"
+rm -rf "$REPO/.grimes"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh")"
+if grep -q 'already registered' <<<"$OUT"; then
+    fail "the failed add blocked the next run"
+else
+    pass "the next run is not blocked by the failed add"
+fi
+assert_match "$OUT" 'worktree: +"' "and it builds a worktree of its own"
+rm -rf "$REPO"
+
+echo ""
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"
 [[ "$FAILED" -eq 0 ]] || exit 1
