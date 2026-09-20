@@ -1258,6 +1258,28 @@ message GrimesResult {
 //
 // A batch is the whole iteration's work, not one fix: the gate runs once over
 // all of it, so nothing smaller than the batch has a verification to point at.
+// Why a fix batch produced no commit.
+//
+// The outcomes are different facts with different remedies -- one is a flag
+// nobody passed, one is the repository refusing the work, one is a repair
+// nothing credits -- and all of them looked the same in the record: no commit,
+// no closed findings, and an operator left to infer which.
+enum CommitWithheld {
+  COMMIT_WITHHELD_UNSPECIFIED = 0;
+  // Nothing was withheld; the batch committed.
+  COMMIT_WITHHELD_NONE = 1;
+  // The run was never authorized to commit.
+  COMMIT_WITHHELD_UNAUTHORIZED = 2;
+  // The gate did not pass over the batch, so nothing here is verified.
+  COMMIT_WITHHELD_GATE = 3;
+  // The batch touched a file anchoring a claim a refuter broke. A commit takes
+  // the whole worktree, so it would carry the unearned repair inside one
+  // crediting the surviving repair beside it.
+  COMMIT_WITHHELD_REFUTED_CLAIM = 4;
+  // The batch closed nothing this run may credit.
+  COMMIT_WITHHELD_NOTHING_CREDITED = 5;
+}
+
 message FixBatch {
   // A commit is the only outcome that needs no directory to point at, since the
   // edits are in history by then. Anything else has to say where the work is,
@@ -1266,6 +1288,13 @@ message FixBatch {
     id: "fix_batch.uncommitted_work_has_a_place"
     message: "a batch that produced no commit must name the directory holding its edits"
     expression: "size(this.commit_sha1) != 0 || this.worktree != ''"
+  };
+  // A batch that committed withheld nothing, and one that did not says which
+  // of the reasons applied. Left unsaid, every reason reads the same.
+  option (buf.validate.message).cel = {
+    id: "fix_batch.withholding_is_named"
+    message: "a batch that did not commit must say why, and one that did must not claim it was withheld"
+    expression: "(size(this.commit_sha1) != 0) == (this.commit_withheld == 1)"
   };
   // Findings a commit closes are the ones the gate passed over. Naming them
   // when there is no commit would claim a closure nothing verified.
@@ -1287,6 +1316,11 @@ message FixBatch {
     items: {
       string: {min_len: 1}
     }
+  }];
+  // Why there is no commit, when there is none.
+  CommitWithheld commit_withheld = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
   }];
 }
 

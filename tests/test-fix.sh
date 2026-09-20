@@ -552,6 +552,10 @@ assert_no_match "$OUT" 'status: +FINDING_STATUS_VERIFIED' \
     "nor verified, whatever the gate said"
 assert_no_match "$OUT" 'commit_sha1' \
     "and nothing is committed over it"
+# The only claim was broken, so the batch credited nothing. That is a different
+# reason from a mixed batch, and the record distinguishes them.
+assert_match "$OUT" 'commit_withheld: +COMMIT_WITHHELD_NOTHING_CREDITED' \
+    "and the record says nothing was credited"
 # The edit is still there to read; it is credited to nothing.
 TREE="$(worktree_of "$OUT")"
 if [[ -n "$TREE" && "$(cat "$TREE/src/app.sh")" != "$REVIEWED" ]]; then
@@ -664,6 +668,8 @@ assert_match "$OUT" 'status: +FINDING_STATUS_VERIFIED' \
     "the surviving claim is still credited with its repair"
 assert_no_match "$OUT" 'commit_sha1' \
     "but nothing is committed while a broken repair shares the tree"
+assert_match "$OUT" 'commit_withheld: +COMMIT_WITHHELD_REFUTED_CLAIM' \
+    "and the record says the broken repair is why, not the gate or the flag"
 rm -rf "$REPO"
 
 # The same batch with both claims upheld: withholding is about the broken one,
@@ -797,6 +803,33 @@ if [[ "$CODE" == "1" ]] && grep -q 'needs a gate' <<<"$OUT"; then
 else
     fail "--verify-excludes without a gate was accepted (exit $CODE)"
 fi
+rm -rf "$REPO"
+
+echo ""
+echo "--- A batch that did not commit says which reason applied ---"
+
+# Four different facts with four different remedies, and every one of them
+# reached the record as an absent commit_sha1.
+REPO="$(repository)"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true")"
+assert_match "$OUT" 'commit_withheld: +COMMIT_WITHHELD_UNAUTHORIZED' \
+    "a run never authorized to commit says so"
+rm -rf "$REPO"
+
+REPO="$(repository)"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" \
+    --verify-command="exit 1" --commit)"
+assert_match "$OUT" 'commit_withheld: +COMMIT_WITHHELD_GATE' \
+    "a batch the gate refused says so"
+rm -rf "$REPO"
+
+# A commit is the one outcome that withheld nothing.
+REPO="$(repository)"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" \
+    --verify-command="true" --commit)"
+assert_match "$OUT" 'commit_sha1' "an authorized batch over a passing gate commits"
+assert_match "$OUT" 'commit_withheld: +COMMIT_WITHHELD_NONE' \
+    "and records that nothing was withheld"
 rm -rf "$REPO"
 
 echo ""
