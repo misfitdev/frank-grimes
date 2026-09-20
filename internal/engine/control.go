@@ -156,18 +156,36 @@ func insertControl(claims []*pb.ClaimUnderTest, c *control) []*pb.ClaimUnderTest
 // of refuting anything, which is the same position as having no refuter at all;
 // and a refuted outcome carrying no excerpt of the artifact is a refuter that
 // recognised the control rather than one that attacked it.
-func checkOf(attempt *pb.RefutationAttempt, ctrl *control) pb.RefuterCheck {
+// The reason travels with the grade. The three ways to fail this are
+// different mistakes with different remedies, and a record saying only that it
+// failed sends a reader to look at all of them.
+func checkOf(attempt *pb.RefutationAttempt, ctrl *control) (pb.RefuterCheck, string) {
 	switch attempt.GetOutcome().(type) {
 	case *pb.RefutationAttempt_Refuted:
 		if !exhibits(attempt.GetRefuted(), ctrl.witness) {
-			return pb.RefuterCheck_REFUTER_CHECK_FAILED
+			return pb.RefuterCheck_REFUTER_CHECK_FAILED, fmt.Sprintf(
+				"the control was broken without exhibiting what the target says: the "+
+					"disproof had to quote %q and its excerpt does not contain it",
+				truncateWitness(ctrl.witness))
 		}
-		return pb.RefuterCheck_REFUTER_CHECK_PASSED
+		return pb.RefuterCheck_REFUTER_CHECK_PASSED, ""
 	case *pb.RefutationAttempt_Upheld:
-		return pb.RefuterCheck_REFUTER_CHECK_FAILED
+		return pb.RefuterCheck_REFUTER_CHECK_FAILED,
+			"the control was upheld; it is false by construction, so a refuter that " +
+				"upholds it has rubber-stamped the claims beside it"
 	default:
-		return pb.RefuterCheck_REFUTER_CHECK_INCONCLUSIVE
+		return pb.RefuterCheck_REFUTER_CHECK_INCONCLUSIVE, ""
 	}
+}
+
+// truncateWitness bounds the quoted line. The contract caps the reason, and a
+// witness is a line of the target, which has no length anyone promised.
+func truncateWitness(s string) string {
+	const max = 120
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "..."
 }
 
 // exhibits reports whether the disproof carries what the artifact says.

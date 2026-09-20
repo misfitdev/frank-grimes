@@ -166,7 +166,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	// It is also the last moment the claims are attackable: a finding the batch
 	// touched is fixed by the time settle returns, and a fixed finding is not a
 	// claim anyone is asked about.
-	check, err := e.refute(ctx, ledger, spec, collected, iteration)
+	check, checkReason, err := e.refute(ctx, ledger, spec, collected, iteration)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	}
 
 	yield := marginalYield(report, ledger, surfaced)
-	result := e.assemble(target, mode, iteration, final, review, verification, ledger, digest, oscillation, yield, check)
+	result := e.assemble(target, mode, iteration, final, review, verification, ledger, digest, oscillation, yield, check, checkReason)
 	result.Adjudication = panel
 	if fix != nil {
 		result.FixBatch = fix.record()

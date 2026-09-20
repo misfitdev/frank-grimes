@@ -4735,6 +4735,11 @@ type GrimesResult struct {
 	UnmetGates        []string               `protobuf:"bytes,18,rep,name=unmet_gates,json=unmetGates,proto3" json:"unmet_gates,omitempty"`
 	Summary           string                 `protobuf:"bytes,19,opt,name=summary,proto3" json:"summary,omitempty"`
 	RefuterCheck      RefuterCheck           `protobuf:"varint,20,opt,name=refuter_check,json=refuterCheck,proto3,enum=frank_grimes.v2.RefuterCheck" json:"refuter_check,omitempty"`
+	// What the refuter did to the planted control, in the engine's own words. A
+	// failed check that says only that it failed cannot be told from a refuter
+	// that upheld the control, one that broke it without exhibiting the line the
+	// engine read, and one that answered nothing at all.
+	RefuterCheckReason string `protobuf:"bytes,24,opt,name=refuter_check_reason,json=refuterCheckReason,proto3" json:"refuter_check_reason,omitempty"`
 	// How each spawned role was bounded to the review's own artifacts. Named
 	// rather than flagged, so a record says which mechanism was relied on and a
 	// reader can tell a built-in boundary from an operator's wrapper.
@@ -4917,6 +4922,13 @@ func (x *GrimesResult) GetRefuterCheck() RefuterCheck {
 		return x.RefuterCheck
 	}
 	return RefuterCheck_REFUTER_CHECK_UNSPECIFIED
+}
+
+func (x *GrimesResult) GetRefuterCheckReason() string {
+	if x != nil {
+		return x.RefuterCheckReason
+	}
+	return ""
 }
 
 func (x *GrimesResult) GetConfinement() string {
@@ -5465,7 +5477,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tB\x18\xbaH\x15r\x13\n" +
 	"\x11.grimes/ledger.pbR\x04path\x12,\n" +
 	"\rdigest_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\fdigestSha256\x121\n" +
-	"\x14oscillation_detected\x18\x03 \x01(\bR\x13oscillationDetected\"\xb9+\n" +
+	"\x14oscillation_detected\x18\x03 \x01(\bR\x13oscillationDetected\"\xa4-\n" +
 	"\fGrimesResult\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
 	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x12\x1e\n" +
@@ -5492,11 +5504,13 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\vunmet_gates\x18\x12 \x03(\tB\x0e\xbaH\v\x92\x01\b\x18\x01\"\x04r\x02\x10\x01R\n" +
 	"unmetGates\x12!\n" +
 	"\asummary\x18\x13 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\asummary\x12L\n" +
-	"\rrefuter_check\x18\x14 \x01(\x0e2\x1d.frank_grimes.v2.RefuterCheckB\b\xbaH\x05\x82\x01\x02\x10\x01R\frefuterCheck\x12)\n" +
+	"\rrefuter_check\x18\x14 \x01(\x0e2\x1d.frank_grimes.v2.RefuterCheckB\b\xbaH\x05\x82\x01\x02\x10\x01R\frefuterCheck\x12:\n" +
+	"\x14refuter_check_reason\x18\x18 \x01(\tB\b\xbaH\x05r\x03\x18\x90\x03R\x12refuterCheckReason\x12)\n" +
 	"\vconfinement\x18\x15 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\vconfinement\x126\n" +
 	"\tfix_batch\x18\x16 \x01(\v2\x19.frank_grimes.v2.FixBatchR\bfixBatch\x12F\n" +
-	"\fadjudication\x18\x17 \x01(\v2\".frank_grimes.v2.AdjudicationPanelR\fadjudication:\xcc \xbaH\xc8 \x1ad\n" +
-	"\x18result.orchestrator_only\x12/only the orchestrator may emit the final result\x1a\x17this.producer_role == 3\x1a\x88\x01\n" +
+	"\fadjudication\x18\x17 \x01(\v2\".frank_grimes.v2.AdjudicationPanelR\fadjudication:\xfb!\xbaH\xf7!\x1ad\n" +
+	"\x18result.orchestrator_only\x12/only the orchestrator may emit the final result\x1a\x17this.producer_role == 3\x1a\xac\x01\n" +
+	"\x1eresult.failed_control_says_why\x12Na failed refuter control check must record what the refuter did to the control\x1a:this.refuter_check != 2 || this.refuter_check_reason != ''\x1a\x88\x01\n" +
 	"!result.report_has_no_verification\x122report mode records verification as not applicable\x1a/this.mode != 1 || this.verification.status == 4\x1a\x94\x03\n" +
 	"#result.report_completion_is_derived\x12hthe completion state must be the one the colour, iteration, bound, exhaustion, and new P0/P1 count imply\x1a\x82\x02this.mode != 1 || this.completion_state == (this.legacy_color == 1 ? 2 : this.iteration >= this.max_iterations ? 4 : (this.iteration > 1 && this.marginal_yield.new_p0_p1 == 0u) ? (this.unmet_gates.exists(g, g == 'coverage' || g == 'refutation') ? 6 : 2) : 1)\x1a\xac\x03\n" +
 	" result.fix_completion_is_derived\x12]the completion state must be the one the colour, iteration, bound, exhaustion, and gate imply\x1a\xa8\x02this.mode != 2 || this.completion_state == (this.legacy_color == 1 ? 3 : this.iteration >= this.max_iterations ? 4 : (this.iteration > 1 && this.marginal_yield.new_p0_p1 == 0u) ? (this.unmet_gates.exists(g, g == 'coverage' || g == 'refutation') ? 6 : (this.verification.status == 1 ? 3 : 6)) : 1)\x1a\xc1\x01\n" +

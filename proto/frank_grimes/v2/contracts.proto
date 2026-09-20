@@ -1047,6 +1047,11 @@ message GrimesResult {
     expression: "this.producer_role == 3"
   };
   option (buf.validate.message).cel = {
+    id: "result.failed_control_says_why"
+    message: "a failed refuter control check must record what the refuter did to the control"
+    expression: "this.refuter_check != 2 || this.refuter_check_reason != ''"
+  };
+  option (buf.validate.message).cel = {
     id: "result.report_has_no_verification"
     message: "report mode records verification as not applicable"
     expression: "this.mode != 1 || this.verification.status == 4"
@@ -1211,6 +1216,11 @@ message GrimesResult {
   ];
   string summary = 19 [(buf.validate.field).string.min_len = 1];
   RefuterCheck refuter_check = 20 [(buf.validate.field).enum.defined_only = true];
+  // What the refuter did to the planted control, in the engine's own words. A
+  // failed check that says only that it failed cannot be told from a refuter
+  // that upheld the control, one that broke it without exhibiting the line the
+  // engine read, and one that answered nothing at all.
+  string refuter_check_reason = 24 [(buf.validate.field).string.max_len = 400];
   // How each spawned role was bounded to the review's own artifacts. Named
   // rather than flagged, so a record says which mechanism was relied on and a
   // reader can tell a built-in boundary from an operator's wrapper.

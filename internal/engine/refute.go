@@ -105,14 +105,14 @@ func (r ProviderRefuter) Refute(ctx context.Context, target *pb.Target, reads Ha
 // pass that vouches for everything raises no finding above unattacked. The
 // control itself never reaches the ledger: it is dropped with every other ref
 // the engine did not issue against a real finding.
-func (e *Engine) refute(ctx context.Context, ledger *pb.Ledger, spec TargetSpec, collected *Collected, iteration uint32) (pb.RefuterCheck, error) {
+func (e *Engine) refute(ctx context.Context, ledger *pb.Ledger, spec TargetSpec, collected *Collected, iteration uint32) (pb.RefuterCheck, string, error) {
 	none := pb.RefuterCheck_REFUTER_CHECK_UNSPECIFIED
 	if e.Refuter == nil || e.Claims == nil {
-		return none, nil
+		return none, "", nil
 	}
 	claims, refs := claimsOf(ledger, e.RunID, iteration)
 	if len(claims) == 0 {
-		return none, nil
+		return none, "", nil
 	}
 	target := collected.Target
 
@@ -120,14 +120,14 @@ func (e *Engine) refute(ctx context.Context, ledger *pb.Ledger, spec TargetSpec,
 	// no reason to recollect the target or to leave a copy behind.
 	reads, err := e.handoff(ctx, spec, collected, RoleRefuter)
 	if err != nil {
-		return none, err
+		return none, "", err
 	}
 
 	ctrl, err := controlFor(e.Dir, reads.ContentPath, claims, e.RunID, iteration)
 	if err != nil {
 		// A pass the engine cannot grade is a pass whose word it has no reason
 		// to take, so it is not run at all.
-		return pb.RefuterCheck_REFUTER_CHECK_INCONCLUSIVE, nil
+		return pb.RefuterCheck_REFUTER_CHECK_INCONCLUSIVE, "", nil
 	}
 
 	path, err := e.Claims.Save(ctx, &pb.RefutationTask{
@@ -138,7 +138,7 @@ func (e *Engine) refute(ctx context.Context, ledger *pb.Ledger, spec TargetSpec,
 		Claims:      insertControl(claims, ctrl),
 	})
 	if err != nil {
-		return none, fmt.Errorf("claims: %w", err)
+		return none, "", fmt.Errorf("claims: %w", err)
 	}
 	defer func() { _ = e.Claims.Discard(ctx, path) }()
 
@@ -147,12 +147,12 @@ func (e *Engine) refute(ctx context.Context, ledger *pb.Ledger, spec TargetSpec,
 		// A refutation that did not happen is not a finding that survived one.
 		// The verdict caps itself on the absence instead, the way it does for a
 		// missing second opinion.
-		return none, nil
+		return none, "", nil
 	}
 
-	check := checkOf(attempts[ctrl.ref], ctrl)
+	check, reason := checkOf(attempts[ctrl.ref], ctrl)
 	if check != pb.RefuterCheck_REFUTER_CHECK_PASSED {
-		return check, nil
+		return check, reason, nil
 	}
 	for ref, attempt := range attempts {
 		id, issued := refs[ref]
@@ -162,7 +162,7 @@ func (e *Engine) refute(ctx context.Context, ledger *pb.Ledger, spec TargetSpec,
 		f := ledger.GetFindings()[id]
 		f.Refutation = append(f.GetRefutation(), attempt)
 	}
-	return check, nil
+	return check, reason, nil
 }
 
 // claimsOf renders the verdict-driving findings as claims, and returns the map
