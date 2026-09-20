@@ -194,6 +194,28 @@ fi
 rm -rf "$WS"
 
 echo ""
+echo "--- Both halves report which build they are ---"
+
+# The two are one contract in two halves and nothing can stop a mismatched pair
+# being installed, so each has to be able to say what it is.
+for BINARY in "$GRIMES" "$(dirname "$GRIMES")/grimes-contract"; do
+    NAME="$(basename "$BINARY")"
+    set +e
+    OUT="$("$BINARY" --version 2>&1)"
+    CODE=$?
+    set -e
+    assert_eq "$CODE" "0" "$NAME answers --version"
+    # Either a commit or an honest unknown. A stamp is absent exactly when the
+    # build was one nobody can vouch for, and saying so beats naming a commit
+    # these bytes did not come from.
+    if grep -qE "^$NAME ([0-9a-f]{12}( \(with uncommitted changes\))?|unknown)$" <<<"$OUT"; then
+        pass "$NAME names itself and its build"
+    else
+        fail "$NAME reported: $OUT"
+    fi
+done
+
+echo ""
 echo "--- Invalid provider output fails closed ---"
 
 for fake in provider-garbage provider-noenvelope provider-exit7 provider-sealed-but-silent provider-silent; do

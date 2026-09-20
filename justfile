@@ -138,7 +138,14 @@ test-orchestrator:
 test-contracts:
     ./tests/test-contracts.sh
 
-# Build the contract codec
-build:
-    go build -o bin/grimes-contract ./cmd/grimes-contract
-    go build -o bin/grimes ./cmd/grimes
+# Build both halves of the contract, stamped with the commit they came from
+#
+# The two binaries are one contract in two halves, and a mismatched pair fails
+# in ways that read as engine defects. -buildvcs=true asks for the stamp that
+# lets someone check, rather than the default auto, which drops it quietly.
+build dir="bin":
+    go build -buildvcs=true -o {{dir}}/grimes-contract ./cmd/grimes-contract
+    go build -buildvcs=true -o {{dir}}/grimes ./cmd/grimes
+
+
+

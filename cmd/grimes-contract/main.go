@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"github.com/misfitdev/frank-grimes/internal/build"
 	"io"
 	"math"
 	"os"
@@ -79,6 +80,9 @@ func main() {
 	}
 	var err error
 	switch os.Args[1] {
+	case "-v", "--version", "version":
+		fmt.Println(build.Line("grimes-contract"))
+		return
 	case "id":
 		err = cmdID(os.Args[2:])
 	case "validate":
