@@ -173,3 +173,21 @@ Read only the cards routed by Phase 2. A probe is an action plus a recorded resu
 **E1 on a prose target:** a named person acting on the artifact's own instructions under a condition the artifact states takes the damaging action or cannot undo it; record the actor, the instructions as followed, and the outcome.
 
 **False-accusation trap:** substituting reviewer preference for evidence about the named actor, task, consequence, and observed interaction path.
+
+## NEC: Necessity, and whether the code earns its keep
+
+**Enumerate:** abstractions and their call sites, configuration options and the cases that set them, feature flags and their consumers, generality nobody exercises, defensive handling for conditions the callers cannot produce, and code reachable only from tests.
+
+**Cheapest decisive probes, in order:**
+
+1. Count call sites for each abstraction with a recorded `rg` command; one caller and one implementation is the shape to examine, not yet the finding.
+2. Search for every value a configuration option is actually set to, across the repository and its deployment inputs; record the command and the hits.
+3. Delete or short-circuit the construct in a disposable copy and run the target's own checks; record the command, exit code, and output. A suite that still passes is the probe, and one that fails is the disproof.
+4. Trace a condition the code defends against back to a caller that can produce it; quote the caller or record that none exists.
+
+**E1 here:** the construct is removed in a disposable copy and the target's own checks still pass, with the negative control showing the same checks fail when something load-bearing is removed the same way.
+
+**E1 on a prose target:** a section is removed and every claim it supported is still carried elsewhere in the artifact; quote the surviving passages.
+
+**False-accusation trap:** calling a single-caller abstraction unnecessary without removing it and finding out. Generality written for a second case that exists in another repository, a flag held for a rollback nobody has needed yet, and an interface that exists to make a dependency swappable are all deliberate, and none of them look different from waste at the call-site count alone. Necessity findings are rarely P0 and almost never systemic: a repair here is a deletion, and a deletion that was wrong is more expensive than the code it removed.
+

@@ -15,7 +15,7 @@ var AllCategories = []pb.Category{
 	pb.Category_CATEGORY_COR, pb.Category_CATEGORY_INT, pb.Category_CATEGORY_SEC,
 	pb.Category_CATEGORY_REL, pb.Category_CATEGORY_OPS, pb.Category_CATEGORY_PER,
 	pb.Category_CATEGORY_VER, pb.Category_CATEGORY_MNT, pb.Category_CATEGORY_DEP,
-	pb.Category_CATEGORY_HUM,
+	pb.Category_CATEGORY_HUM, pb.Category_CATEGORY_NEC,
 }
 
 // StrictBroker admits a finding only when the contract accepts it whole and its

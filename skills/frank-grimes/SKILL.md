@@ -92,7 +92,7 @@ If critical contract fields are missing, ask at most **3 targeted questions**. O
 
 Inventory the target's trust boundaries, inputs, outputs, persistent state, external dependencies, failure consequences, and cross-artifact invariants. Record the command or read action used and its result; do not claim an inventory item that was not observed.
 
-Route exactly **5–8** categories from `COR`, `INT`, `SEC`, `REL`, `OPS`, `PER`, `VER`, `MNT`, `DEP`, and `HUM`. Start with five and add a category only when a distinct plausible P0 hypothesis cannot be owned by a category already selected. Record one clause for every inclusion and every exclusion. Exclude a category only when the contract and inventory show that a P0 cannot live there. Routing is triage, not mercy, and category count is not a quota for findings.
+Route exactly **5–8** categories from `COR`, `INT`, `SEC`, `REL`, `OPS`, `PER`, `VER`, `MNT`, `DEP`, `HUM`, and `NEC`. Start with five and add a category only when a distinct plausible P0 hypothesis cannot be owned by a category already selected. Record one clause for every inclusion and every exclusion. Exclude a category only when the contract and inventory show that a P0 cannot live there. Routing is triage, not mercy, and category count is not a quota for findings.
 
 For each routed category, read only its category section in [references/category-attacks.md](references/category-attacks.md) and run its probes in priority order. For architecture, incident, process, or proposal targets, also read only that target section in [references/non-code-targets.md](references/non-code-targets.md). Assign one primary category to each root cause; secondary tags do not create additional findings.
 
@@ -128,7 +128,7 @@ Record candidate findings in this clinical form before the self-grind:
 
 ```text
 - Candidate ID: [temporary identifier]
-- Primary category: [COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM]
+- Primary category: [COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM|NEC]
 - Root cause and violated invariant: [one defect, not duplicate symptoms]
 - Primary evidence: [E1|E2|E3 record]
 - Consequence, likelihood, and blast radius: [facts and stated preconditions]

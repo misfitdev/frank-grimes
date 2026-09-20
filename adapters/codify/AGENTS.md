@@ -106,3 +106,9 @@ grimes-contract refute seal
 ```
 
 Run identity and target fingerprint come from the exported environment, so the prompt carries neither. The engine plants its own control and maps each answer back to the finding it was issued for; the prompt carries no control and relays no outcome by hand.
+
+## Running the roles on other CLIs
+
+`adapters/roles.md` is where the per-role commands, the preflight a run needs
+before it starts, and what to do when one fails are written down. It is the only
+copy: what is here is this adapter's own wiring.

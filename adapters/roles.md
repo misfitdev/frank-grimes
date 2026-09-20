@@ -14,6 +14,53 @@ That is what makes an adjudication independent rather than nominal: a separate
 process, a separate context, and — if you want — a separate model that has
 never seen the first review. A `pass` needs one.
 
+## Before the run
+
+An operator says one sentence. These are the parts of it nobody says, and every
+one of them cost a failed run to learn.
+
+**The tree must be clean.** A fix run builds its worktree from the commit you
+are on, so uncommitted work means the bytes in front of the operator are not the
+bytes under review, and anything lying there untracked is credited to the fixer
+at the end. Do not commit or stash their work to get past it; say what is dirty.
+
+**Tooling dirt is excluded, not committed.** Codex writes `.codex/` into the
+repository, so a trial creates the state that refuses the next run:
+
+```bash
+echo '.codex/' >> "$(git rev-parse --path-format=absolute --git-common-dir)/info/exclude"
+```
+
+Through the common git directory rather than `.git/info/exclude`: in a linked
+worktree `.git` is a file and the redirection fails with `not a directory`. This
+form is correct in both. Do not reach for `GIT_CONFIG_*` — the engine strips it
+deliberately, because the same mechanism sets `core.fileMode`, and an exclusion
+passed that way is ignored without saying so.
+
+**A revision range is a target, not a description.** Pass `b24a0e0^..HEAD`
+directly as the target argument. Passing `.` and describing the range in prose
+measures coverage against every file in the repository, which caps the verdict
+for a reason that has nothing to do with the code.
+
+**Build both binaries from one commit.** They are one contract in two halves and
+a mismatched pair fails in ways that read as engine defects. `just build` stamps
+them; `grimes --version` and `grimes-contract --version` must agree.
+
+## When a run fails
+
+Preserve and report. Do not retry, repair the runner, or clean up.
+
+- the exact `grimes run` argv, including every role prompt in full
+- the exact error
+- `.grimes/work/<role>.log`, which the engine writes for every pass
+- whether `.grimes/fix` exists, and `git -C .grimes/fix status --porcelain`
+- `grimes state --show --dir=.`
+
+Report **what happened** — the command, its output, the state — and do not
+diagnose it. This applies to your own mistakes as much as the engine's: paste
+the command, not an account of why it went wrong. A cause named without being
+checked sends the reader to the wrong place, and a wrong one is worse than none.
+
 ## What each CLI needs
 
 Verified 2026-09-18. Each of these runs one shot, takes the prompt as the last
@@ -71,6 +118,33 @@ grimes run --dir=. \
 spawns: you are saying each command begins a context that has not seen the
 first review. It is your word, and the record keeps it as such.
 
+> Grind this repo against the last three commits, fix mode, all three roles on
+> Codex.
+
+```bash
+grimes run --dir="$PWD" --mode=fix \
+  --provider-command="codex exec" \
+    --provider-arg="--dangerously-bypass-approvals-and-sandbox" \
+    --provider-arg="$(cat adapters/prompts/primary.txt)" \
+  --refuter-command="codex exec" \
+    --refuter-arg="--dangerously-bypass-approvals-and-sandbox" \
+    --refuter-arg="$(cat adapters/prompts/refuter.txt)" --refuter-fresh \
+  --adjudicator-command="codex exec" \
+    --adjudicator-arg="--dangerously-bypass-approvals-and-sandbox" \
+    --adjudicator-arg="$(cat adapters/prompts/adjudicator.txt)" --adjudicator-fresh \
+  --provider-timeout=45m \
+  --verify-command='just check' \
+  HEAD~3..HEAD
+```
+
+The prompt is the whole file, read as-is. Do not extract part of one, append to
+one, or compose one from more than one source. A pattern written to pull text
+out of a file is how two runs lost their role prompts to an empty string.
+
+No `--json`. It streams every tool call to stdout, and a long review crosses the
+retention bound mid-pass; it buys nothing either, since the report arrives as a
+sealed file and the engine records stdout regardless.
+
 ## What to put in a role prompt
 
 Not the methodology. `skills/frank-grimes/SKILL.md` is the normative procedure,
@@ -95,6 +169,30 @@ correct the arguments and try again rather than abandon the review.
 engine collects the file first and falls back to stdout, so a role that seals
 and then describes its work in prose is not penalised for it. That is the
 ordinary behaviour of an agent CLI, and it needs no prompting against.
+
+## Reviewing with your own context
+
+The engine spawns a provider, so from the outside a role always looks fresh.
+It is not, if the command you gave it reaches back into the session running the
+review. An agent that drives Grimes and also answers as the provider is the
+most contaminated context in the system: it has seen the target, the previous
+iterations, and its own earlier conclusions, and it is now being asked whether
+those conclusions hold.
+
+Nothing can detect that. Say it instead:
+
+```bash
+grimes run --provider-is-coordinator ...
+```
+
+The run records `coordinator_authored`, reports `coordinator_separation` as an
+unmet gate, and caps `review_confidence` at medium, which puts GREEN out of
+reach. It does not stop the review: a contaminated context still finds real
+defects. It stops the review from vouching for itself.
+
+The alternative is to spawn the review on a CLI of its own, which is what the
+per-role commands above are for. A separate process with a separate context is
+the thing the declaration is admitting you do not have.
 
 ## What a long review needs
 

@@ -27,6 +27,15 @@ enum Category {
   CATEGORY_MNT = 8;
   CATEGORY_DEP = 9;
   CATEGORY_HUM = 10;
+  // Whether the code earns its keep at all. The other ten ask whether the
+  // target is correct, safe, reliable and maintainable; none asks whether it
+  // should exist. Maintainability is the cost of keeping something; necessity
+  // is whether there was anything to keep: an abstraction with one call site,
+  // configuration with no second case, a problem solved before it was had.
+  //
+  // It is the one category whose repair is usually deletion, which is why the
+  // others do not express it.
+  CATEGORY_NEC = 11;
 }
 
 enum Severity {
@@ -43,6 +52,19 @@ enum Likelihood {
   LIKELIHOOD_PLAUSIBLE = 2;
   LIKELIHOOD_UNLIKELY = 3;
   LIKELIHOOD_UNKNOWN = 4;
+}
+
+// How much work the repair is, as the reporting context estimates it.
+//
+// Self-reported and only a tie-break: it orders findings that already carry the
+// same probability and impact, and it can never lift one above a finding with
+// a worse product. Unstated sorts between the two, so declining to guess costs
+// nothing and claiming nothing gains nothing.
+enum EaseOfFix {
+  EASE_OF_FIX_UNSPECIFIED = 0;
+  EASE_OF_FIX_TRIVIAL = 1;
+  EASE_OF_FIX_MODERATE = 2;
+  EASE_OF_FIX_INVOLVED = 3;
 }
 
 enum BlastRadius {
@@ -216,6 +238,8 @@ message Risk {
     defined_only: true
     not_in: [0]
   }];
+  // Optional: a report that does not estimate the repair is not worse for it.
+  EaseOfFix ease_of_fix = 4 [(buf.validate.field).enum.defined_only = true];
 }
 
 // Accepting a risk is a human decision with a name attached and a date by
@@ -440,6 +464,28 @@ message Acquittal {
   string scope = 6 [(buf.validate.field).string.min_len = 1];
 }
 
+// An acquittal the ledger keeps, and what has happened to it since.
+//
+// A claim that survived a controlled probe is a durable fact in the opposite
+// direction from a finding, and it was report-scoped: re-earned from scratch
+// each iteration, or silently not re-earned, with nothing able to tell an
+// invariant that keeps surviving from one that stopped being probed.
+message AcquittalRecord {
+  // The acquittal as the pass that earned it reported it. Replaced each time
+  // the claim is acquitted again, so this is the most recent probe.
+  Acquittal acquittal = 1 [(buf.validate.field).required = true];
+  // Iterations that attacked this claim and could not break it, counted across
+  // the whole run rather than within one report.
+  uint32 survived = 2 [(buf.validate.field).uint32.gte = 1];
+  // The iteration that last probed it. A claim acquitted in iteration 1 and
+  // untouched since is not the same as one still being tested.
+  uint32 last_probed_iteration = 3 [(buf.validate.field).uint32.gte = 1];
+  // Set when a later pass raised a finding for the claim this acquitted. The
+  // interesting transition: something the review said it had tested and cleared
+  // turned out to be a defect, and the record keeps both halves.
+  string overturned_by_finding_id = 4;
+}
+
 // A unit deliberately not examined. The reason is required: an unexplained
 // skip is indistinguishable from an oversight.
 message SkippedUnit {
@@ -654,6 +700,11 @@ enum FindingProvenance {
   FINDING_PROVENANCE_UPHELD = 1;
   FINDING_PROVENANCE_UNATTACKED = 2;
   FINDING_PROVENANCE_REFUTED = 3;
+  // One context broke the claim and another, which also did not form it, could
+  // not. Convergence between reviewers is not correctness, and neither is the
+  // first answer to arrive: a claim nobody agrees about is reported as one
+  // rather than resolved by whichever attempt the engine read first.
+  FINDING_PROVENANCE_CONTESTED = 4;
 }
 
 // Whether the refutation pass was shown capable of refuting, by being handed a
@@ -720,7 +771,7 @@ message Finding {
     expression: "this.evidence.tier != 3 || this.risk.severity != 1"
   };
 
-  string id = 1 [(buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$"];
+  string id = 1 [(buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM|NEC)-[0-9a-f]{12}([0-9a-f]{4})?$"];
   bytes fingerprint_sha256 = 2 [(buf.validate.field).bytes.len = 32];
   Category category = 3 [(buf.validate.field).enum = {
     defined_only: true
@@ -746,7 +797,7 @@ message Finding {
   // context that could choose it could merge two defects into one, or split one
   // into two, and the loop reads both as progress.
   string supersedes = 14 [
-    (buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$",
+    (buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM|NEC)-[0-9a-f]{12}([0-9a-f]{4})?$",
     (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
   ];
 }
@@ -786,6 +837,10 @@ message Ledger {
   uint32 schema_minor = 2;
   Target target = 3 [(buf.validate.field).required = true];
   map<string, Finding> findings = 4;
+  // Acquittals by content address, the way findings are. A claim keeps its
+  // identity across iterations so the review can say it has survived four
+  // probes rather than that someone probed something once.
+  map<string, AcquittalRecord> acquittals = 8;
   // The target this ledger's findings were raised against before a fix moved
   // it. Present only on a ledger that crossed a fingerprint change, and written
   // by the run that made the change: it is what separates a target the review
@@ -1036,7 +1091,15 @@ message FindingCounts {
 }
 
 message FindingSnapshot {
-  string id = 1 [(buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$"];
+  // A label nothing supports is an assertion. Contested means two attempts
+  // disagreed, so the record carries at least the two.
+  option (buf.validate.message).cel = {
+    id: "finding.contested_shows_both_positions"
+    message: "a contested finding must carry the attempts that disagree"
+    expression: "this.provenance != 4 || size(this.refutation) >= 2"
+  };
+
+  string id = 1 [(buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM|NEC)-[0-9a-f]{12}([0-9a-f]{4})?$"];
   FindingStatus status = 2 [(buf.validate.field).enum = {
     defined_only: true
     not_in: [0]
@@ -1053,6 +1116,19 @@ message FindingSnapshot {
     defined_only: true
     not_in: [0]
   }];
+  // Every attack this claim survived or did not. Present so a contested
+  // finding is readable as the disagreement it is: the label says the positions
+  // differ, and these are the positions.
+  repeated RefutationAttempt refutation = 7;
+  // How many independent contexts tried to break this claim and could not.
+  // Survived refutation is the one evidence class that gets stronger with
+  // effort, which is why it raises the probability axis below.
+  uint32 survived_refutations = 8;
+  // Probability times impact, with ease of fix as a fraction below one so it
+  // orders equals without overtaking anything. Recorded rather than left
+  // implicit in the order, so a reader can see why one finding sorts above
+  // another instead of taking the sequence on faith.
+  double rank = 9;
 }
 
 message LedgerRef {
@@ -1066,6 +1142,11 @@ message GrimesResult {
     id: "result.orchestrator_only"
     message: "only the orchestrator may emit the final result"
     expression: "this.producer_role == 3"
+  };
+  option (buf.validate.message).cel = {
+    id: "result.coordinator_authored_is_not_green"
+    message: "a review authored by the coordinating context cannot be green"
+    expression: "!this.coordinator_authored || this.legacy_color != 1"
   };
   option (buf.validate.message).cel = {
     id: "result.failed_control_says_why"
@@ -1242,6 +1323,16 @@ message GrimesResult {
   // that upheld the control, one that broke it without exhibiting the line the
   // engine read, and one that answered nothing at all.
   string refuter_check_reason = 24 [(buf.validate.field).string.max_len = 400];
+  // Set when the operator said the reviewing context is the one coordinating
+  // the run.
+  //
+  // A coordinator holds context across the whole review, which makes it the
+  // most contaminated context in the system by construction. If it also
+  // authors findings, the fresh-context rule buys nothing: the review is
+  // ratifying itself at the top. The engine cannot see this -- a provider is
+  // an opaque command either way -- so it is the operator's word, recorded as
+  // such, and it caps confidence the way a waived boundary does.
+  bool coordinator_authored = 25;
   // How each spawned role was bounded to the review's own artifacts. Named
   // rather than flagged, so a record says which mechanism was relied on and a
   // reader can tell a built-in boundary from an operator's wrapper.
@@ -1272,9 +1363,10 @@ enum CommitWithheld {
   COMMIT_WITHHELD_UNAUTHORIZED = 2;
   // The gate did not pass over the batch, so nothing here is verified.
   COMMIT_WITHHELD_GATE = 3;
-  // The batch touched a file anchoring a claim a refuter broke. A commit takes
-  // the whole worktree, so it would carry the unearned repair inside one
-  // crediting the surviving repair beside it.
+  // The batch touched a file anchoring a claim an independent context broke,
+  // or one two of them disagreed about. A commit takes the whole worktree, so
+  // it would carry the uncredited repair inside one crediting the surviving
+  // repair beside it.
   COMMIT_WITHHELD_REFUTED_CLAIM = 4;
   // The batch closed nothing this run may credit.
   COMMIT_WITHHELD_NOTHING_CREDITED = 5;

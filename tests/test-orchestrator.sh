@@ -241,6 +241,146 @@ fi
 rm -rf "$WS"
 
 echo ""
+echo "--- Findings are ordered by what to fix first ---"
+
+# Two findings of the same severity: one reachable but small, one systemic but
+# improbable. A single letter cannot separate them, so the record used to sort
+# them by id and say nothing about which mattered more.
+WS="$(workspace)"
+OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-two-ranks.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --format=prototext src 2>&1 || true)"
+FIRST_RADIUS="$(awk '/blast_radius: /{print $2; exit}' <<<"$OUT")"
+if [[ "$FIRST_RADIUS" == "BLAST_RADIUS_SYSTEMIC" ]]; then
+    pass "impact carries a systemic finding above a likelier small one"
+else
+    fail "the record led with $FIRST_RADIUS"
+fi
+# The order is explainable rather than taken on faith.
+if grep -qE '^ +rank: +[0-9]' <<<"$OUT"; then
+    pass "and the record says what put it there"
+else
+    fail "the record carries no rank"
+fi
+rm -rf "$WS"
+
+# Rank orders work within a band; it does not decide which band a finding is in.
+# The skill keeps every terminal P0/P1 ahead of P2/P3, and a likely systemic P2
+# outscores an unlikely single-user P0.
+WS="$(workspace)"
+OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-band-inversion.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --format=prototext src 2>&1 || true)"
+FIRST_SEVERITY="$(awk '/severity: /{print $2; exit}' <<<"$OUT")"
+if [[ "$FIRST_SEVERITY" == "SEVERITY_P0" ]]; then
+    pass "a terminal finding leads a higher-scoring P2"
+else
+    fail "the record led with $FIRST_SEVERITY"
+fi
+rm -rf "$WS"
+
+echo ""
+echo "--- A review its own coordinator authored cannot be green ---"
+
+# A coordinator holds context across the whole review, which makes it the most
+# contaminated context in the system. If it also authors findings, the review
+# ratifies itself above every fresh context beneath it. The engine cannot see
+# this -- a provider is an opaque command either way -- so it is the operator's
+# word, and it costs what a waived boundary costs.
+WS="$(workspace)"
+OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --provider-is-coordinator --format=prototext src 2>&1 || true)"
+assert_match "$OUT" 'coordinator_authored: +true' \
+    "the declaration reaches the record"
+assert_match "$OUT" 'unmet_gates: +"coordinator_separation"' \
+    "and is named as the gate it did not meet"
+assert_no_match "$OUT" 'legacy_color: +LEGACY_COLOR_GREEN' \
+    "a self-authored review cannot be green"
+rm -rf "$WS"
+
+# The same run without the declaration is the one that can reach green, so the
+# cap is the declaration and not something else in the way.
+WS="$(workspace)"
+OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --format=prototext src 2>&1 || true)"
+assert_match "$OUT" 'legacy_color: +LEGACY_COLOR_GREEN' \
+    "and the undeclared run still reaches green"
+rm -rf "$WS"
+
+echo ""
+echo "--- An acquittal is a durable fact, not a report's own arithmetic ---"
+
+# A claim that survived a probe was re-earned from scratch each pass, or
+# silently not re-earned, and nothing could tell an invariant that keeps
+# surviving from one that stopped being probed.
+acq_field() {
+    "$BINDIR/grimes-contract" decode --type=Ledger "$1/.grimes/ledger.pb" 2>/dev/null | grep -aE "$2" || true
+}
+
+WS="$(workspace)"
+for _ in 1 2 3; do
+    "$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-p2.sh" \
+        --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+        src >/dev/null 2>&1 || true
+done
+if [[ -n "$(acq_field "$WS" 'survived: +3')" ]]; then
+    pass "a claim probed three times has survived three times"
+else
+    fail "the ledger did not count the probes: $(acq_field "$WS" 'survived:')"
+fi
+rm -rf "$WS"
+
+# The transition worth keeping: something the review cleared turns out to be a
+# defect, and both halves stay.
+WS="$(workspace)"
+"$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-clears-sec.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    src >/dev/null 2>&1 || true
+if [[ -n "$(acq_field "$WS" 'overturned_by_finding_id')" ]]; then
+    fail "a claim nobody contradicted was recorded as overturned"
+else
+    pass "a claim nobody contradicted is not overturned"
+fi
+"$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-overturns.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    src >/dev/null 2>&1 || true
+if [[ -n "$(acq_field "$WS" 'overturned_by_finding_id: +"FG-SEC-')" ]]; then
+    pass "and the finding that contradicted it is named against the acquittal"
+else
+    fail "the overturned acquittal names no finding"
+fi
+rm -rf "$WS"
+
+echo ""
+echo "--- Necessity is a category of its own ---"
+
+# The other ten ask whether the target is correct, safe, reliable and
+# maintainable. None asks whether it should exist, and a repair here is usually
+# a deletion, which none of them naturally expresses.
+WS="$(workspace)"
+OUT="$("$GRIMES" run --dir="$WS" --categories=NEC,COR,SEC,REL,OPS \
+    --provider-command="$FAKES/provider-necessity.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --format=prototext src 2>&1 || true)"
+# The finding is the observable: the routed set is not carried in the result,
+# so a run that admits an FG-NEC finding is what says the category reached the
+# role and came back.
+assert_match "$OUT" 'FG-NEC-' "a necessity finding is routed, admitted and recorded"
+rm -rf "$WS"
+
+# And a finding in it carries the category in its identity, the way the other
+# ten do.
+NEC_ID="$("$BINDIR/grimes-contract" id --category=NEC --path=src/app.sh \
+    --evidence="an abstraction with one call site" 2>/dev/null | awk '/^id:/{print $2}')"
+if [[ "$NEC_ID" == FG-NEC-* ]]; then
+    pass "a necessity finding is addressable as one"
+else
+    fail "the contract issued $NEC_ID"
+fi
+
+echo ""
 echo "--- Invalid provider output fails closed ---"
 
 for fake in provider-garbage provider-noenvelope provider-exit7 provider-sealed-but-silent provider-silent; do

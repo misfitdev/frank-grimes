@@ -394,6 +394,18 @@ Grimey's voice is deliberately not scored: it exists because it is fun to read, 
 
 See `benchmark/rubric.md` for the full rubric and scoring criteria.
 
+## Reviewing with the context that is running the review
+
+A provider is an opaque command, so the engine cannot tell a fresh reviewing
+context from the session driving the run. If they are the same, the review is
+ratifying itself: the coordinator holds context across every iteration, and a
+finding it raised is then judged by the context that raised it.
+
+`--provider-is-coordinator` is the operator saying so. The run records it,
+names `coordinator_separation` among its unmet gates, and caps review
+confidence at medium, so such a run cannot be green. Declaring it costs a
+colour; not declaring it costs the meaning of the colour.
+
 ## Anti-Patterns
 
 The skill warns against these failure modes:
