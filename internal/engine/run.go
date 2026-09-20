@@ -460,7 +460,28 @@ func missingEnvelope(out *ProviderOutput) string {
 		fmt.Fprintf(&b, ". Its stderr ended: %q", tail(out.Diagnostics, diagnosticTail))
 	}
 	b.WriteString(". A report reaches the engine on the provider's own stdout")
+	if nestedSandbox(out) {
+		b.WriteString(". The provider said sandbox_apply, which is the kernel " +
+			"refusing a second sandbox inside this one: a role already runs " +
+			"under the engine's boundary, and macOS refuses a nested " +
+			"sandbox_apply as soon as the outer profile denies anything. Turn " +
+			"the provider's own sandboxing off -- codex takes " +
+			"--dangerously-bypass-approvals-and-sandbox -- rather than reaching " +
+			"for --unsafe here, which waives the engine's boundary instead and " +
+			"leaves the run unable to vouch for what it read")
+	}
 	return b.String()
+}
+
+// nestedSandbox reports whether the provider died refusing to nest a sandbox.
+//
+// sandbox_apply is the operating system's error, not any provider's, so
+// recognising it holds no per-provider knowledge: nothing has to be taught
+// about a CLI for this to name what happened to it.
+func nestedSandbox(out *ProviderOutput) bool {
+	const refusal = "sandbox_apply"
+	return strings.Contains(out.Diagnostics, refusal) ||
+		strings.Contains(string(out.Raw), refusal)
 }
 
 // diagnosticTail bounds each excerpt in that account. Enough to recognise what
