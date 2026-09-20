@@ -654,6 +654,11 @@ enum FindingProvenance {
   FINDING_PROVENANCE_UPHELD = 1;
   FINDING_PROVENANCE_UNATTACKED = 2;
   FINDING_PROVENANCE_REFUTED = 3;
+  // One context broke the claim and another, which also did not form it, could
+  // not. Convergence between reviewers is not correctness, and neither is the
+  // first answer to arrive: a claim nobody agrees about is reported as one
+  // rather than resolved by whichever attempt the engine read first.
+  FINDING_PROVENANCE_CONTESTED = 4;
 }
 
 // Whether the refutation pass was shown capable of refuting, by being handed a
@@ -1036,6 +1041,14 @@ message FindingCounts {
 }
 
 message FindingSnapshot {
+  // A label nothing supports is an assertion. Contested means two attempts
+  // disagreed, so the record carries at least the two.
+  option (buf.validate.message).cel = {
+    id: "finding.contested_shows_both_positions"
+    message: "a contested finding must carry the attempts that disagree"
+    expression: "this.provenance != 4 || size(this.refutation) >= 2"
+  };
+
   string id = 1 [(buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$"];
   FindingStatus status = 2 [(buf.validate.field).enum = {
     defined_only: true
@@ -1053,6 +1066,10 @@ message FindingSnapshot {
     defined_only: true
     not_in: [0]
   }];
+  // Every attack this claim survived or did not. Present so a contested
+  // finding is readable as the disagreement it is: the label says the positions
+  // differ, and these are the positions.
+  repeated RefutationAttempt refutation = 7;
 }
 
 message LedgerRef {
@@ -1272,9 +1289,10 @@ enum CommitWithheld {
   COMMIT_WITHHELD_UNAUTHORIZED = 2;
   // The gate did not pass over the batch, so nothing here is verified.
   COMMIT_WITHHELD_GATE = 3;
-  // The batch touched a file anchoring a claim a refuter broke. A commit takes
-  // the whole worktree, so it would carry the unearned repair inside one
-  // crediting the surviving repair beside it.
+  // The batch touched a file anchoring a claim an independent context broke,
+  // or one two of them disagreed about. A commit takes the whole worktree, so
+  // it would carry the uncredited repair inside one crediting the surviving
+  // repair beside it.
   COMMIT_WITHHELD_REFUTED_CLAIM = 4;
   // The batch closed nothing this run may credit.
   COMMIT_WITHHELD_NOTHING_CREDITED = 5;

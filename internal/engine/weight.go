@@ -23,6 +23,12 @@ func count(cands []Candidate) *pb.FindingCounts {
 		if !Weighted(cand.Tags) || !Open(cand.Status) {
 			continue
 		}
+		// A claim two independent contexts disagree about has not been
+		// established. It must not force a block on one context's word; it
+		// must not buy a pass either, which decide() sees to.
+		if cand.Provenance == pb.FindingProvenance_FINDING_PROVENANCE_CONTESTED {
+			continue
+		}
 		switch cand.Severity {
 		case pb.Severity_SEVERITY_P0:
 			c.OpenP0++
@@ -59,6 +65,12 @@ func decide(in DeriveInput, counts *pb.FindingCounts) pb.Decision {
 	}
 	// A verdict over part of a target is not a verdict over the target.
 	if criticalUnknown(in) {
+		return pb.Decision_DECISION_CONDITIONAL
+	}
+	// Dropped from the blocking counts above, which would otherwise let one
+	// context's word decide. Excluding it from the pass as well is the other
+	// half: a disagreement nobody resolved is not a clean review.
+	if contested(in.Candidates) {
 		return pb.Decision_DECISION_CONDITIONAL
 	}
 	// A severe finding nobody tested carries no verdict weight, so it cannot
@@ -146,7 +158,9 @@ func confidence(in DeriveInput) pb.ReviewConfidence {
 	}
 	driving := drivingFindings(in.Candidates)
 	for _, c := range driving {
-		if c.EvidenceConflict || c.Provenance == pb.FindingProvenance_FINDING_PROVENANCE_REFUTED {
+		if c.EvidenceConflict ||
+			c.Provenance == pb.FindingProvenance_FINDING_PROVENANCE_REFUTED ||
+			c.Provenance == pb.FindingProvenance_FINDING_PROVENANCE_CONTESTED {
 			return pb.ReviewConfidence_REVIEW_CONFIDENCE_LOW
 		}
 	}
@@ -185,6 +199,17 @@ func drivingFindings(cands []Candidate) []Candidate {
 		}
 	}
 	return out
+}
+
+// contested reports whether a finding the verdict rests on is one two
+// independent contexts answered differently.
+func contested(cands []Candidate) bool {
+	for _, c := range drivingFindings(cands) {
+		if c.Provenance == pb.FindingProvenance_FINDING_PROVENANCE_CONTESTED {
+			return true
+		}
+	}
+	return false
 }
 
 // unrefuted reports whether a finding the verdict rests on has yet to survive

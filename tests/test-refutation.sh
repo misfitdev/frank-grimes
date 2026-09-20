@@ -380,6 +380,55 @@ assert_no_match "$OUT" 'unmet_gates: +"refutation"' \
 rm -rf "$WS"
 
 echo ""
+echo "--- A claim two contexts answer differently stays contested ---"
+
+# Attempts accumulate on a finding across passes, so the same claim can be
+# broken by one context and survive another. Reading whichever arrived first
+# would let the order of a repeated field decide what the review found.
+#
+# A P0, because that is the weight at which excluding a contested claim from
+# the blocking counts is observable.
+contested_run() {
+    "$GRIMES" run --dir="$1" \
+        --provider-command="$FAKES/provider-p0.sh" \
+        --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+        --refuter-command="$FAKES/refuter-flips.sh" --refuter-fresh \
+        --format=prototext src 2>&1 || true
+}
+
+WS="$(workspace)"
+contested_run "$WS" >/dev/null
+OUT="$(contested_run "$WS")"
+assert_match "$OUT" 'provenance: +FINDING_PROVENANCE_CONTESTED' \
+    "a claim answered both ways is contested, not refuted"
+assert_match "$OUT" 'unmet_gates: +"contested"' \
+    "and the disagreement is a gate of its own, not folded into refutation"
+
+# Both positions, not just the label saying they differ.
+ATTEMPTS="$(grep -cE 'refutation: +\{' <<<"$OUT" || true)"
+if [[ "$ATTEMPTS" -ge 2 ]]; then
+    pass "and the record carries both attempts"
+else
+    fail "the record carries $ATTEMPTS attempts, want both"
+fi
+
+# Neither direction decided on one context's word. The run's own decision, not
+# the adjudicator's nested one, which appears later in the same record.
+RUN_DECISION="$(awk '/^  decision: /{print $2; exit}' <<<"$OUT")"
+if [[ "$RUN_DECISION" == "DECISION_CONDITIONAL" ]]; then
+    pass "a contested P0 neither blocks nor passes on one context's word"
+else
+    fail "a contested P0 decided $RUN_DECISION"
+fi
+
+# Excluded from the blocking tally, still in the record.
+assert_no_match "$OUT" 'open_p0:' \
+    "a contested P0 is not counted as one that blocks"
+assert_match "$OUT" 'total: +1' \
+    "but it has not vanished from the record"
+rm -rf "$WS"
+
+echo ""
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"
 

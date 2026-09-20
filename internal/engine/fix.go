@@ -221,7 +221,10 @@ func editedFindings(ledger *pb.Ledger, changed []string) []string {
 		if !Open(f.GetStatus()) {
 			continue
 		}
-		if provenanceOf(f) == pb.FindingProvenance_FINDING_PROVENANCE_REFUTED {
+		// Contested alongside refuted: a claim two independent contexts
+		// answered differently has not been established either, so a repair
+		// for it is not this run's to credit.
+		if unestablished(provenanceOf(f)) {
 			continue
 		}
 		if touched[f.GetLocation().GetAnchor().GetRepoLine().GetPath().GetValue()] {
@@ -261,7 +264,7 @@ func refutedTouched(ledger *pb.Ledger, changed []string) bool {
 		if !Open(f.GetStatus()) {
 			continue
 		}
-		if provenanceOf(f) != pb.FindingProvenance_FINDING_PROVENANCE_REFUTED {
+		if !unestablished(provenanceOf(f)) {
 			continue
 		}
 		if touched[f.GetLocation().GetAnchor().GetRepoLine().GetPath().GetValue()] {
@@ -290,6 +293,13 @@ func underPath(path, scope string) bool {
 		return true
 	}
 	return path == scope || strings.HasPrefix(path, scope+"/")
+}
+
+// unestablished reports a provenance that does not entitle a repair to credit:
+// a claim an independent context broke, or one two of them disagreed about.
+func unestablished(p pb.FindingProvenance) bool {
+	return p == pb.FindingProvenance_FINDING_PROVENANCE_REFUTED ||
+		p == pb.FindingProvenance_FINDING_PROVENANCE_CONTESTED
 }
 
 func commitMessage(closed []string) string {

@@ -512,6 +512,11 @@ const (
 	FindingProvenance_FINDING_PROVENANCE_UPHELD      FindingProvenance = 1
 	FindingProvenance_FINDING_PROVENANCE_UNATTACKED  FindingProvenance = 2
 	FindingProvenance_FINDING_PROVENANCE_REFUTED     FindingProvenance = 3
+	// One context broke the claim and another, which also did not form it, could
+	// not. Convergence between reviewers is not correctness, and neither is the
+	// first answer to arrive: a claim nobody agrees about is reported as one
+	// rather than resolved by whichever attempt the engine read first.
+	FindingProvenance_FINDING_PROVENANCE_CONTESTED FindingProvenance = 4
 )
 
 // Enum value maps for FindingProvenance.
@@ -521,12 +526,14 @@ var (
 		1: "FINDING_PROVENANCE_UPHELD",
 		2: "FINDING_PROVENANCE_UNATTACKED",
 		3: "FINDING_PROVENANCE_REFUTED",
+		4: "FINDING_PROVENANCE_CONTESTED",
 	}
 	FindingProvenance_value = map[string]int32{
 		"FINDING_PROVENANCE_UNSPECIFIED": 0,
 		"FINDING_PROVENANCE_UPHELD":      1,
 		"FINDING_PROVENANCE_UNATTACKED":  2,
 		"FINDING_PROVENANCE_REFUTED":     3,
+		"FINDING_PROVENANCE_CONTESTED":   4,
 	}
 )
 
@@ -1237,9 +1244,10 @@ const (
 	CommitWithheld_COMMIT_WITHHELD_UNAUTHORIZED CommitWithheld = 2
 	// The gate did not pass over the batch, so nothing here is verified.
 	CommitWithheld_COMMIT_WITHHELD_GATE CommitWithheld = 3
-	// The batch touched a file anchoring a claim a refuter broke. A commit takes
-	// the whole worktree, so it would carry the unearned repair inside one
-	// crediting the surviving repair beside it.
+	// The batch touched a file anchoring a claim an independent context broke,
+	// or one two of them disagreed about. A commit takes the whole worktree, so
+	// it would carry the uncredited repair inside one crediting the surviving
+	// repair beside it.
 	CommitWithheld_COMMIT_WITHHELD_REFUTED_CLAIM CommitWithheld = 4
 	// The batch closed nothing this run may credit.
 	CommitWithheld_COMMIT_WITHHELD_NOTHING_CREDITED CommitWithheld = 5
@@ -4668,7 +4676,11 @@ type FindingSnapshot struct {
 	EvidenceSha256 []byte                 `protobuf:"bytes,5,opt,name=evidence_sha256,json=evidenceSha256,proto3" json:"evidence_sha256,omitempty"`
 	// What an independent attack on this claim came to. Every other field here
 	// is the reporting context describing its own finding.
-	Provenance    FindingProvenance `protobuf:"varint,6,opt,name=provenance,proto3,enum=frank_grimes.v2.FindingProvenance" json:"provenance,omitempty"`
+	Provenance FindingProvenance `protobuf:"varint,6,opt,name=provenance,proto3,enum=frank_grimes.v2.FindingProvenance" json:"provenance,omitempty"`
+	// Every attack this claim survived or did not. Present so a contested
+	// finding is readable as the disagreement it is: the label says the positions
+	// differ, and these are the positions.
+	Refutation    []*RefutationAttempt `protobuf:"bytes,7,rep,name=refutation,proto3" json:"refutation,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4743,6 +4755,13 @@ func (x *FindingSnapshot) GetProvenance() FindingProvenance {
 		return x.Provenance
 	}
 	return FindingProvenance_FINDING_PROVENANCE_UNSPECIFIED
+}
+
+func (x *FindingSnapshot) GetRefutation() []*RefutationAttempt {
+	if x != nil {
+		return x.Refutation
+	}
+	return nil
 }
 
 type LedgerRef struct {
@@ -5559,7 +5578,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\bverified\x18\x02 \x01(\rR\bverified\x12\x1a\n" +
 	"\baccepted\x18\x03 \x01(\rR\baccepted\x12\x17\n" +
 	"\aopen_p0\x18\x04 \x01(\rR\x06openP0\x12\x17\n" +
-	"\aopen_p1\x18\x05 \x01(\rR\x06openP1\"\xbc\x03\n" +
+	"\aopen_p1\x18\x05 \x01(\rR\x06openP1\"\xa1\x05\n" +
 	"\x0fFindingSnapshot\x12`\n" +
 	"\x02id\x18\x01 \x01(\tBP\xbaHMrK2I^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$R\x02id\x12B\n" +
 	"\x06status\x18\x02 \x01(\x0e2\x1e.frank_grimes.v2.FindingStatusB\n" +
@@ -5571,7 +5590,11 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\n" +
 	"provenance\x18\x06 \x01(\x0e2\".frank_grimes.v2.FindingProvenanceB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\n" +
-	"provenance\"\x9a\x01\n" +
+	"provenance\x12B\n" +
+	"\n" +
+	"refutation\x18\a \x03(\v2\".frank_grimes.v2.RefutationAttemptR\n" +
+	"refutation:\x9e\x01\xbaH\x9a\x01\x1a\x97\x01\n" +
+	"&finding.contested_shows_both_positions\x129a contested finding must carry the attempts that disagree\x1a2this.provenance != 4 || size(this.refutation) >= 2\"\x9a\x01\n" +
 	"\tLedgerRef\x12,\n" +
 	"\x04path\x18\x01 \x01(\tB\x18\xbaH\x15r\x13\n" +
 	"\x11.grimes/ledger.pbR\x04path\x12,\n" +
@@ -5707,12 +5730,13 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x1aSTOP_CONDITION_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dSTOP_CONDITION_MARGINAL_YIELD\x10\x01\x12#\n" +
 	"\x1fSTOP_CONDITION_PROBES_EXHAUSTED\x10\x02\x12'\n" +
-	"#STOP_CONDITION_EVIDENCE_UNAVAILABLE\x10\x03*\x99\x01\n" +
+	"#STOP_CONDITION_EVIDENCE_UNAVAILABLE\x10\x03*\xbb\x01\n" +
 	"\x11FindingProvenance\x12\"\n" +
 	"\x1eFINDING_PROVENANCE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19FINDING_PROVENANCE_UPHELD\x10\x01\x12!\n" +
 	"\x1dFINDING_PROVENANCE_UNATTACKED\x10\x02\x12\x1e\n" +
-	"\x1aFINDING_PROVENANCE_REFUTED\x10\x03*\x81\x01\n" +
+	"\x1aFINDING_PROVENANCE_REFUTED\x10\x03\x12 \n" +
+	"\x1cFINDING_PROVENANCE_CONTESTED\x10\x04*\x81\x01\n" +
 	"\fRefuterCheck\x12\x1d\n" +
 	"\x19REFUTER_CHECK_UNSPECIFIED\x10\x00\x12\x18\n" +
 	"\x14REFUTER_CHECK_PASSED\x10\x01\x12\x18\n" +
@@ -5965,30 +5989,31 @@ var file_frank_grimes_v2_contracts_proto_depIdxs = []int32{
 	32,  // 87: frank_grimes.v2.FindingSnapshot.risk:type_name -> frank_grimes.v2.Risk
 	5,   // 88: frank_grimes.v2.FindingSnapshot.evidence_tier:type_name -> frank_grimes.v2.EvidenceTier
 	8,   // 89: frank_grimes.v2.FindingSnapshot.provenance:type_name -> frank_grimes.v2.FindingProvenance
-	17,  // 90: frank_grimes.v2.GrimesResult.producer_role:type_name -> frank_grimes.v2.ProducerRole
-	22,  // 91: frank_grimes.v2.GrimesResult.target:type_name -> frank_grimes.v2.Target
-	15,  // 92: frank_grimes.v2.GrimesResult.mode:type_name -> frank_grimes.v2.Mode
-	16,  // 93: frank_grimes.v2.GrimesResult.completion_state:type_name -> frank_grimes.v2.CompletionState
-	57,  // 94: frank_grimes.v2.GrimesResult.verdict:type_name -> frank_grimes.v2.Verdict
-	14,  // 95: frank_grimes.v2.GrimesResult.legacy_color:type_name -> frank_grimes.v2.LegacyColor
-	61,  // 96: frank_grimes.v2.GrimesResult.marginal_yield:type_name -> frank_grimes.v2.MarginalYield
-	62,  // 97: frank_grimes.v2.GrimesResult.counts:type_name -> frank_grimes.v2.FindingCounts
-	63,  // 98: frank_grimes.v2.GrimesResult.findings:type_name -> frank_grimes.v2.FindingSnapshot
-	58,  // 99: frank_grimes.v2.GrimesResult.verification:type_name -> frank_grimes.v2.Verification
-	60,  // 100: frank_grimes.v2.GrimesResult.independent_review:type_name -> frank_grimes.v2.IndependentReview
-	64,  // 101: frank_grimes.v2.GrimesResult.ledger:type_name -> frank_grimes.v2.LedgerRef
-	9,   // 102: frank_grimes.v2.GrimesResult.refuter_check:type_name -> frank_grimes.v2.RefuterCheck
-	66,  // 103: frank_grimes.v2.GrimesResult.fix_batch:type_name -> frank_grimes.v2.FixBatch
-	59,  // 104: frank_grimes.v2.GrimesResult.adjudication:type_name -> frank_grimes.v2.AdjudicationPanel
-	21,  // 105: frank_grimes.v2.FixBatch.commit_withheld:type_name -> frank_grimes.v2.CommitWithheld
-	22,  // 106: frank_grimes.v2.LoopState.target:type_name -> frank_grimes.v2.Target
-	15,  // 107: frank_grimes.v2.LoopState.mode:type_name -> frank_grimes.v2.Mode
-	55,  // 108: frank_grimes.v2.Ledger.FindingsEntry.value:type_name -> frank_grimes.v2.Finding
-	109, // [109:109] is the sub-list for method output_type
-	109, // [109:109] is the sub-list for method input_type
-	109, // [109:109] is the sub-list for extension type_name
-	109, // [109:109] is the sub-list for extension extendee
-	0,   // [0:109] is the sub-list for field type_name
+	53,  // 90: frank_grimes.v2.FindingSnapshot.refutation:type_name -> frank_grimes.v2.RefutationAttempt
+	17,  // 91: frank_grimes.v2.GrimesResult.producer_role:type_name -> frank_grimes.v2.ProducerRole
+	22,  // 92: frank_grimes.v2.GrimesResult.target:type_name -> frank_grimes.v2.Target
+	15,  // 93: frank_grimes.v2.GrimesResult.mode:type_name -> frank_grimes.v2.Mode
+	16,  // 94: frank_grimes.v2.GrimesResult.completion_state:type_name -> frank_grimes.v2.CompletionState
+	57,  // 95: frank_grimes.v2.GrimesResult.verdict:type_name -> frank_grimes.v2.Verdict
+	14,  // 96: frank_grimes.v2.GrimesResult.legacy_color:type_name -> frank_grimes.v2.LegacyColor
+	61,  // 97: frank_grimes.v2.GrimesResult.marginal_yield:type_name -> frank_grimes.v2.MarginalYield
+	62,  // 98: frank_grimes.v2.GrimesResult.counts:type_name -> frank_grimes.v2.FindingCounts
+	63,  // 99: frank_grimes.v2.GrimesResult.findings:type_name -> frank_grimes.v2.FindingSnapshot
+	58,  // 100: frank_grimes.v2.GrimesResult.verification:type_name -> frank_grimes.v2.Verification
+	60,  // 101: frank_grimes.v2.GrimesResult.independent_review:type_name -> frank_grimes.v2.IndependentReview
+	64,  // 102: frank_grimes.v2.GrimesResult.ledger:type_name -> frank_grimes.v2.LedgerRef
+	9,   // 103: frank_grimes.v2.GrimesResult.refuter_check:type_name -> frank_grimes.v2.RefuterCheck
+	66,  // 104: frank_grimes.v2.GrimesResult.fix_batch:type_name -> frank_grimes.v2.FixBatch
+	59,  // 105: frank_grimes.v2.GrimesResult.adjudication:type_name -> frank_grimes.v2.AdjudicationPanel
+	21,  // 106: frank_grimes.v2.FixBatch.commit_withheld:type_name -> frank_grimes.v2.CommitWithheld
+	22,  // 107: frank_grimes.v2.LoopState.target:type_name -> frank_grimes.v2.Target
+	15,  // 108: frank_grimes.v2.LoopState.mode:type_name -> frank_grimes.v2.Mode
+	55,  // 109: frank_grimes.v2.Ledger.FindingsEntry.value:type_name -> frank_grimes.v2.Finding
+	110, // [110:110] is the sub-list for method output_type
+	110, // [110:110] is the sub-list for method input_type
+	110, // [110:110] is the sub-list for extension type_name
+	110, // [110:110] is the sub-list for extension extendee
+	0,   // [0:110] is the sub-list for field type_name
 }
 
 func init() { file_frank_grimes_v2_contracts_proto_init() }

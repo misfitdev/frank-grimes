@@ -15,6 +15,7 @@ const (
 	GateConfinement        = "confinement"
 	GateCoverage           = "coverage"
 	GateVerificationScope  = "verification_scope"
+	GateContested          = "contested"
 )
 
 // unmetGates names every gate standing between this run and a pass, in a fixed
@@ -45,6 +46,12 @@ func unmetGates(v *pb.Verdict, in DeriveInput) []string {
 	// lacked evidence.
 	if unrefuted(in.Candidates) {
 		gates = append(gates, GateRefutation)
+	}
+	// Named separately from refutation: a claim nobody attacked and a claim two
+	// contexts answered differently are different states of knowledge, and the
+	// record should not read as though the second were the first.
+	if contested(in.Candidates) {
+		gates = append(gates, GateContested)
 	}
 	// A unit nobody named and a category that stopped attacking before it ran
 	// out of probes are the same shortfall measured two ways, so they answer to

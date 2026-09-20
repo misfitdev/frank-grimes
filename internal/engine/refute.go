@@ -203,17 +203,28 @@ func claimsOf(ledger *pb.Ledger, runID string, iteration uint32) ([]*pb.ClaimUnd
 // the absence of one. Only an attack from a context the engine knows did not
 // form the claim can raise the finding above unattacked; anything else is the
 // claim vouching for itself, which is what the pass exists to stop.
+//
+// Both at once is neither. A claim one independent context broke and another
+// could not is a disagreement, and the record says so rather than resolving it.
 func provenanceOf(f *pb.Finding) pb.FindingProvenance {
-	upheld := false
+	refuted, upheld := false, false
 	for _, a := range f.GetRefutation() {
 		switch a.GetOutcome().(type) {
 		case *pb.RefutationAttempt_Refuted:
-			return pb.FindingProvenance_FINDING_PROVENANCE_REFUTED
+			refuted = true
 		case *pb.RefutationAttempt_Upheld:
 			upheld = upheld || a.GetContextOrigin() == pb.ContextOrigin_CONTEXT_ORIGIN_ENGINE_SPAWNED
 		}
 	}
-	if upheld {
+	switch {
+	case refuted && upheld:
+		// Two contexts that did not form the claim reached opposite answers.
+		// Reading whichever arrived first as the outcome would let the order
+		// of a repeated field decide what the review found.
+		return pb.FindingProvenance_FINDING_PROVENANCE_CONTESTED
+	case refuted:
+		return pb.FindingProvenance_FINDING_PROVENANCE_REFUTED
+	case upheld:
 		return pb.FindingProvenance_FINDING_PROVENANCE_UPHELD
 	}
 	return pb.FindingProvenance_FINDING_PROVENANCE_UNATTACKED
