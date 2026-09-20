@@ -319,3 +319,30 @@ func TestCodeForDecision(t *testing.T) {
 		}
 	}
 }
+
+// The flag package stops reading options at a bare --, so a target spelled
+// after one is a path. A raw scanner that kept going would turn that path into
+// a command the engine runs.
+func TestScannersStopAtDashDash(t *testing.T) {
+	args := []string{"--dir=.", "--provider-command=/bin/echo", "--", "--adjudicator-command=./evil.sh"}
+
+	panel, err := adjudicators(args)
+	if err != nil {
+		t.Fatalf("adjudicators: %v", err)
+	}
+	if len(panel) != 0 {
+		t.Errorf("a positional target introduced reviewer commands: %q", panel)
+	}
+
+	// And the whole parse keeps the token as the target it is.
+	c, err := parseRun(args)
+	if err != nil {
+		t.Fatalf("parseRun: %v", err)
+	}
+	if c.Target != "--adjudicator-command=./evil.sh" {
+		t.Errorf("target = %q, want the token after --", c.Target)
+	}
+	if len(c.AdjudicatorCommands) != 0 {
+		t.Errorf("reviewers = %q, want none", c.AdjudicatorCommands)
+	}
+}

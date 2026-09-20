@@ -22,7 +22,7 @@ import (
 // DefaultGateTimeout bounds one gate run. A gate is the repository's own aggregate
 // check, which is allowed to be slow; one that has not finished in this long is
 // not going to answer this iteration.
-const DefaultGateTimeout = 30 * time.Minute
+const DefaultGateTimeout = 60 * time.Minute
 
 // gateOutputLimit bounds what is retained from a gate. Only the digest reaches
 // the record, but the digest has to be over something bounded.

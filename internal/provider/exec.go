@@ -39,7 +39,10 @@ const DefaultMaxOutputBytes = 16 << 20
 const DefaultTimeout = 10 * time.Minute
 
 // stderrLimit bounds retained provider diagnostics.
-const stderrLimit = 8 << 10
+//
+// Sized like the stdout bound rather than like a note: an agent CLI narrates
+// its whole working here, and the command that went wrong is somewhere in it.
+const stderrLimit = 16 << 20
 
 // Exec invokes Command with the request supplied through the environment.
 type Exec struct {
@@ -274,7 +277,7 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	// Before any of the returns below, so that the passes worth diagnosing --
 	// a timeout, a non-zero exit -- are the ones that leave a record rather
 	// than the ones that do not.
-	e.record(req, argv, out, stderr.String(), waitErr, kept.dropped()+stderr.dropped())
+	e.record(req, argv, out, stderr.String(), waitErr, kept.dropped(), stderr.dropped())
 
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return nil, fmt.Errorf("%w: %v", engine.ErrProviderFailed, ctxErr)
@@ -292,6 +295,15 @@ func (e *Exec) Review(ctx context.Context, req engine.Request) (*engine.Provider
 	}, nil
 }
 
+// dropNote says what a stream lost, so a truncated record does not read as a
+// whole one.
+func dropNote(dropped int) string {
+	if dropped == 0 {
+		return ""
+	}
+	return fmt.Sprintf(", %d earlier dropped", dropped)
+}
+
 // RoleLog names where a role's pass is recorded, under the work directory the
 // role itself may write to.
 func RoleLog(role engine.Role) string {
@@ -307,7 +319,7 @@ func RoleLog(role engine.Role) string {
 //
 // Best effort. A run that produced a verdict is not failed for want of a note
 // about how it got there.
-func (e *Exec) record(req engine.Request, argv []string, stdout []byte, stderr string, waitErr error, dropped int) {
+func (e *Exec) record(req engine.Request, argv []string, stdout []byte, stderr string, waitErr error, outDropped, errDropped int) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "=== %s iteration %d: %s\n", roleName(req.Role), req.Iteration, strings.Join(argv, " "))
 	if waitErr != nil {
@@ -315,15 +327,12 @@ func (e *Exec) record(req engine.Request, argv []string, stdout []byte, stderr s
 	} else {
 		b.WriteString("exit: 0\n")
 	}
-	if dropped > 0 {
-		fmt.Fprintf(&b, "dropped: %d bytes over the retention bound, oldest first\n", dropped)
-	}
-	fmt.Fprintf(&b, "--- stdout (%d bytes) ---\n", len(stdout))
+	fmt.Fprintf(&b, "--- stdout (%d bytes%s) ---\n", len(stdout), dropNote(outDropped))
 	b.Write(stdout)
 	if len(stdout) > 0 && !strings.HasSuffix(string(stdout), "\n") {
 		b.WriteString("\n")
 	}
-	b.WriteString("--- stderr ---\n")
+	fmt.Fprintf(&b, "--- stderr (%d bytes%s) ---\n", len(stderr), dropNote(errDropped))
 	b.WriteString(stderr)
 	if stderr != "" && !strings.HasSuffix(stderr, "\n") {
 		b.WriteString("\n")
@@ -333,7 +342,10 @@ func (e *Exec) record(req engine.Request, argv []string, stdout []byte, stderr s
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return
 	}
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
+	// O_NOFOLLOW: the role may write this directory, and an open that follows
+	// a link would write wherever the role pointed one, as the engine rather
+	// than as the confined role. A planted link costs the log, not the file.
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND|syscall.O_NOFOLLOW, 0o644)
 	if err != nil {
 		return
 	}
