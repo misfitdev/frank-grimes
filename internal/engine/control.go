@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
@@ -165,8 +166,8 @@ func checkOf(attempt *pb.RefutationAttempt, ctrl *control) (pb.RefuterCheck, str
 		if !exhibits(attempt.GetRefuted(), ctrl.witness) {
 			return pb.RefuterCheck_REFUTER_CHECK_FAILED, fmt.Sprintf(
 				"the control was broken without exhibiting what the target says: the "+
-					"disproof had to quote %q and its excerpt does not contain it",
-				truncateWitness(ctrl.witness))
+					"disproof had to quote %s and its excerpt does not contain it",
+				quotedWitness(ctrl.witness))
 		}
 		return pb.RefuterCheck_REFUTER_CHECK_PASSED, ""
 	case *pb.RefutationAttempt_Upheld:
@@ -178,14 +179,30 @@ func checkOf(attempt *pb.RefutationAttempt, ctrl *control) (pb.RefuterCheck, str
 	}
 }
 
-// truncateWitness bounds the quoted line. The contract caps the reason, and a
-// witness is a line of the target, which has no length anyone promised.
-func truncateWitness(s string) string {
-	const max = 120
-	if len(s) <= max {
-		return s
+// quotedWitness renders the line for the reason, bounded after quoting.
+//
+// Bounding the raw line is not enough: %q escapes, and a byte that is not
+// valid UTF-8 becomes four characters, so 120 raw bytes can quote to 482. The
+// contract caps the reason at 400, and a target is read without any promise
+// about its encoding, so an overlong reason would fail validation and lose the
+// whole result rather than the excerpt.
+//
+// The raw witness is untouched; exhibits compares against that.
+func quotedWitness(s string) string {
+	const max = 200
+	if len(s) > max {
+		s = s[:max]
 	}
-	return s[:max] + "..."
+	truncated := false
+	for len(strconv.Quote(s)) > max && len(s) > 0 {
+		s = s[:len(s)-1]
+		truncated = true
+	}
+	q := strconv.Quote(s)
+	if truncated {
+		return q + " (truncated)"
+	}
+	return q
 }
 
 // exhibits reports whether the disproof carries what the artifact says.

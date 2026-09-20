@@ -160,29 +160,41 @@ func (r *Repo) AddWorktree(ctx context.Context, dir, branch, commit string) (*Wo
 	if err != nil {
 		return nil, err
 	}
+	// Whether the branch is ours to delete if the add fails. An add that failed
+	// because the name was taken must not take the branch that took it.
+	mine := !r.hasBranch(ctx, branch)
 	if _, err := r.run(ctx, "worktree", "add", "--quiet", "-b", branch, abs, commit); err != nil {
 		// git registers the worktree before it runs the repository's own
 		// post-checkout hook, so a hook that fails leaves the registration
 		// behind. Every later run then refuses a path that is registered and
 		// not there, naming neither the hook nor prune. Cleared here so a
 		// failure costs this run and not the next one.
-		r.discardWorktree(ctx, abs, branch)
+		r.discardWorktree(ctx, abs, branch, mine)
 		return nil, fmt.Errorf("creating the worktree: %w", err)
 	}
 	return r.openWorktree(ctx, abs)
 }
 
 // discardWorktree clears what a failed add left: the directory, the
-// registration that outlives it, and the branch the add may already have made.
+// registration that outlives it, and the branch, when the branch is one this
+// call made.
 //
 // Best effort, and it reports nothing. The caller is already returning the
 // failure that matters, and a cleanup error would replace it with a less
 // useful one.
-func (r *Repo) discardWorktree(ctx context.Context, dir, branch string) {
+func (r *Repo) discardWorktree(ctx context.Context, dir, branch string, ownBranch bool) {
 	_, _ = r.run(ctx, "worktree", "remove", "--force", dir)
 	_ = os.RemoveAll(dir)
 	_, _ = r.run(ctx, "worktree", "prune")
-	_, _ = r.run(ctx, "branch", "-D", branch)
+	if ownBranch {
+		_, _ = r.run(ctx, "branch", "-D", branch)
+	}
+}
+
+// hasBranch reports whether the name is already a branch here.
+func (r *Repo) hasBranch(ctx context.Context, branch string) bool {
+	_, err := r.run(ctx, "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
+	return err == nil
 }
 
 // OpenWorktree returns a worktree that is already there, from a run that made

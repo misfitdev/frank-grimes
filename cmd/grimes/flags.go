@@ -318,8 +318,12 @@ func (c *config) validate() error {
 	if err := validateResearch(c.Research); err != nil {
 		return err
 	}
-	if len(c.VerifyExcludes) > 0 && c.VerifyCommand == "" && !c.RepositoryCheck {
-		return fmt.Errorf("--verify-excludes needs a gate to exclude something from")
+	// Report mode runs no gate, so an exclusion there would be accepted and
+	// dropped: absent from the record and from the unmet gates, which is worse
+	// than refusing it.
+	if len(c.VerifyExcludes) > 0 &&
+		(c.Mode != pb.Mode_MODE_FIX || (c.VerifyCommand == "" && !c.RepositoryCheck)) {
+		return fmt.Errorf("--verify-excludes needs --mode fix and a gate to exclude something from")
 	}
 	if c.Commit && c.Mode != pb.Mode_MODE_FIX {
 		return fmt.Errorf("--commit requires --mode fix")

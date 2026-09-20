@@ -1,9 +1,9 @@
 # Dependencies and build output
 node_modules/
 vendor/
-dist/
-build/
-coverage/
+/dist/
+/build/
+/coverage/
 .cache/
 .tmp/
 tmp/

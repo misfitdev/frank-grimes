@@ -798,10 +798,25 @@ OUT="$("$GRIMES" run --dir="$REPO" --mode=fix --provider-command="$FAKES/fixer-r
 CODE=$?
 set -e
 # Exit 1, the way every other refused flag combination exits.
-if [[ "$CODE" == "1" ]] && grep -q 'needs a gate' <<<"$OUT"; then
+if [[ "$CODE" == "1" ]] && grep -q 'needs --mode fix and a gate' <<<"$OUT"; then
     pass "--verify-excludes without a gate is refused by name"
 else
     fail "--verify-excludes without a gate was accepted (exit $CODE)"
+fi
+rm -rf "$REPO"
+
+# Report mode runs no gate at all, so an exclusion there would be accepted and
+# then dropped: absent from the record and from the unmet gates.
+REPO="$(repository)"
+set +e
+OUT="$("$GRIMES" run --dir="$REPO" --provider-command="$FAKES/provider-green.sh" \
+    --verify-command="true" --verify-excludes="something" src 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" == "1" ]] && grep -q 'needs --mode fix' <<<"$OUT"; then
+    pass "--verify-excludes in report mode is refused by name"
+else
+    fail "--verify-excludes in report mode was accepted (exit $CODE)"
 fi
 rm -rf "$REPO"
 
