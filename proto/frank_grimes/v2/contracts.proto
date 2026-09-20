@@ -455,6 +455,28 @@ message Acquittal {
   string scope = 6 [(buf.validate.field).string.min_len = 1];
 }
 
+// An acquittal the ledger keeps, and what has happened to it since.
+//
+// A claim that survived a controlled probe is a durable fact in the opposite
+// direction from a finding, and it was report-scoped: re-earned from scratch
+// each iteration, or silently not re-earned, with nothing able to tell an
+// invariant that keeps surviving from one that stopped being probed.
+message AcquittalRecord {
+  // The acquittal as the pass that earned it reported it. Replaced each time
+  // the claim is acquitted again, so this is the most recent probe.
+  Acquittal acquittal = 1 [(buf.validate.field).required = true];
+  // Iterations that attacked this claim and could not break it, counted across
+  // the whole run rather than within one report.
+  uint32 survived = 2 [(buf.validate.field).uint32.gte = 1];
+  // The iteration that last probed it. A claim acquitted in iteration 1 and
+  // untouched since is not the same as one still being tested.
+  uint32 last_probed_iteration = 3 [(buf.validate.field).uint32.gte = 1];
+  // Set when a later pass raised a finding for the claim this acquitted. The
+  // interesting transition: something the review said it had tested and cleared
+  // turned out to be a defect, and the record keeps both halves.
+  string overturned_by_finding_id = 4;
+}
+
 // A unit deliberately not examined. The reason is required: an unexplained
 // skip is indistinguishable from an oversight.
 message SkippedUnit {
@@ -806,6 +828,10 @@ message Ledger {
   uint32 schema_minor = 2;
   Target target = 3 [(buf.validate.field).required = true];
   map<string, Finding> findings = 4;
+  // Acquittals by content address, the way findings are. A claim keeps its
+  // identity across iterations so the review can say it has survived four
+  // probes rather than that someone probed something once.
+  map<string, AcquittalRecord> acquittals = 8;
   // The target this ledger's findings were raised against before a fix moved
   // it. Present only on a ledger that crossed a fingerprint change, and written
   // by the run that made the change: it is what separates a target the review

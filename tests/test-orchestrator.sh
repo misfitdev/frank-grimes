@@ -257,7 +257,7 @@ else
     fail "the record led with $FIRST_RADIUS"
 fi
 # The order is explainable rather than taken on faith.
-if grep -qE '^  rank: [0-9]' <<<"$OUT"; then
+if grep -qE '^ +rank: +[0-9]' <<<"$OUT"; then
     pass "and the record says what put it there"
 else
     fail "the record carries no rank"
@@ -292,6 +292,50 @@ OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-green.sh" \
     --format=prototext src 2>&1 || true)"
 assert_match "$OUT" 'legacy_color: +LEGACY_COLOR_GREEN' \
     "and the undeclared run still reaches green"
+rm -rf "$WS"
+
+echo ""
+echo "--- An acquittal is a durable fact, not a report's own arithmetic ---"
+
+# A claim that survived a probe was re-earned from scratch each pass, or
+# silently not re-earned, and nothing could tell an invariant that keeps
+# surviving from one that stopped being probed.
+acq_field() {
+    "$BINDIR/grimes-contract" decode --type=Ledger "$1/.grimes/ledger.pb" 2>/dev/null | grep -aE "$2" || true
+}
+
+WS="$(workspace)"
+for _ in 1 2 3; do
+    "$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-p2.sh" \
+        --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+        src >/dev/null 2>&1 || true
+done
+if [[ -n "$(acq_field "$WS" 'survived: +3')" ]]; then
+    pass "a claim probed three times has survived three times"
+else
+    fail "the ledger did not count the probes: $(acq_field "$WS" 'survived:')"
+fi
+rm -rf "$WS"
+
+# The transition worth keeping: something the review cleared turns out to be a
+# defect, and both halves stay.
+WS="$(workspace)"
+"$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-clears-sec.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    src >/dev/null 2>&1 || true
+if [[ -n "$(acq_field "$WS" 'overturned_by_finding_id')" ]]; then
+    fail "a claim nobody contradicted was recorded as overturned"
+else
+    pass "a claim nobody contradicted is not overturned"
+fi
+"$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-overturns.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    src >/dev/null 2>&1 || true
+if [[ -n "$(acq_field "$WS" 'overturned_by_finding_id: +"FG-SEC-')" ]]; then
+    pass "and the finding that contradicted it is named against the acquittal"
+else
+    fail "the overturned acquittal names no finding"
+fi
 rm -rf "$WS"
 
 echo ""

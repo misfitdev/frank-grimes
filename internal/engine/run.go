@@ -571,6 +571,13 @@ func (e *Engine) apply(ctx context.Context, ledger *pb.Ledger, report *pb.Provid
 		reported[finding.GetId()] = true
 	}
 
+	// After the candidates are admitted below, so an acquittal a finding in the
+	// same pass contradicts is linked to it rather than to the next pass's.
+	defer func() {
+		keepAcquittals(ledger, report, iteration)
+		overturnAcquittals(ledger)
+	}()
+
 	named := map[string]bool{}
 	for _, finding := range admitted {
 		id := finding.GetId()
