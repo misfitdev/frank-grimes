@@ -27,4 +27,5 @@ summary: "One deletion path fixed and verified."
 confinement: "sandbox-exec"
 fix_batch {
   branch: "grimes/fix-010"
+  commit_withheld: COMMIT_WITHHELD_GATE
 }

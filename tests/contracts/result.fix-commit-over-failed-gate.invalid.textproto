@@ -29,4 +29,5 @@ fix_batch {
   branch: "grimes/fix-010"
   commit_sha1: "0123456789012345678a"
   closed_finding_ids: "FG-SEC-0001"
+  commit_withheld: COMMIT_WITHHELD_NONE
 }

@@ -29,4 +29,5 @@ fix_batch {
   worktree: "/tmp/grimes-fix-010"
   branch: "grimes/fix-010"
   closed_finding_ids: "FG-SEC-0001"
+  commit_withheld: COMMIT_WITHHELD_GATE
 }

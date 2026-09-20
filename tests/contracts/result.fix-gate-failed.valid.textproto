@@ -28,4 +28,5 @@ confinement: "sandbox-exec"
 fix_batch {
   worktree: "/tmp/grimes-fix-010"
   branch: "grimes/fix-010"
+  commit_withheld: COMMIT_WITHHELD_GATE
 }
