@@ -4184,7 +4184,17 @@ type Verification struct {
 	// Not optional: "the repository's own check passed" and "no gate was
 	// available" are different facts, and a record that omits which rule applied
 	// cannot tell them apart.
-	SelectedBy    GateSelection `protobuf:"varint,7,opt,name=selected_by,json=selectedBy,proto3,enum=frank_grimes.v2.GateSelection" json:"selected_by,omitempty"`
+	SelectedBy GateSelection `protobuf:"varint,7,opt,name=selected_by,json=selectedBy,proto3,enum=frank_grimes.v2.GateSelection" json:"selected_by,omitempty"`
+	// What this gate is known not to cover, named by the operator who chose the
+	// command. The engine runs an opaque command and cannot see what it left out,
+	// so a gap is only in the record because someone put it there; a gate that
+	// covered everything carries none of these.
+	//
+	// It exists because a check can be impossible to run from inside the boundary
+	// it is checking: a suite that creates sandboxes cannot run inside one. A
+	// passing gate that skipped such a check has not verified the batch, and
+	// without this the record could not tell the two apart.
+	Excluded      []string `protobuf:"bytes,8,rep,name=excluded,proto3" json:"excluded,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4266,6 +4276,13 @@ func (x *Verification) GetSelectedBy() GateSelection {
 		return x.SelectedBy
 	}
 	return GateSelection_GATE_SELECTION_UNSPECIFIED
+}
+
+func (x *Verification) GetExcluded() []string {
+	if x != nil {
+		return x.Excluded
+	}
+	return nil
 }
 
 // A second opinion, and what is known about the context that formed it.
@@ -5421,7 +5438,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x11review_confidence\x18\x03 \x01(\x0e2!.frank_grimes.v2.ReviewConfidenceB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x10reviewConfidence\x12`\n" +
 	"\x13review_completeness\x18\x04 \x01(\x0e2#.frank_grimes.v2.ReviewCompletenessB\n" +
-	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x12reviewCompleteness\"\xbd\x06\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x12reviewCompleteness\"\x95\b\n" +
 	"\fVerification\x12G\n" +
 	"\x06status\x18\x01 \x01(\x0e2#.frank_grimes.v2.VerificationStatusB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x12\x18\n" +
@@ -5432,8 +5449,10 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\fcompleted_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\x12K\n" +
 	"\vselected_by\x18\a \x01(\x0e2\x1e.frank_grimes.v2.GateSelectionB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\n" +
-	"selectedBy:\xce\x03\xbaH\xca\x03\x1a\xf2\x01\n" +
-	"$verification.passed_requires_success\x12Mpassed verification requires command, zero exit, output digest, and timestamp\x1a{this.status != 1 || (this.command != '' && this.exit_code == 0 && size(this.output_sha256) == 32 && has(this.completed_at))\x1a\xd2\x01\n" +
+	"selectedBy\x12-\n" +
+	"\bexcluded\x18\b \x03(\tB\x11\xbaH\x0e\x92\x01\v\x18\x01\"\ar\x05\x10\x01\x18\xc8\x01R\bexcluded:\xf7\x04\xbaH\xf3\x04\x1a\xf2\x01\n" +
+	"$verification.passed_requires_success\x12Mpassed verification requires command, zero exit, output digest, and timestamp\x1a{this.status != 1 || (this.command != '' && this.exit_code == 0 && size(this.output_sha256) == 32 && has(this.completed_at))\x1a\xa6\x01\n" +
+	"*verification.only_a_gate_that_ran_excludes\x124a gate that did not run cannot name what it excluded\x1aB(this.status != 3 && this.status != 4) || size(this.excluded) == 0\x1a\xd2\x01\n" +
 	"%verification.selection_matches_status\x12fa gate that ran records which rule selected it, and an unavailable one records that it was unavailable\x1aA(this.status == 3 || this.status == 4) == (this.selected_by == 4)\"\xf5\x02\n" +
 	"\x11AdjudicationPanel\x12\x1c\n" +
 	"\trequested\x18\x01 \x01(\rR\trequested\x12@\n" +

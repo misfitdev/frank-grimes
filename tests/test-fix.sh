@@ -757,6 +757,49 @@ assert_match "$OUT" 'worktree: +"' "and it builds a worktree of its own"
 rm -rf "$REPO"
 
 echo ""
+echo "--- A gate that skipped a check says so, and does not pass for the rest ---"
+
+# A check can be impossible to run from inside the boundary it is checking: a
+# suite that creates sandboxes cannot create one inside another. The engine runs
+# an opaque command and cannot see what it left out, so the gap is the
+# operator's word, recorded as such.
+REPO="$(repository)"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" \
+    --verify-command="true" --verify-excludes="the confinement suite")"
+assert_match "$OUT" 'status: +VERIFICATION_STATUS_PASSED' \
+    "the gate still passes on what it did run"
+assert_match "$OUT" 'excluded: +"the confinement suite"' \
+    "and the record names what it did not"
+assert_match "$OUT" 'unmet_gates: +"verification_scope"' \
+    "a gate with a declared gap has not verified the batch"
+rm -rf "$REPO"
+
+# The same gate without the declaration claims everything.
+REPO="$(repository)"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true")"
+if grep -qE 'unmet_gates: +"verification_scope"' <<<"$OUT"; then
+    fail "a gate with no declared gap was treated as incomplete"
+else
+    pass "a gate with nothing declared is read as covering its batch"
+fi
+rm -rf "$REPO"
+
+# A gap needs a gate to be a gap in.
+REPO="$(repository)"
+set +e
+OUT="$("$GRIMES" run --dir="$REPO" --mode=fix --provider-command="$FAKES/fixer-repairs.sh" \
+    --verify-excludes="something" src 2>&1)"
+CODE=$?
+set -e
+# Exit 1, the way every other refused flag combination exits.
+if [[ "$CODE" == "1" ]] && grep -q 'needs a gate' <<<"$OUT"; then
+    pass "--verify-excludes without a gate is refused by name"
+else
+    fail "--verify-excludes without a gate was accepted (exit $CODE)"
+fi
+rm -rf "$REPO"
+
+echo ""
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"
 [[ "$FAILED" -eq 0 ]] || exit 1

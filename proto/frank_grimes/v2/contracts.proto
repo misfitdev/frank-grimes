@@ -917,6 +917,13 @@ message Verification {
   };
   // A gate that ran was selected by one of the three rules that can name a
   // command; one that did not run was selected by none of them.
+  // A gate that did not run covered nothing, and saying it excluded some
+  // particular thing would imply the rest was checked.
+  option (buf.validate.message).cel = {
+    id: "verification.only_a_gate_that_ran_excludes"
+    message: "a gate that did not run cannot name what it excluded"
+    expression: "(this.status != 3 && this.status != 4) || size(this.excluded) == 0"
+  };
   option (buf.validate.message).cel = {
     id: "verification.selection_matches_status"
     message: "a gate that ran records which rule selected it, and an unavailable one records that it was unavailable"
@@ -939,6 +946,20 @@ message Verification {
     defined_only: true
     not_in: [0]
   }];
+  // What this gate is known not to cover, named by the operator who chose the
+  // command. The engine runs an opaque command and cannot see what it left out,
+  // so a gap is only in the record because someone put it there; a gate that
+  // covered everything carries none of these.
+  //
+  // It exists because a check can be impossible to run from inside the boundary
+  // it is checking: a suite that creates sandboxes cannot run inside one. A
+  // passing gate that skipped such a check has not verified the batch, and
+  // without this the record could not tell the two apart.
+  repeated string excluded = 8 [
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string.min_len = 1,
+    (buf.validate.field).repeated.items.string.max_len = 200
+  ];
 }
 
 // How the context that produced a review came to exist.

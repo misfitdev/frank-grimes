@@ -159,6 +159,7 @@ func gateFor(cfg *config, mech confine.Mechanism) engine.GateRunner {
 		return engine.NotApplicableGate{}
 	}
 	g := engine.SelectGate(cfg.VerifyCommand, cfg.Dir, cfg.RepositoryCheck)
+	g.Excluded = cfg.VerifyExcludes
 	g.Confine = mech
 	return g
 }

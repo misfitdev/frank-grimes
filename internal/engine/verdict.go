@@ -48,6 +48,10 @@ type Candidate struct {
 
 // DeriveInput is every fact the verdict depends on.
 type DeriveInput struct {
+	// VerificationExcluded is what the operator said the gate does not cover.
+	// A gate is an opaque command, so nothing else can know.
+	VerificationExcluded []string
+
 	Candidates []Candidate
 
 	// Adjudication

@@ -208,6 +208,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		CoverageIncomplete:           len(cov.Unaccounted) > 0,
 		Oscillation:                  oscillation,
 		Unconfined:                   e.Unconfined,
+		VerificationExcluded:         e.gateExclusions(),
 	})
 
 	panel, err := e.adjudicate(ctx, spec, collected, primary.Verdict)
@@ -231,6 +232,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		CoverageIncomplete:           len(cov.Unaccounted) > 0,
 		Oscillation:                  oscillation,
 		Unconfined:                   e.Unconfined,
+		VerificationExcluded:         e.gateExclusions(),
 	})
 
 	// The target a fix run leaves behind is not the one it reviewed, and that is

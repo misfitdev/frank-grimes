@@ -47,6 +47,10 @@ type ExecGate struct {
 	Confine  confine.Mechanism
 	Root     string
 	Writable []string
+	// Excluded is what the operator said this command does not cover. The gate
+	// is an opaque command and the engine cannot see inside it, so a gap is in
+	// the record only because someone declared it.
+	Excluded []string
 }
 
 // Run executes the gate in cwd and reports the outcome whichever way it exits.
@@ -127,6 +131,7 @@ func (g ExecGate) Run(ctx context.Context, cwd string) (*pb.Verification, error)
 		OutputSha256: digest[:],
 		CompletedAt:  timestamppb.Now(),
 		SelectedBy:   g.Selected,
+		Excluded:     g.Excluded,
 	}
 	return v, nil
 }
@@ -234,3 +239,13 @@ func (b *boundedWriter) Write(p []byte) (int, error) {
 }
 
 var _ = fmt.Sprintf
+
+// gateExclusions is what the gate was declared not to cover, or nothing when
+// no gate was configured to have gaps.
+func (e *Engine) gateExclusions() []string {
+	g, ok := e.Gate.(ExecGate)
+	if !ok {
+		return nil
+	}
+	return g.Excluded
+}
