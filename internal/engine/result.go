@@ -70,18 +70,30 @@ func (e *Engine) assemble(
 func snapshots(ledger *pb.Ledger) []*pb.FindingSnapshot {
 	out := make([]*pb.FindingSnapshot, 0, len(ledger.GetFindings()))
 	for _, f := range ledger.GetFindings() {
+		provenance := provenanceOf(f)
+		survived := survivedRefutations(f)
 		out = append(out, &pb.FindingSnapshot{
 			Id:             f.GetId(),
 			Status:         f.GetStatus(),
 			Risk:           f.GetRisk(),
 			EvidenceTier:   f.GetEvidence().GetTier(),
 			EvidenceSha256: f.GetEvidenceSha256(),
-			Provenance:     provenanceOf(f),
+			Provenance:     provenance,
 			// Both positions, not just the label saying they differ.
-			Refutation: f.GetRefutation(),
+			Refutation:          f.GetRefutation(),
+			SurvivedRefutations: survived,
+			Rank:                Rank(f.GetRisk(), survived, provenance),
 		})
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].GetId() < out[j].GetId() })
+	// Worst first, so the order is the order to work in. Ties fall back to the
+	// id, which is content-derived, so two runs over the same ledger write the
+	// same bytes.
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].GetRank() != out[j].GetRank() {
+			return out[i].GetRank() > out[j].GetRank()
+		}
+		return out[i].GetId() < out[j].GetId()
+	})
 	return out
 }
 

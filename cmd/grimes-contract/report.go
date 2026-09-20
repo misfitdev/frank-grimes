@@ -60,6 +60,7 @@ func cmdReport(args []string) error {
 
 const reportUsage = `report subcommands:
   report add   --category=<CODE> <anchor> --severity=<P0-P3> --likelihood=<L> --blast=<B> \
+               [--ease-of-fix=trivial|moderate|involved] \
                --tier=<E1|E2|E3> --claim=<text> <evidence flags>
   report seal  [--run-id=<id>] --target-root=<path> --target-scope=<scope> \
                [--kind=code|document|idea|external] [--iteration=<n>] --summary=<text> \
@@ -90,6 +91,7 @@ func cmdReportAdd(args []string) error {
 	severity := fs.String("severity", "", "P0, P1, P2, or P3")
 	likelihood := fs.String("likelihood", "likely", "likely, plausible, unlikely, or unknown")
 	blast := fs.String("blast", "", "single-user, local-component, service, or systemic")
+	easeOfFix := fs.String("ease-of-fix", "", "trivial, moderate, or involved; breaks ties between equally ranked findings")
 	tier := fs.String("tier", "", "E1, E2, or E3")
 	claim := fs.String("claim", "", "what the evidence establishes")
 	fix := fs.String("suggested-fix", "", "suggested fix, recorded as text in report mode")
@@ -156,6 +158,10 @@ func cmdReportAdd(args []string) error {
 	if err != nil {
 		return err
 	}
+	howEasy, err := parseEase(*easeOfFix)
+	if err != nil {
+		return err
+	}
 	evidence, err := evidenceFromFlags(*tier, *claim, anchor,
 		*action, *cwd, *exitCode, *output, *outputSum,
 		*quote, *assumption, *reasoning, *falsifier)
@@ -173,7 +179,7 @@ func cmdReportAdd(args []string) error {
 	candidate := &pb.CandidateFinding{
 		Category: cat,
 		Location: &pb.Location{Anchor: anchor},
-		Risk:     &pb.Risk{Severity: sev, Likelihood: like, BlastRadius: radius},
+		Risk:     &pb.Risk{Severity: sev, Likelihood: like, BlastRadius: radius, EaseOfFix: howEasy},
 		Evidence: evidence,
 	}
 	if *fix != "" {

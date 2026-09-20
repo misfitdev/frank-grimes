@@ -29,6 +29,23 @@ func parseSeverity(s string) (pb.Severity, error) {
 	}
 }
 
+// parseEase reads the tie-break. Empty is unstated, which is neutral: a report
+// that declines to estimate the repair is not worse for it.
+func parseEase(s string) (pb.EaseOfFix, error) {
+	switch strings.ToLower(s) {
+	case "":
+		return pb.EaseOfFix_EASE_OF_FIX_UNSPECIFIED, nil
+	case "trivial":
+		return pb.EaseOfFix_EASE_OF_FIX_TRIVIAL, nil
+	case "moderate":
+		return pb.EaseOfFix_EASE_OF_FIX_MODERATE, nil
+	case "involved":
+		return pb.EaseOfFix_EASE_OF_FIX_INVOLVED, nil
+	default:
+		return 0, fmt.Errorf("unknown ease of fix %q", s)
+	}
+}
+
 func parseLikelihood(s string) (pb.Likelihood, error) {
 	switch strings.ToLower(s) {
 	case "likely":

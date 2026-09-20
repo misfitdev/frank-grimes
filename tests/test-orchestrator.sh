@@ -241,6 +241,30 @@ fi
 rm -rf "$WS"
 
 echo ""
+echo "--- Findings are ordered by what to fix first ---"
+
+# Two findings of the same severity: one reachable but small, one systemic but
+# improbable. A single letter cannot separate them, so the record used to sort
+# them by id and say nothing about which mattered more.
+WS="$(workspace)"
+OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-two-ranks.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --format=prototext src 2>&1 || true)"
+FIRST_RADIUS="$(awk '/blast_radius: /{print $2; exit}' <<<"$OUT")"
+if [[ "$FIRST_RADIUS" == "BLAST_RADIUS_SYSTEMIC" ]]; then
+    pass "impact carries a systemic finding above a likelier small one"
+else
+    fail "the record led with $FIRST_RADIUS"
+fi
+# The order is explainable rather than taken on faith.
+if grep -qE '^  rank: [0-9]' <<<"$OUT"; then
+    pass "and the record says what put it there"
+else
+    fail "the record carries no rank"
+fi
+rm -rf "$WS"
+
+echo ""
 echo "--- Invalid provider output fails closed ---"
 
 for fake in provider-garbage provider-noenvelope provider-exit7 provider-sealed-but-silent provider-silent; do
