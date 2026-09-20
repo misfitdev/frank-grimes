@@ -68,6 +68,17 @@ func (e *Engine) assemble(
 
 // snapshots renders the ledger in a stable order so two runs over the same
 // ledger produce identical result bytes.
+// terminal reports the severity band the skill orders on: P0 and P1 are the
+// findings a verdict turns on, and they precede everything else whatever the
+// rest of the register scores.
+func terminal(f *pb.FindingSnapshot) bool {
+	switch f.GetRisk().GetSeverity() {
+	case pb.Severity_SEVERITY_P0, pb.Severity_SEVERITY_P1:
+		return true
+	}
+	return false
+}
+
 func snapshots(ledger *pb.Ledger) []*pb.FindingSnapshot {
 	out := make([]*pb.FindingSnapshot, 0, len(ledger.GetFindings()))
 	for _, f := range ledger.GetFindings() {
@@ -86,10 +97,18 @@ func snapshots(ledger *pb.Ledger) []*pb.FindingSnapshot {
 			Rank:                Rank(f.GetRisk(), survived, provenance),
 		})
 	}
-	// Worst first, so the order is the order to work in. Ties fall back to the
-	// id, which is content-derived, so two runs over the same ledger write the
-	// same bytes.
+	// Terminal findings first, then worst first within that band. The skill
+	// requires every terminal P0/P1 ahead of P2/P3, and rank is a product of
+	// probability and impact that can put a likely systemic P2 above an
+	// unlikely single-user P0. Rank orders work inside a band; it does not
+	// decide which band a finding is in.
+	//
+	// Ties fall back to the id, which is content-derived, so two runs over the
+	// same ledger write the same bytes.
 	sort.Slice(out, func(i, j int) bool {
+		if a, b := terminal(out[i]), terminal(out[j]); a != b {
+			return a
+		}
 		if out[i].GetRank() != out[j].GetRank() {
 			return out[i].GetRank() > out[j].GetRank()
 		}

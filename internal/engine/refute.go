@@ -206,18 +206,27 @@ func claimsOf(ledger *pb.Ledger, runID string, iteration uint32) ([]*pb.ClaimUnd
 //
 // Both at once is neither. A claim one independent context broke and another
 // could not is a disagreement, and the record says so rather than resolving it.
+// Both halves have to be independent: contested is the only provenance that
+// removes a finding from the blocking counts, and a context the engine cannot
+// vouch for must not be what removes it.
 func provenanceOf(f *pb.Finding) pb.FindingProvenance {
-	refuted, upheld := false, false
+	refuted, brokeIndependently, upheld := false, false, false
 	for _, a := range f.GetRefutation() {
+		independent := a.GetContextOrigin() == pb.ContextOrigin_CONTEXT_ORIGIN_ENGINE_SPAWNED
 		switch a.GetOutcome().(type) {
 		case *pb.RefutationAttempt_Refuted:
 			refuted = true
+			brokeIndependently = brokeIndependently || independent
 		case *pb.RefutationAttempt_Upheld:
-			upheld = upheld || a.GetContextOrigin() == pb.ContextOrigin_CONTEXT_ORIGIN_ENGINE_SPAWNED
+			upheld = upheld || independent
 		}
 	}
 	switch {
-	case refuted && upheld:
+	// Both sides independent. Contested is the only provenance that takes a
+	// finding out of the blocking counts, so an attempt from a context the
+	// engine cannot vouch for must not be half of the disagreement that does
+	// it: that would let an unknown context lift a P0 off a block.
+	case brokeIndependently && upheld:
 		// Two contexts that did not form the claim reached opposite answers.
 		// Reading whichever arrived first as the outcome would let the order
 		// of a repeated field decide what the review found.

@@ -222,6 +222,12 @@ func contested(cands []Candidate) bool {
 // attack, so it is not short of one.
 func unrefuted(cands []Candidate) bool {
 	for _, c := range drivingFindings(cands) {
+		// Contested is reported as its own gate. A claim two contexts answered
+		// differently has been attacked; saying it is also unrefuted would name
+		// the same finding under two states the record calls distinct.
+		if c.Provenance == pb.FindingProvenance_FINDING_PROVENANCE_CONTESTED {
+			continue
+		}
 		if c.Provenance != pb.FindingProvenance_FINDING_PROVENANCE_UPHELD {
 			return true
 		}

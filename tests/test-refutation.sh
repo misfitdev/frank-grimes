@@ -403,6 +403,10 @@ assert_match "$OUT" 'provenance: +FINDING_PROVENANCE_CONTESTED' \
     "a claim answered both ways is contested, not refuted"
 assert_match "$OUT" 'unmet_gates: +"contested"' \
     "and the disagreement is a gate of its own, not folded into refutation"
+# A claim two contexts attacked is not a claim nobody attacked. Naming it under
+# both states would put one finding in two the record calls distinct.
+assert_no_match "$OUT" 'unmet_gates: +"refutation"' \
+    "and it is not also reported as unattacked"
 
 # Both positions, not just the label saying they differ.
 ATTEMPTS="$(grep -cE 'refutation: +\{' <<<"$OUT" || true)"
@@ -426,6 +430,30 @@ assert_no_match "$OUT" 'open_p0:' \
     "a contested P0 is not counted as one that blocks"
 assert_match "$OUT" 'total: +1' \
     "but it has not vanished from the record"
+rm -rf "$WS"
+
+echo ""
+echo "--- Contested needs two contexts the engine can vouch for ---"
+
+# Contested is the only provenance that takes a finding out of the blocking
+# counts. An attempt from a context the engine cannot vouch for must not be half
+# of the disagreement that does it, or an unknown context lifts a P0 off a
+# block.
+WS="$(workspace)"
+# First pass breaks the claim, with no freshness asserted: unknown origin.
+"$GRIMES" run --dir="$WS" \
+    --provider-command="$FAKES/provider-p0.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --refuter-command="$FAKES/refuter-flips.sh" \
+    --format=prototext src >/dev/null 2>&1 || true
+# Second upholds it from a context the engine opened.
+OUT="$("$GRIMES" run --dir="$WS" \
+    --provider-command="$FAKES/provider-p0.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --refuter-command="$FAKES/refuter-flips.sh" --refuter-fresh \
+    --format=prototext src 2>&1 || true)"
+assert_no_match "$OUT" 'provenance: +FINDING_PROVENANCE_CONTESTED' \
+    "an unknown context's refutation is not half of a disagreement"
 rm -rf "$WS"
 
 echo ""

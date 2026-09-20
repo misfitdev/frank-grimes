@@ -264,6 +264,21 @@ else
 fi
 rm -rf "$WS"
 
+# Rank orders work within a band; it does not decide which band a finding is in.
+# The skill keeps every terminal P0/P1 ahead of P2/P3, and a likely systemic P2
+# outscores an unlikely single-user P0.
+WS="$(workspace)"
+OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-band-inversion.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --format=prototext src 2>&1 || true)"
+FIRST_SEVERITY="$(awk '/severity: /{print $2; exit}' <<<"$OUT")"
+if [[ "$FIRST_SEVERITY" == "SEVERITY_P0" ]]; then
+    pass "a terminal finding leads a higher-scoring P2"
+else
+    fail "the record led with $FIRST_SEVERITY"
+fi
+rm -rf "$WS"
+
 echo ""
 echo "--- A review its own coordinator authored cannot be green ---"
 
