@@ -46,6 +46,9 @@ func rejectSwallowedFlags(fs *flag.FlagSet, args []string) error {
 		return false
 	}
 	for i, tok := range args {
+		if tok == "--" {
+			break
+		}
 		if !takesArg(tok) || i+1 >= len(args) {
 			continue
 		}
@@ -83,6 +86,13 @@ func rejectSwallowedFlags(fs *flag.FlagSet, args []string) error {
 func adjudicators(args []string) ([][]string, error) {
 	var panel [][]string
 	for i := 0; i < len(args); i++ {
+		// The flag package stops reading options at a bare --, and a scanner
+		// that did not would read the target spelled after it as one. A target
+		// is a path the operator names; a reviewer is a command the engine
+		// runs, and nothing positional may become one.
+		if args[i] == "--" {
+			break
+		}
 		name, value, ok := adjudicatorOption(args, &i)
 		if !ok {
 			continue
