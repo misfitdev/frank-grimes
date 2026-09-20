@@ -12,3 +12,9 @@ nothing afterward.
 
 A validation error is the contract telling you the shape it needs: correct the
 arguments and run it again.
+
+The GRIMES_ variables in your environment are the engine's, and they identify
+the run you are answering. Read them; never set, export, override or recompute
+one, and pass no --run-id or --target-fingerprint of your own. An answer that
+names an identity the engine did not issue is an answer about some other run,
+and it is discarded.
