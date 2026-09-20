@@ -552,6 +552,10 @@ assert_no_match "$OUT" 'status: +FINDING_STATUS_VERIFIED' \
     "nor verified, whatever the gate said"
 assert_no_match "$OUT" 'commit_sha1' \
     "and nothing is committed over it"
+# The only claim was broken, so the batch credited nothing. That is a different
+# reason from a mixed batch, and the record distinguishes them.
+assert_match "$OUT" 'commit_withheld: +COMMIT_WITHHELD_NOTHING_CREDITED' \
+    "and the record says nothing was credited"
 # The edit is still there to read; it is credited to nothing.
 TREE="$(worktree_of "$OUT")"
 if [[ -n "$TREE" && "$(cat "$TREE/src/app.sh")" != "$REVIEWED" ]]; then
@@ -664,6 +668,8 @@ assert_match "$OUT" 'status: +FINDING_STATUS_VERIFIED' \
     "the surviving claim is still credited with its repair"
 assert_no_match "$OUT" 'commit_sha1' \
     "but nothing is committed while a broken repair shares the tree"
+assert_match "$OUT" 'commit_withheld: +COMMIT_WITHHELD_REFUTED_CLAIM' \
+    "and the record says the broken repair is why, not the gate or the flag"
 rm -rf "$REPO"
 
 # The same batch with both claims upheld: withholding is about the broken one,
@@ -724,6 +730,121 @@ OUT="$(cd "$REPO" && "$GRIMES" run --dir=. --mode=fix \
     --verify-command="true" --format=prototext src 2>&1 || true)"
 assert_match "$OUT" 'status: +VERIFICATION_STATUS_PASSED' \
     "a relative --dir reaches the gate"
+rm -rf "$REPO"
+
+echo ""
+echo "--- A worktree add that fails leaves nothing for the next run ---"
+
+# git registers the worktree before running the repository's post-checkout
+# hook, so a hook that fails leaves the registration without the directory.
+# Left there, every later run is refused a path it never made.
+REPO="$(repository)"
+printf '#!/bin/sh\nexit 1\n' >"$REPO/.git/hooks/post-checkout"
+chmod +x "$REPO/.git/hooks/post-checkout"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh")"
+if grep -q 'creating the worktree' <<<"$OUT"; then
+    pass "a hook that fails, fails the run"
+else
+    fail "the failing hook did not fail the run"
+fi
+
+# The run that matters is the next one, after the operator clears what the
+# failure left. The directory goes; the registration is what outlives it, and a
+# run that found the directory would reopen it instead of adding one.
+rm -f "$REPO/.git/hooks/post-checkout"
+rm -rf "$REPO/.grimes"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh")"
+if grep -q 'already registered' <<<"$OUT"; then
+    fail "the failed add blocked the next run"
+else
+    pass "the next run is not blocked by the failed add"
+fi
+assert_match "$OUT" 'worktree: +"' "and it builds a worktree of its own"
+rm -rf "$REPO"
+
+echo ""
+echo "--- A gate that skipped a check says so, and does not pass for the rest ---"
+
+# A check can be impossible to run from inside the boundary it is checking: a
+# suite that creates sandboxes cannot create one inside another. The engine runs
+# an opaque command and cannot see what it left out, so the gap is the
+# operator's word, recorded as such.
+REPO="$(repository)"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" \
+    --verify-command="true" --verify-excludes="the confinement suite")"
+assert_match "$OUT" 'status: +VERIFICATION_STATUS_PASSED' \
+    "the gate still passes on what it did run"
+assert_match "$OUT" 'excluded: +"the confinement suite"' \
+    "and the record names what it did not"
+assert_match "$OUT" 'unmet_gates: +"verification_scope"' \
+    "a gate with a declared gap has not verified the batch"
+rm -rf "$REPO"
+
+# The same gate without the declaration claims everything.
+REPO="$(repository)"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true")"
+if grep -qE 'unmet_gates: +"verification_scope"' <<<"$OUT"; then
+    fail "a gate with no declared gap was treated as incomplete"
+else
+    pass "a gate with nothing declared is read as covering its batch"
+fi
+rm -rf "$REPO"
+
+# A gap needs a gate to be a gap in.
+REPO="$(repository)"
+set +e
+OUT="$("$GRIMES" run --dir="$REPO" --mode=fix --provider-command="$FAKES/fixer-repairs.sh" \
+    --verify-excludes="something" src 2>&1)"
+CODE=$?
+set -e
+# Exit 1, the way every other refused flag combination exits.
+if [[ "$CODE" == "1" ]] && grep -q 'needs --mode fix and a gate' <<<"$OUT"; then
+    pass "--verify-excludes without a gate is refused by name"
+else
+    fail "--verify-excludes without a gate was accepted (exit $CODE)"
+fi
+rm -rf "$REPO"
+
+# Report mode runs no gate at all, so an exclusion there would be accepted and
+# then dropped: absent from the record and from the unmet gates.
+REPO="$(repository)"
+set +e
+OUT="$("$GRIMES" run --dir="$REPO" --provider-command="$FAKES/provider-green.sh" \
+    --verify-command="true" --verify-excludes="something" src 2>&1)"
+CODE=$?
+set -e
+if [[ "$CODE" == "1" ]] && grep -q 'needs --mode fix' <<<"$OUT"; then
+    pass "--verify-excludes in report mode is refused by name"
+else
+    fail "--verify-excludes in report mode was accepted (exit $CODE)"
+fi
+rm -rf "$REPO"
+
+echo ""
+echo "--- A batch that did not commit says which reason applied ---"
+
+# Four different facts with four different remedies, and every one of them
+# reached the record as an absent commit_sha1.
+REPO="$(repository)"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" --verify-command="true")"
+assert_match "$OUT" 'commit_withheld: +COMMIT_WITHHELD_UNAUTHORIZED' \
+    "a run never authorized to commit says so"
+rm -rf "$REPO"
+
+REPO="$(repository)"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" \
+    --verify-command="exit 1" --commit)"
+assert_match "$OUT" 'commit_withheld: +COMMIT_WITHHELD_GATE' \
+    "a batch the gate refused says so"
+rm -rf "$REPO"
+
+# A commit is the one outcome that withheld nothing.
+REPO="$(repository)"
+OUT="$(run_fix "$REPO" --provider-command="$FAKES/fixer-repairs.sh" \
+    --verify-command="true" --commit)"
+assert_match "$OUT" 'commit_sha1' "an authorized batch over a passing gate commits"
+assert_match "$OUT" 'commit_withheld: +COMMIT_WITHHELD_NONE' \
+    "and records that nothing was withheld"
 rm -rf "$REPO"
 
 echo ""

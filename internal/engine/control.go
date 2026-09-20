@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
@@ -156,18 +157,52 @@ func insertControl(claims []*pb.ClaimUnderTest, c *control) []*pb.ClaimUnderTest
 // of refuting anything, which is the same position as having no refuter at all;
 // and a refuted outcome carrying no excerpt of the artifact is a refuter that
 // recognised the control rather than one that attacked it.
-func checkOf(attempt *pb.RefutationAttempt, ctrl *control) pb.RefuterCheck {
+// The reason travels with the grade. The three ways to fail this are
+// different mistakes with different remedies, and a record saying only that it
+// failed sends a reader to look at all of them.
+func checkOf(attempt *pb.RefutationAttempt, ctrl *control) (pb.RefuterCheck, string) {
 	switch attempt.GetOutcome().(type) {
 	case *pb.RefutationAttempt_Refuted:
 		if !exhibits(attempt.GetRefuted(), ctrl.witness) {
-			return pb.RefuterCheck_REFUTER_CHECK_FAILED
+			return pb.RefuterCheck_REFUTER_CHECK_FAILED, fmt.Sprintf(
+				"the control was broken without exhibiting what the target says: the "+
+					"disproof had to quote %s and its excerpt does not contain it",
+				quotedWitness(ctrl.witness))
 		}
-		return pb.RefuterCheck_REFUTER_CHECK_PASSED
+		return pb.RefuterCheck_REFUTER_CHECK_PASSED, ""
 	case *pb.RefutationAttempt_Upheld:
-		return pb.RefuterCheck_REFUTER_CHECK_FAILED
+		return pb.RefuterCheck_REFUTER_CHECK_FAILED,
+			"the control was upheld; it is false by construction, so a refuter that " +
+				"upholds it has rubber-stamped the claims beside it"
 	default:
-		return pb.RefuterCheck_REFUTER_CHECK_INCONCLUSIVE
+		return pb.RefuterCheck_REFUTER_CHECK_INCONCLUSIVE, ""
 	}
+}
+
+// quotedWitness renders the line for the reason, bounded after quoting.
+//
+// Bounding the raw line is not enough: %q escapes, and a byte that is not
+// valid UTF-8 becomes four characters, so 120 raw bytes can quote to 482. The
+// contract caps the reason at 400, and a target is read without any promise
+// about its encoding, so an overlong reason would fail validation and lose the
+// whole result rather than the excerpt.
+//
+// The raw witness is untouched; exhibits compares against that.
+func quotedWitness(s string) string {
+	const max = 200
+	if len(s) > max {
+		s = s[:max]
+	}
+	truncated := false
+	for len(strconv.Quote(s)) > max && len(s) > 0 {
+		s = s[:len(s)-1]
+		truncated = true
+	}
+	q := strconv.Quote(s)
+	if truncated {
+		return q + " (truncated)"
+	}
+	return q
 }
 
 // exhibits reports whether the disproof carries what the artifact says.

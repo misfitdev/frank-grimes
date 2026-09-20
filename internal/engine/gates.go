@@ -14,6 +14,7 @@ const (
 	GateOscillation        = "oscillation"
 	GateConfinement        = "confinement"
 	GateCoverage           = "coverage"
+	GateVerificationScope  = "verification_scope"
 )
 
 // unmetGates names every gate standing between this run and a pass, in a fixed
@@ -48,6 +49,12 @@ func unmetGates(v *pb.Verdict, in DeriveInput) []string {
 	// A unit nobody named and a category that stopped attacking before it ran
 	// out of probes are the same shortfall measured two ways, so they answer to
 	// one gate.
+	// A gate that skipped a check has not verified the batch, whatever it
+	// returned for the rest. Named rather than folded into coverage, which is
+	// about the units a review accounted for.
+	if len(in.VerificationExcluded) > 0 {
+		gates = append(gates, GateVerificationScope)
+	}
 	if in.CoverageIncomplete || !in.AllCategoriesStopped {
 		gates = append(gates, GateCoverage)
 	}

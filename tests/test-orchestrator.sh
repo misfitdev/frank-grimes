@@ -194,6 +194,53 @@ fi
 rm -rf "$WS"
 
 echo ""
+echo "--- Both halves report which build they are ---"
+
+# The two are one contract in two halves and nothing can stop a mismatched pair
+# being installed, so each has to be able to say what it is.
+for BINARY in "$GRIMES" "$(dirname "$GRIMES")/grimes-contract"; do
+    NAME="$(basename "$BINARY")"
+    set +e
+    OUT="$("$BINARY" --version 2>&1)"
+    CODE=$?
+    set -e
+    assert_eq "$CODE" "0" "$NAME answers --version"
+    # Either a commit or an honest unknown. A stamp is absent exactly when the
+    # build was one nobody can vouch for, and saying so beats naming a commit
+    # these bytes did not come from.
+    if grep -qE "^$NAME ([0-9a-f]{12}( \(with uncommitted changes\))?|unknown)$" <<<"$OUT"; then
+        pass "$NAME names itself and its build"
+    else
+        fail "$NAME reported: $OUT"
+    fi
+done
+
+echo ""
+echo "--- A provider that cannot nest its own sandbox is told so ---"
+
+# The engine's report is "no report envelope", which is true and useless: the
+# operator still has to recognise a syscall name to find out why.
+WS="$(workspace)"
+set +e
+OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-nested-sandbox.sh" src 2>&1)"
+CODE=$?
+set -e
+assert_eq "$CODE" "1" "a provider refused a nested sandbox fails the run"
+if grep -q 'second sandbox inside this one' <<<"$OUT"; then
+    pass "and the refusal names the collision"
+else
+    fail "the refusal does not name the collision"
+fi
+# Naming --unsafe as the way out would trade the engine's boundary for the
+# provider's, which is the opposite of what is wanted.
+if grep -q 'waives the engine' <<<"$OUT"; then
+    pass "and says why --unsafe is the wrong reach"
+else
+    fail "the refusal does not warn against --unsafe"
+fi
+rm -rf "$WS"
+
+echo ""
 echo "--- Invalid provider output fails closed ---"
 
 for fake in provider-garbage provider-noenvelope provider-exit7 provider-sealed-but-silent provider-silent; do

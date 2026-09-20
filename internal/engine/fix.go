@@ -42,6 +42,9 @@ type fixRun struct {
 	gate      *pb.Verification
 	closed    []string
 	commit    string
+	// withheld is why there is no commit, set at the point the decision was
+	// made rather than inferred afterwards from an empty field.
+	withheld pb.CommitWithheld
 }
 
 // prepareFix puts the batch somewhere the operator's own working tree is not.
@@ -65,7 +68,8 @@ func (e *Engine) prepareFix(ctx context.Context) (*fixRun, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &fixRun{repo: repo, tree: tree, continued: true}, nil
+		return &fixRun{repo: repo, tree: tree, continued: true,
+			withheld: pb.CommitWithheld_COMMIT_WITHHELD_NOTHING_CREDITED}, nil
 	}
 
 	// .grimes is the review's own, not the operator's work.
@@ -83,7 +87,8 @@ func (e *Engine) prepareFix(ctx context.Context) (*fixRun, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &fixRun{repo: repo, tree: tree}, nil
+	return &fixRun{repo: repo, tree: tree,
+		withheld: pb.CommitWithheld_COMMIT_WITHHELD_NOTHING_CREDITED}, nil
 }
 
 func fixBranch(runID string) string { return "grimes/fix-" + contracts.RunSlug(runID) }
@@ -111,11 +116,16 @@ func pinned(f *fixRun, ledger *pb.Ledger, spec TargetSpec) TargetSpec {
 
 // record returns what the run says it did with its edits.
 func (f *fixRun) record() *pb.FixBatch {
-	b := &pb.FixBatch{Worktree: f.tree.Dir, Branch: f.tree.Branch}
+	b := &pb.FixBatch{
+		Worktree:       f.tree.Dir,
+		Branch:         f.tree.Branch,
+		CommitWithheld: f.withheld,
+	}
 	if f.commit != "" {
 		if sum, err := hex.DecodeString(f.commit); err == nil {
 			b.CommitSha1 = sum
 			b.ClosedFindingIds = f.closed
+			b.CommitWithheld = pb.CommitWithheld_COMMIT_WITHHELD_NONE
 		}
 	}
 	return b
@@ -145,6 +155,7 @@ func (e *Engine) settle(ctx context.Context, f *fixRun, ledger *pb.Ledger, itera
 	// read; a commit is the strongest form of crediting, and there is nothing
 	// here to credit.
 	if len(edited) == 0 {
+		f.withheld = pb.CommitWithheld_COMMIT_WITHHELD_NOTHING_CREDITED
 		return nil
 	}
 	for _, id := range edited {
@@ -154,6 +165,7 @@ func (e *Engine) settle(ctx context.Context, f *fixRun, ledger *pb.Ledger, itera
 		}
 	}
 	if f.gate.GetStatus() != pb.VerificationStatus_VERIFICATION_STATUS_PASSED {
+		f.withheld = pb.CommitWithheld_COMMIT_WITHHELD_GATE
 		return nil
 	}
 	for _, id := range edited {
@@ -168,6 +180,7 @@ func (e *Engine) settle(ctx context.Context, f *fixRun, ledger *pb.Ledger, itera
 	f.closed = edited
 
 	if !e.Commit {
+		f.withheld = pb.CommitWithheld_COMMIT_WITHHELD_UNAUTHORIZED
 		return nil
 	}
 	// A commit takes the whole worktree, so a batch that repaired a broken
@@ -176,6 +189,7 @@ func (e *Engine) settle(ctx context.Context, f *fixRun, ledger *pb.Ledger, itera
 	// gate passed over the tree entire, and a partial commit is a state nothing
 	// verified.
 	if refutedTouched(ledger, changed) {
+		f.withheld = pb.CommitWithheld_COMMIT_WITHHELD_REFUTED_CLAIM
 		return nil
 	}
 	sha, err := f.tree.Commit(ctx, commitMessage(edited))

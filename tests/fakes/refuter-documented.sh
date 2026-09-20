@@ -25,7 +25,15 @@ case "${OUTCOME}" in
         : >"$ERRLOG"
         grimes-contract refute add --ref="not-a-ref" --upheld \
             --action="sh -c true" --cwd="." --exit-code=0 --output="x" 2>>"$ERRLOG" || true
-        first="$(grimes-contract refute claims | head -1 | cut -f1)"
+        # Read rather than piped into head: pipefail is set, and head closing
+        # the pipe sends SIGPIPE to the producer, so the pipeline fails even
+        # though it got what it asked for. Linux hits that far more readily
+        # than macOS, which is how it reached CI green on one and not the other.
+        first=""
+        while IFS=$'\t' read -r ref _rest; do
+            first="$ref"
+            break
+        done < <(grimes-contract refute claims)
         grimes-contract refute add --ref="$first" --upheld \
             --action="sh -c true" --cwd="." --exit-code=0 --output="x"
         grimes-contract refute add --ref="$first" --upheld \

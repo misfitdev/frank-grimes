@@ -356,3 +356,40 @@ func TestRemoveTakesTheWorktreeAndItsBranch(t *testing.T) {
 		t.Errorf("the branch is still there: %q", out)
 	}
 }
+
+// An add that failed because the branch name was taken must not take the
+// branch that took it. Unit-level because the name a run derives comes from its
+// own identity, which the CLI generates and nothing outside can predict.
+func TestAFailedAddLeavesAPreExistingBranchAlone(t *testing.T) {
+	ctx := context.Background()
+	r := repo(t)
+	const branch = "grimes/fix-already-here"
+	git(t, r.Dir, "branch", branch)
+
+	// The branch is taken, so the add fails.
+	if _, err := r.AddWorktree(ctx, filepath.Join(t.TempDir(), "wt"), branch, "HEAD"); err == nil {
+		t.Fatal("want an error adding a worktree on a branch that already exists")
+	}
+	if !r.hasBranch(ctx, branch) {
+		t.Error("the failed add deleted a branch it did not create")
+	}
+}
+
+// And the branch it did create is still cleared, or the next run inherits it.
+func TestAFailedAddClearsTheBranchItCreated(t *testing.T) {
+	ctx := context.Background()
+	r := repo(t)
+	hook := filepath.Join(r.Dir, ".git", "hooks", "post-checkout")
+	write(t, hook, "#!/bin/sh\nexit 1\n")
+	if err := os.Chmod(hook, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	const branch = "grimes/fix-made-here"
+	if _, err := r.AddWorktree(ctx, filepath.Join(t.TempDir(), "wt"), branch, "HEAD"); err == nil {
+		t.Fatal("want an error when the post-checkout hook fails")
+	}
+	if r.hasBranch(ctx, branch) {
+		t.Error("the failed add left behind the branch it created")
+	}
+}

@@ -1,0 +1,21 @@
+# A failed control check that says which mistake it was. Upholding a claim that
+# is false by construction is the rubber stamp the control exists to catch.
+schema_major: 2
+run_id: "run-041"
+producer_role: PRODUCER_ROLE_ORCHESTRATOR
+target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
+mode: MODE_REPORT
+iteration: 1
+max_iterations: 5
+completion_state: COMPLETION_STATE_CONTINUE
+verdict { decision: DECISION_CONDITIONAL residual_risk: RESIDUAL_RISK_MODERATE review_confidence: REVIEW_CONFIDENCE_LOW review_completeness: REVIEW_COMPLETENESS_LIMITED }
+legacy_color: LEGACY_COLOR_YELLOW
+marginal_yield { candidates_examined: 2 candidates_disproved: 1 }
+counts { total: 1 }
+verification { status: VERIFICATION_STATUS_NOT_APPLICABLE selected_by: GATE_SELECTION_UNAVAILABLE }
+ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678901" }
+unmet_gates: "refutation"
+summary: "The refutation pass could not be graded."
+refuter_check: REFUTER_CHECK_FAILED
+refuter_check_reason: "the control was upheld; it is false by construction, so a refuter that upholds it has rubber-stamped the claims beside it"
+confinement: "sandbox-exec"

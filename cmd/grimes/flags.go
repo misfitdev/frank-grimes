@@ -160,6 +160,7 @@ type config struct {
 	Categories      []pb.Category
 	Mode            pb.Mode
 	VerifyCommand   string
+	VerifyExcludes  []string
 	Commit          bool
 	RepositoryCheck bool
 	MaxIterations   uint
@@ -199,6 +200,8 @@ func parseRun(args []string) (*config, error) {
 	categories := fs.String("categories", "", "comma-separated categories to route, e.g. COR,SEC")
 	mode := fs.String("mode", "report", "report or fix")
 	verify := fs.String("verify-command", "", "gate command run once over a fix batch")
+	var verifyExcludes repeatedArg
+	fs.Var(&verifyExcludes, "verify-excludes", "a check the gate does not cover; repeatable, your word, recorded as such")
 	commit := fs.Bool("commit", false, "authorize one commit; requires --mode fix and a passing gate")
 	repoCheck := fs.Bool("repository-check", false, "authorize running the repository's own check recipe as the gate; it is a command from inside the target, so this is you saying you have read it")
 	maxIter := fs.Uint("max-iterations", 5, "iteration ceiling")
@@ -239,6 +242,7 @@ func parseRun(args []string) (*config, error) {
 	c := &config{
 		Target:           fs.Arg(0),
 		VerifyCommand:    *verify,
+		VerifyExcludes:   verifyExcludes,
 		Commit:           *commit,
 		RepositoryCheck:  *repoCheck,
 		MaxIterations:    *maxIter,
@@ -313,6 +317,13 @@ func (c *config) validate() error {
 	}
 	if err := validateResearch(c.Research); err != nil {
 		return err
+	}
+	// Report mode runs no gate, so an exclusion there would be accepted and
+	// dropped: absent from the record and from the unmet gates, which is worse
+	// than refusing it.
+	if len(c.VerifyExcludes) > 0 &&
+		(c.Mode != pb.Mode_MODE_FIX || (c.VerifyCommand == "" && !c.RepositoryCheck)) {
+		return fmt.Errorf("--verify-excludes needs --mode fix and a gate to exclude something from")
 	}
 	if c.Commit && c.Mode != pb.Mode_MODE_FIX {
 		return fmt.Errorf("--commit requires --mode fix")

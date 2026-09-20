@@ -139,6 +139,19 @@ just bench-all    # run the benchmark against every target
 
 `just check` is the gate. It must exit 0 before anything is committed.
 
+When Grimes reviews this repository, the gate is `just check-confined`. A role
+runs inside a Seatbelt profile and macOS refuses a nested `sandbox_apply` once
+the outer profile denies anything, so the checks that create sandboxes cannot
+run from inside one. Declare the gap so the record does not read as a full gate:
+
+```bash
+--verify-command='just check-confined' \
+  --verify-excludes='the confinement suite, which cannot create a sandbox inside one'
+```
+
+Changes to `internal/confine` are verifiable only by a gate run outside the
+review.
+
 ## Architecture Overview
 
 `skills/frank-grimes/SKILL.md` is the sole normative methodology; nothing else may restate its phases, categories, evidence tiers, or verdict rules. `proto/frank_grimes/v2/contracts.proto` is the sole normative machine contract, enforced by the `grimes-contract` codec. Adapters under `adapters/` carry provider-specific wiring only: arguments, tools, and transport. The engine owns the iteration loop, the verdict, and the run record; `hooks/stop.sh` asks it for a decision and relays the answer.

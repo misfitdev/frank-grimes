@@ -12,6 +12,7 @@ import (
 	"time"
 
 	pb "github.com/misfitdev/frank-grimes/gen/go/frank_grimes/v2"
+	"github.com/misfitdev/frank-grimes/internal/build"
 	"github.com/misfitdev/frank-grimes/internal/confine"
 	"github.com/misfitdev/frank-grimes/internal/contracts"
 	"github.com/misfitdev/frank-grimes/internal/engine"
@@ -74,6 +75,9 @@ func main() {
 		code, err = cmdState(os.Args[2:])
 	case "-h", "--help", "help":
 		fmt.Print(usage)
+		return
+	case "-v", "--version", "version":
+		fmt.Println(build.Line("grimes"))
 		return
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n%s", os.Args[1], usage)
@@ -159,6 +163,7 @@ func gateFor(cfg *config, mech confine.Mechanism) engine.GateRunner {
 		return engine.NotApplicableGate{}
 	}
 	g := engine.SelectGate(cfg.VerifyCommand, cfg.Dir, cfg.RepositoryCheck)
+	g.Excluded = cfg.VerifyExcludes
 	g.Confine = mech
 	return g
 }

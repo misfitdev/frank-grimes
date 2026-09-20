@@ -42,6 +42,25 @@ sync-github:
 # Lint, format-check, validate, and run contract tests
 check: lint fmt-check proto-lint proto-breaking vet test-go validate test-fix-gate test-adjudication test-refutation test-stop-hook test-contracts test-collector test-orchestrator test-adapter-seam test-confinement test-fix
 
+# A role runs inside a Seatbelt profile, and macOS refuses a nested
+# sandbox_apply as soon as the outer profile contains one deny rule, which is
+# what a boundary is made of. So the checks that create sandboxes cannot run
+# from inside one: test-confinement, and the internal/confine tests within
+# test-go. Everything they cover still runs in CI, unconfined.
+#
+# Tell the engine what this leaves out, so the record does not read as a full
+# gate:
+#
+#   --verify-command='just check-confined' \
+#     --verify-excludes='the confinement suite, which cannot create a sandbox inside one'
+
+# The gate to use when Grimes is reviewing this repository
+check-confined: lint fmt-check proto-lint proto-breaking vet test-go-unconfined validate test-fix-gate test-adjudication test-refutation test-stop-hook test-contracts test-collector test-orchestrator test-adapter-seam test-fix
+
+# Run the Go tests a confined gate can reach
+test-go-unconfined:
+    go test $(go list ./... | grep -v /internal/confine)
+
 # Vet the Go packages
 #
 # Both platforms, because the confinement backends are behind build tags: a
@@ -119,7 +138,14 @@ test-orchestrator:
 test-contracts:
     ./tests/test-contracts.sh
 
-# Build the contract codec
-build:
-    go build -o bin/grimes-contract ./cmd/grimes-contract
-    go build -o bin/grimes ./cmd/grimes
+# Build both halves of the contract, stamped with the commit they came from
+#
+# The two binaries are one contract in two halves, and a mismatched pair fails
+# in ways that read as engine defects. -buildvcs=true asks for the stamp that
+# lets someone check, rather than the default auto, which drops it quietly.
+build dir="bin":
+    go build -buildvcs=true -o {{dir}}/grimes-contract ./cmd/grimes-contract
+    go build -buildvcs=true -o {{dir}}/grimes ./cmd/grimes
+
+
+

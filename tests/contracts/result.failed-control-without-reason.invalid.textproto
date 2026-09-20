@@ -1,0 +1,21 @@
+# A control check that failed and says nothing about what the refuter did. The
+# three ways to fail it are different mistakes, and a record that cannot tell
+# them apart sends a reader to look at all of them.
+schema_major: 2
+run_id: "run-040"
+producer_role: PRODUCER_ROLE_ORCHESTRATOR
+target { root: "/repo" scope: "src" fingerprint_sha256: "01234567890123456789012345678901" kind: TARGET_KIND_CODE }
+mode: MODE_REPORT
+iteration: 1
+max_iterations: 5
+completion_state: COMPLETION_STATE_CONTINUE
+verdict { decision: DECISION_CONDITIONAL residual_risk: RESIDUAL_RISK_MODERATE review_confidence: REVIEW_CONFIDENCE_LOW review_completeness: REVIEW_COMPLETENESS_LIMITED }
+legacy_color: LEGACY_COLOR_YELLOW
+marginal_yield { candidates_examined: 2 candidates_disproved: 1 }
+counts { total: 1 }
+verification { status: VERIFICATION_STATUS_NOT_APPLICABLE selected_by: GATE_SELECTION_UNAVAILABLE }
+ledger { path: ".grimes/ledger.pb" digest_sha256: "01234567890123456789012345678901" }
+unmet_gates: "refutation"
+summary: "The refutation pass could not be graded."
+refuter_check: REFUTER_CHECK_FAILED
+confinement: "sandbox-exec"

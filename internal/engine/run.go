@@ -166,7 +166,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	// It is also the last moment the claims are attackable: a finding the batch
 	// touched is fixed by the time settle returns, and a fixed finding is not a
 	// claim anyone is asked about.
-	check, err := e.refute(ctx, ledger, spec, collected, iteration)
+	check, checkReason, err := e.refute(ctx, ledger, spec, collected, iteration)
 	if err != nil {
 		return nil, err
 	}
@@ -208,6 +208,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		CoverageIncomplete:           len(cov.Unaccounted) > 0,
 		Oscillation:                  oscillation,
 		Unconfined:                   e.Unconfined,
+		VerificationExcluded:         e.gateExclusions(),
 	})
 
 	panel, err := e.adjudicate(ctx, spec, collected, primary.Verdict)
@@ -231,6 +232,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		CoverageIncomplete:           len(cov.Unaccounted) > 0,
 		Oscillation:                  oscillation,
 		Unconfined:                   e.Unconfined,
+		VerificationExcluded:         e.gateExclusions(),
 	})
 
 	// The target a fix run leaves behind is not the one it reviewed, and that is
@@ -249,7 +251,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 	}
 
 	yield := marginalYield(report, ledger, surfaced)
-	result := e.assemble(target, mode, iteration, final, review, verification, ledger, digest, oscillation, yield, check)
+	result := e.assemble(target, mode, iteration, final, review, verification, ledger, digest, oscillation, yield, check, checkReason)
 	result.Adjudication = panel
 	if fix != nil {
 		result.FixBatch = fix.record()
@@ -458,7 +460,28 @@ func missingEnvelope(out *ProviderOutput) string {
 		fmt.Fprintf(&b, ". Its stderr ended: %q", tail(out.Diagnostics, diagnosticTail))
 	}
 	b.WriteString(". A report reaches the engine on the provider's own stdout")
+	if nestedSandbox(out) {
+		b.WriteString(". The provider said sandbox_apply, which is the kernel " +
+			"refusing a second sandbox inside this one: a role already runs " +
+			"under the engine's boundary, and macOS refuses a nested " +
+			"sandbox_apply as soon as the outer profile denies anything. Turn " +
+			"the provider's own sandboxing off -- codex takes " +
+			"--dangerously-bypass-approvals-and-sandbox -- rather than reaching " +
+			"for --unsafe here, which waives the engine's boundary instead and " +
+			"leaves the run unable to vouch for what it read")
+	}
 	return b.String()
+}
+
+// nestedSandbox reports whether the provider died refusing to nest a sandbox.
+//
+// sandbox_apply is the operating system's error, not any provider's, so
+// recognising it holds no per-provider knowledge: nothing has to be taught
+// about a CLI for this to name what happened to it.
+func nestedSandbox(out *ProviderOutput) bool {
+	const refusal = "sandbox_apply"
+	return strings.Contains(out.Diagnostics, refusal) ||
+		strings.Contains(string(out.Raw), refusal)
 }
 
 // diagnosticTail bounds each excerpt in that account. Enough to recognise what

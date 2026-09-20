@@ -917,6 +917,13 @@ message Verification {
   };
   // A gate that ran was selected by one of the three rules that can name a
   // command; one that did not run was selected by none of them.
+  // A gate that did not run covered nothing, and saying it excluded some
+  // particular thing would imply the rest was checked.
+  option (buf.validate.message).cel = {
+    id: "verification.only_a_gate_that_ran_excludes"
+    message: "a gate that did not run cannot name what it excluded"
+    expression: "(this.status != 3 && this.status != 4) || size(this.excluded) == 0"
+  };
   option (buf.validate.message).cel = {
     id: "verification.selection_matches_status"
     message: "a gate that ran records which rule selected it, and an unavailable one records that it was unavailable"
@@ -939,6 +946,20 @@ message Verification {
     defined_only: true
     not_in: [0]
   }];
+  // What this gate is known not to cover, named by the operator who chose the
+  // command. The engine runs an opaque command and cannot see what it left out,
+  // so a gap is only in the record because someone put it there; a gate that
+  // covered everything carries none of these.
+  //
+  // It exists because a check can be impossible to run from inside the boundary
+  // it is checking: a suite that creates sandboxes cannot run inside one. A
+  // passing gate that skipped such a check has not verified the batch, and
+  // without this the record could not tell the two apart.
+  repeated string excluded = 8 [
+    (buf.validate.field).repeated.unique = true,
+    (buf.validate.field).repeated.items.string.min_len = 1,
+    (buf.validate.field).repeated.items.string.max_len = 200
+  ];
 }
 
 // How the context that produced a review came to exist.
@@ -1045,6 +1066,11 @@ message GrimesResult {
     id: "result.orchestrator_only"
     message: "only the orchestrator may emit the final result"
     expression: "this.producer_role == 3"
+  };
+  option (buf.validate.message).cel = {
+    id: "result.failed_control_says_why"
+    message: "a failed refuter control check must record what the refuter did to the control"
+    expression: "this.refuter_check != 2 || this.refuter_check_reason != ''"
   };
   option (buf.validate.message).cel = {
     id: "result.report_has_no_verification"
@@ -1211,6 +1237,11 @@ message GrimesResult {
   ];
   string summary = 19 [(buf.validate.field).string.min_len = 1];
   RefuterCheck refuter_check = 20 [(buf.validate.field).enum.defined_only = true];
+  // What the refuter did to the planted control, in the engine's own words. A
+  // failed check that says only that it failed cannot be told from a refuter
+  // that upheld the control, one that broke it without exhibiting the line the
+  // engine read, and one that answered nothing at all.
+  string refuter_check_reason = 24 [(buf.validate.field).string.max_len = 400];
   // How each spawned role was bounded to the review's own artifacts. Named
   // rather than flagged, so a record says which mechanism was relied on and a
   // reader can tell a built-in boundary from an operator's wrapper.
@@ -1227,6 +1258,28 @@ message GrimesResult {
 //
 // A batch is the whole iteration's work, not one fix: the gate runs once over
 // all of it, so nothing smaller than the batch has a verification to point at.
+// Why a fix batch produced no commit.
+//
+// The outcomes are different facts with different remedies -- one is a flag
+// nobody passed, one is the repository refusing the work, one is a repair
+// nothing credits -- and all of them looked the same in the record: no commit,
+// no closed findings, and an operator left to infer which.
+enum CommitWithheld {
+  COMMIT_WITHHELD_UNSPECIFIED = 0;
+  // Nothing was withheld; the batch committed.
+  COMMIT_WITHHELD_NONE = 1;
+  // The run was never authorized to commit.
+  COMMIT_WITHHELD_UNAUTHORIZED = 2;
+  // The gate did not pass over the batch, so nothing here is verified.
+  COMMIT_WITHHELD_GATE = 3;
+  // The batch touched a file anchoring a claim a refuter broke. A commit takes
+  // the whole worktree, so it would carry the unearned repair inside one
+  // crediting the surviving repair beside it.
+  COMMIT_WITHHELD_REFUTED_CLAIM = 4;
+  // The batch closed nothing this run may credit.
+  COMMIT_WITHHELD_NOTHING_CREDITED = 5;
+}
+
 message FixBatch {
   // A commit is the only outcome that needs no directory to point at, since the
   // edits are in history by then. Anything else has to say where the work is,
@@ -1235,6 +1288,13 @@ message FixBatch {
     id: "fix_batch.uncommitted_work_has_a_place"
     message: "a batch that produced no commit must name the directory holding its edits"
     expression: "size(this.commit_sha1) != 0 || this.worktree != ''"
+  };
+  // A batch that committed withheld nothing, and one that did not says which
+  // of the reasons applied. Left unsaid, every reason reads the same.
+  option (buf.validate.message).cel = {
+    id: "fix_batch.withholding_is_named"
+    message: "a batch that did not commit must say why, and one that did must not claim it was withheld"
+    expression: "(size(this.commit_sha1) != 0) == (this.commit_withheld == 1)"
   };
   // Findings a commit closes are the ones the gate passed over. Naming them
   // when there is no commit would claim a closure nothing verified.
@@ -1256,6 +1316,11 @@ message FixBatch {
     items: {
       string: {min_len: 1}
     }
+  }];
+  // Why there is no commit, when there is none.
+  CommitWithheld commit_withheld = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
   }];
 }
 

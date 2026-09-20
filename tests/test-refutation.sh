@@ -143,6 +143,11 @@ OUT="$(run_grimes "$WS" \
     --refuter-command="$FAKES/refuter-rubberstamp.sh" --refuter-fresh)"
 assert_match "$OUT" 'refuter_check: +REFUTER_CHECK_FAILED' \
     "the record says the refuter failed its own check"
+# Which mistake it was. Upholding the control and breaking it without exhibiting
+# the target's line are different errors with different remedies, and a record
+# that grades both the same sends a reader to look at both.
+assert_match "$OUT" 'refuter_check_reason: +"the control was upheld' \
+    "and says the control was upheld"
 assert_match "$OUT" 'provenance: +FINDING_PROVENANCE_UNATTACKED' \
     "a rubber-stamped claim is left unattacked"
 assert_match "$OUT" 'unmet_gates: +"refutation"' \
@@ -275,6 +280,8 @@ assert_no_match "$OUT" 'refuter_check: +REFUTER_CHECK_PASSED' \
     "a fabricated disproof of the control does not pass the check"
 assert_match "$OUT" 'unmet_gates: +"refutation"' \
     "a fabricated disproof of the control acquits nothing"
+assert_match "$OUT" 'refuter_check_reason: +"the control was broken without exhibiting' \
+    "and the record says the disproof exhibited nothing from the target"
 assert_match "$OUT" 'provenance: +FINDING_PROVENANCE_UNATTACKED' \
     "a claim vouched for behind a fabricated control is left unattacked"
 rm -rf "$WS"
