@@ -254,3 +254,31 @@ func TestExecAdjudicatorIsNotToldTheVerdict(t *testing.T) {
 		}
 	}
 }
+
+// A role may write its own work directory, so it may plant a link there. The
+// engine writes the log unconfined, so an open that followed one would write
+// wherever the role pointed it.
+func TestRecordDoesNotFollowAPlantedLink(t *testing.T) {
+	root := t.TempDir()
+	work := filepath.Join(root, ".grimes", "work")
+	if err := os.MkdirAll(work, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	outside := filepath.Join(root, "outside")
+	if err := os.WriteFile(outside, []byte("untouched"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(work, "primary.log")); err != nil {
+		t.Fatal(err)
+	}
+
+	(&Exec{Dir: root}).record(primaryReq(), []string{"provider"}, []byte("x"), "", nil, 0, 0)
+
+	got, err := os.ReadFile(outside)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "untouched" {
+		t.Errorf("the log followed a planted link and wrote %q", got)
+	}
+}
