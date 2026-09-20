@@ -44,6 +44,15 @@ const (
 	Category_CATEGORY_MNT         Category = 8
 	Category_CATEGORY_DEP         Category = 9
 	Category_CATEGORY_HUM         Category = 10
+	// Whether the code earns its keep at all. The other ten ask whether the
+	// target is correct, safe, reliable and maintainable; none asks whether it
+	// should exist. Maintainability is the cost of keeping something; necessity
+	// is whether there was anything to keep: an abstraction with one call site,
+	// configuration with no second case, a problem solved before it was had.
+	//
+	// It is the one category whose repair is usually deletion, which is why the
+	// others do not express it.
+	Category_CATEGORY_NEC Category = 11
 )
 
 // Enum value maps for Category.
@@ -60,6 +69,7 @@ var (
 		8:  "CATEGORY_MNT",
 		9:  "CATEGORY_DEP",
 		10: "CATEGORY_HUM",
+		11: "CATEGORY_NEC",
 	}
 	Category_value = map[string]int32{
 		"CATEGORY_UNSPECIFIED": 0,
@@ -73,6 +83,7 @@ var (
 		"CATEGORY_MNT":         8,
 		"CATEGORY_DEP":         9,
 		"CATEGORY_HUM":         10,
+		"CATEGORY_NEC":         11,
 	}
 )
 
@@ -5697,10 +5708,10 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x12verified_by_sha256\x18\a \x01(\fB\n" +
 	"\xbaH\a\xd8\x01\x01z\x02h R\x10verifiedBySha256:\xb9\x02\xbaH\xb5\x02\x1a\xa0\x01\n" +
 	"'finding_event.verified_carries_its_gate\x12@a move to verified must carry the digest of the gate that passed\x1a3this.to != 3 || size(this.verified_by_sha256) == 32\x1a\x8f\x01\n" +
-	"*finding_event.only_verified_carries_a_gate\x12-only a move to verified carries a gate digest\x1a2this.to == 3 || size(this.verified_by_sha256) == 0\"\xba\n" +
+	"*finding_event.only_verified_carries_a_gate\x12-only a move to verified carries a gate digest\x1a2this.to == 3 || size(this.verified_by_sha256) == 0\"\xc2\n" +
 	"\n" +
-	"\aFinding\x12`\n" +
-	"\x02id\x18\x01 \x01(\tBP\xbaHMrK2I^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$R\x02id\x126\n" +
+	"\aFinding\x12d\n" +
+	"\x02id\x18\x01 \x01(\tBT\xbaHQrO2M^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM|NEC)-[0-9a-f]{12}([0-9a-f]{4})?$R\x02id\x126\n" +
 	"\x12fingerprint_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\x11fingerprintSha256\x12A\n" +
 	"\bcategory\x18\x03 \x01(\x0e2\x19.frank_grimes.v2.CategoryB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\bcategory\x12=\n" +
@@ -5718,9 +5729,9 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\ahistory\x18\f \x03(\v2\x1d.frank_grimes.v2.FindingEventB\b\xbaH\x05\x92\x01\x02\b\x01R\ahistory\x12B\n" +
 	"\n" +
 	"refutation\x18\r \x03(\v2\".frank_grimes.v2.RefutationAttemptR\n" +
-	"refutation\x12s\n" +
+	"refutation\x12w\n" +
 	"\n" +
-	"supersedes\x18\x0e \x01(\tBS\xbaHP\xd8\x01\x01rK2I^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$R\n" +
+	"supersedes\x18\x0e \x01(\tBW\xbaHT\xd8\x01\x01rO2M^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM|NEC)-[0-9a-f]{12}([0-9a-f]{4})?$R\n" +
 	"supersedes:\xf7\x02\xbaH\xf3\x02\x1au\n" +
 	"%finding.accepted_requires_human_owner\x12'accepted findings require a human owner\x1a#this.status != 4 || has(this.owner)\x1av\n" +
 	"\x1cfinding.p0_requires_e1_or_e2\x12\x1dP0 requires E1 or E2 evidence\x1a7this.risk.severity != 1 || this.evidence.tier in [1, 2]\x1a\x81\x01\n" +
@@ -5792,9 +5803,9 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\bverified\x18\x02 \x01(\rR\bverified\x12\x1a\n" +
 	"\baccepted\x18\x03 \x01(\rR\baccepted\x12\x17\n" +
 	"\aopen_p0\x18\x04 \x01(\rR\x06openP0\x12\x17\n" +
-	"\aopen_p1\x18\x05 \x01(\rR\x06openP1\"\xe8\x05\n" +
-	"\x0fFindingSnapshot\x12`\n" +
-	"\x02id\x18\x01 \x01(\tBP\xbaHMrK2I^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$R\x02id\x12B\n" +
+	"\aopen_p1\x18\x05 \x01(\rR\x06openP1\"\xec\x05\n" +
+	"\x0fFindingSnapshot\x12d\n" +
+	"\x02id\x18\x01 \x01(\tBT\xbaHQrO2M^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM|NEC)-[0-9a-f]{12}([0-9a-f]{4})?$R\x02id\x12B\n" +
 	"\x06status\x18\x02 \x01(\x0e2\x1e.frank_grimes.v2.FindingStatusB\n" +
 	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\x121\n" +
 	"\x04risk\x18\x03 \x01(\v2\x15.frank_grimes.v2.RiskB\x06\xbaH\x03\xc8\x01\x01R\x04risk\x12N\n" +
@@ -5890,7 +5901,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x0emax_iterations\x18\a \x01(\rB\a\xbaH\x04*\x02 \x00R\rmaxIterations\x129\n" +
 	"\x14ledger_digest_sha256\x18\b \x01(\fB\a\xbaH\x04z\x02h R\x12ledgerDigestSha256\x125\n" +
 	"\x12last_result_sha256\x18\t \x01(\fB\a\xbaH\x04z\x02h R\x10lastResultSha256:r\xbaHo\x1am\n" +
-	"\x1cstate.iteration_within_limit\x12&iteration cannot exceed max_iterations\x1a%this.iteration <= this.max_iterations*\xd8\x01\n" +
+	"\x1cstate.iteration_within_limit\x12&iteration cannot exceed max_iterations\x1a%this.iteration <= this.max_iterations*\xea\x01\n" +
 	"\bCategory\x12\x18\n" +
 	"\x14CATEGORY_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fCATEGORY_COR\x10\x01\x12\x10\n" +
@@ -5903,7 +5914,8 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\fCATEGORY_MNT\x10\b\x12\x10\n" +
 	"\fCATEGORY_DEP\x10\t\x12\x10\n" +
 	"\fCATEGORY_HUM\x10\n" +
-	"*h\n" +
+	"\x12\x10\n" +
+	"\fCATEGORY_NEC\x10\v*h\n" +
 	"\bSeverity\x12\x18\n" +
 	"\x14SEVERITY_UNSPECIFIED\x10\x00\x12\x0f\n" +
 	"\vSEVERITY_P0\x10\x01\x12\x0f\n" +

@@ -339,6 +339,33 @@ fi
 rm -rf "$WS"
 
 echo ""
+echo "--- Necessity is a category of its own ---"
+
+# The other ten ask whether the target is correct, safe, reliable and
+# maintainable. None asks whether it should exist, and a repair here is usually
+# a deletion, which none of them naturally expresses.
+WS="$(workspace)"
+OUT="$("$GRIMES" run --dir="$WS" --categories=NEC,COR,SEC,REL,OPS \
+    --provider-command="$FAKES/provider-necessity.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --format=prototext src 2>&1 || true)"
+# The finding is the observable: the routed set is not carried in the result,
+# so a run that admits an FG-NEC finding is what says the category reached the
+# role and came back.
+assert_match "$OUT" 'FG-NEC-' "a necessity finding is routed, admitted and recorded"
+rm -rf "$WS"
+
+# And a finding in it carries the category in its identity, the way the other
+# ten do.
+NEC_ID="$("$BINDIR/grimes-contract" id --category=NEC --path=src/app.sh \
+    --evidence="an abstraction with one call site" 2>/dev/null | awk '/^id:/{print $2}')"
+if [[ "$NEC_ID" == FG-NEC-* ]]; then
+    pass "a necessity finding is addressable as one"
+else
+    fail "the contract issued $NEC_ID"
+fi
+
+echo ""
 echo "--- Invalid provider output fails closed ---"
 
 for fake in provider-garbage provider-noenvelope provider-exit7 provider-sealed-but-silent provider-silent; do

@@ -27,6 +27,15 @@ enum Category {
   CATEGORY_MNT = 8;
   CATEGORY_DEP = 9;
   CATEGORY_HUM = 10;
+  // Whether the code earns its keep at all. The other ten ask whether the
+  // target is correct, safe, reliable and maintainable; none asks whether it
+  // should exist. Maintainability is the cost of keeping something; necessity
+  // is whether there was anything to keep: an abstraction with one call site,
+  // configuration with no second case, a problem solved before it was had.
+  //
+  // It is the one category whose repair is usually deletion, which is why the
+  // others do not express it.
+  CATEGORY_NEC = 11;
 }
 
 enum Severity {
@@ -762,7 +771,7 @@ message Finding {
     expression: "this.evidence.tier != 3 || this.risk.severity != 1"
   };
 
-  string id = 1 [(buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$"];
+  string id = 1 [(buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM|NEC)-[0-9a-f]{12}([0-9a-f]{4})?$"];
   bytes fingerprint_sha256 = 2 [(buf.validate.field).bytes.len = 32];
   Category category = 3 [(buf.validate.field).enum = {
     defined_only: true
@@ -788,7 +797,7 @@ message Finding {
   // context that could choose it could merge two defects into one, or split one
   // into two, and the loop reads both as progress.
   string supersedes = 14 [
-    (buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$",
+    (buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM|NEC)-[0-9a-f]{12}([0-9a-f]{4})?$",
     (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
   ];
 }
@@ -1090,7 +1099,7 @@ message FindingSnapshot {
     expression: "this.provenance != 4 || size(this.refutation) >= 2"
   };
 
-  string id = 1 [(buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM)-[0-9a-f]{12}([0-9a-f]{4})?$"];
+  string id = 1 [(buf.validate.field).string.pattern = "^FG-(COR|INT|SEC|REL|OPS|PER|VER|MNT|DEP|HUM|NEC)-[0-9a-f]{12}([0-9a-f]{4})?$"];
   FindingStatus status = 2 [(buf.validate.field).enum = {
     defined_only: true
     not_in: [0]
