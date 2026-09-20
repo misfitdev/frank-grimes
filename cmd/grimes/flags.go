@@ -181,6 +181,7 @@ type config struct {
 	RefuterFresh        bool
 	SandboxCommand      []string
 	Unsafe              bool
+	CoordinatorAuthored bool
 }
 
 // Root is the repository root a code target is taken from. Only a code target
@@ -217,6 +218,8 @@ func parseRun(args []string) (*config, error) {
 	refuterFresh := fs.Bool("refuter-fresh", false, "assert the refuter command begins a new context; without it nothing it upholds can raise confidence")
 	sandboxCmd := fs.String("sandbox-command", "", "wrapper that confines each role in place of the built-in one; split on whitespace")
 	unsafe := fs.Bool("unsafe", false, "run each role unconfined; recorded as an unmet gate and caps confidence")
+	coordinator := fs.Bool("provider-is-coordinator", false,
+		"the reviewing context is the one coordinating this run; recorded as an unmet gate and caps confidence")
 	var providerArgs, adjudicatorArgs, refuterArgs, sandboxArgs repeatedArg
 	fs.Var(&providerArgs, "provider-arg", "one argument for the provider command; repeatable, not split")
 	fs.Var(&adjudicatorArgs, "adjudicator-arg", "one argument for the adjudicator command it follows; repeatable, not split")
@@ -240,22 +243,23 @@ func parseRun(args []string) (*config, error) {
 	}
 
 	c := &config{
-		Target:           fs.Arg(0),
-		VerifyCommand:    *verify,
-		VerifyExcludes:   verifyExcludes,
-		Commit:           *commit,
-		RepositoryCheck:  *repoCheck,
-		MaxIterations:    *maxIter,
-		AutoLoop:         *autoLoop,
-		Research:         *research,
-		ProviderTimeout:  *timeout,
-		MaxOutputBytes:   *maxBytes,
-		Format:           *format,
-		Dir:              *dir,
-		Snapshot:         *snapshot,
-		AdjudicatorFresh: *adjudicatorFresh,
-		RefuterFresh:     *refuterFresh,
-		Unsafe:           *unsafe,
+		Target:              fs.Arg(0),
+		VerifyCommand:       *verify,
+		VerifyExcludes:      verifyExcludes,
+		Commit:              *commit,
+		RepositoryCheck:     *repoCheck,
+		MaxIterations:       *maxIter,
+		AutoLoop:            *autoLoop,
+		Research:            *research,
+		ProviderTimeout:     *timeout,
+		MaxOutputBytes:      *maxBytes,
+		Format:              *format,
+		Dir:                 *dir,
+		Snapshot:            *snapshot,
+		AdjudicatorFresh:    *adjudicatorFresh,
+		RefuterFresh:        *refuterFresh,
+		Unsafe:              *unsafe,
+		CoordinatorAuthored: *coordinator,
 	}
 
 	var err error

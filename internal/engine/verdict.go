@@ -90,7 +90,12 @@ type DeriveInput struct {
 	// the review's own artifacts. It caps confidence and leaves the decision
 	// alone: an unconfined run can still find something real, it just cannot
 	// vouch for the artifacts its conclusions were drawn from.
-	Unconfined                   bool
+	Unconfined bool
+	// CoordinatorAuthored is set when the operator said the reviewing context is
+	// the one coordinating the run. It caps confidence and leaves the decision
+	// alone, for the same reason a waived boundary does: a contaminated context
+	// can still find something real, it just cannot ratify its own finding.
+	CoordinatorAuthored          bool
 	RankingBlocked               bool
 	CriticalFalsifierUnavailable bool
 }

@@ -96,6 +96,30 @@ engine collects the file first and falls back to stdout, so a role that seals
 and then describes its work in prose is not penalised for it. That is the
 ordinary behaviour of an agent CLI, and it needs no prompting against.
 
+## Reviewing with your own context
+
+The engine spawns a provider, so from the outside a role always looks fresh.
+It is not, if the command you gave it reaches back into the session running the
+review. An agent that drives Grimes and also answers as the provider is the
+most contaminated context in the system: it has seen the target, the previous
+iterations, and its own earlier conclusions, and it is now being asked whether
+those conclusions hold.
+
+Nothing can detect that. Say it instead:
+
+```bash
+grimes run --provider-is-coordinator ...
+```
+
+The run records `coordinator_authored`, reports `coordinator_separation` as an
+unmet gate, and caps `review_confidence` at medium, which puts GREEN out of
+reach. It does not stop the review: a contaminated context still finds real
+defects. It stops the review from vouching for itself.
+
+The alternative is to spawn the review on a CLI of its own, which is what the
+per-role commands above are for. A separate process with a separate context is
+the thing the declaration is admitting you do not have.
+
 ## What a long review needs
 
 `--provider-timeout` defaults to ten minutes. A review of a multi-commit range

@@ -42,6 +42,9 @@ type Engine struct {
 	Confinement string
 	// Unconfined is set when the operator waived it.
 	Unconfined bool
+	// CoordinatorAuthored is the operator saying the reviewing context is their
+	// own, not one the run opened.
+	CoordinatorAuthored bool
 	// Commit authorizes one commit per verified batch, separately from fix
 	// mode itself. Without it a fix run edits and stops.
 	Commit bool
@@ -208,6 +211,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		CoverageIncomplete:           len(cov.Unaccounted) > 0,
 		Oscillation:                  oscillation,
 		Unconfined:                   e.Unconfined,
+		CoordinatorAuthored:          e.CoordinatorAuthored,
 		VerificationExcluded:         e.gateExclusions(),
 	})
 
@@ -232,6 +236,7 @@ func (e *Engine) Run(ctx context.Context, spec TargetSpec, mode pb.Mode) (*pb.Gr
 		CoverageIncomplete:           len(cov.Unaccounted) > 0,
 		Oscillation:                  oscillation,
 		Unconfined:                   e.Unconfined,
+		CoordinatorAuthored:          e.CoordinatorAuthored,
 		VerificationExcluded:         e.gateExclusions(),
 	})
 

@@ -4941,6 +4941,16 @@ type GrimesResult struct {
 	// that upheld the control, one that broke it without exhibiting the line the
 	// engine read, and one that answered nothing at all.
 	RefuterCheckReason string `protobuf:"bytes,24,opt,name=refuter_check_reason,json=refuterCheckReason,proto3" json:"refuter_check_reason,omitempty"`
+	// Set when the operator said the reviewing context is the one coordinating
+	// the run.
+	//
+	// A coordinator holds context across the whole review, which makes it the
+	// most contaminated context in the system by construction. If it also
+	// authors findings, the fresh-context rule buys nothing: the review is
+	// ratifying itself at the top. The engine cannot see this -- a provider is
+	// an opaque command either way -- so it is the operator's word, recorded as
+	// such, and it caps confidence the way a waived boundary does.
+	CoordinatorAuthored bool `protobuf:"varint,25,opt,name=coordinator_authored,json=coordinatorAuthored,proto3" json:"coordinator_authored,omitempty"`
 	// How each spawned role was bounded to the review's own artifacts. Named
 	// rather than flagged, so a record says which mechanism was relied on and a
 	// reader can tell a built-in boundary from an operator's wrapper.
@@ -5130,6 +5140,13 @@ func (x *GrimesResult) GetRefuterCheckReason() string {
 		return x.RefuterCheckReason
 	}
 	return ""
+}
+
+func (x *GrimesResult) GetCoordinatorAuthored() bool {
+	if x != nil {
+		return x.CoordinatorAuthored
+	}
+	return false
 }
 
 func (x *GrimesResult) GetConfinement() string {
@@ -5692,7 +5709,7 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"\x04path\x18\x01 \x01(\tB\x18\xbaH\x15r\x13\n" +
 	"\x11.grimes/ledger.pbR\x04path\x12,\n" +
 	"\rdigest_sha256\x18\x02 \x01(\fB\a\xbaH\x04z\x02h R\fdigestSha256\x121\n" +
-	"\x14oscillation_detected\x18\x03 \x01(\bR\x13oscillationDetected\"\xa4-\n" +
+	"\x14oscillation_detected\x18\x03 \x01(\bR\x13oscillationDetected\"\xf9.\n" +
 	"\fGrimesResult\x12*\n" +
 	"\fschema_major\x18\x01 \x01(\rB\a\xbaH\x04*\x02\b\x02R\vschemaMajor\x12!\n" +
 	"\fschema_minor\x18\x02 \x01(\rR\vschemaMinor\x12\x1e\n" +
@@ -5720,11 +5737,13 @@ const file_frank_grimes_v2_contracts_proto_rawDesc = "" +
 	"unmetGates\x12!\n" +
 	"\asummary\x18\x13 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\asummary\x12L\n" +
 	"\rrefuter_check\x18\x14 \x01(\x0e2\x1d.frank_grimes.v2.RefuterCheckB\b\xbaH\x05\x82\x01\x02\x10\x01R\frefuterCheck\x12:\n" +
-	"\x14refuter_check_reason\x18\x18 \x01(\tB\b\xbaH\x05r\x03\x18\x90\x03R\x12refuterCheckReason\x12)\n" +
+	"\x14refuter_check_reason\x18\x18 \x01(\tB\b\xbaH\x05r\x03\x18\x90\x03R\x12refuterCheckReason\x121\n" +
+	"\x14coordinator_authored\x18\x19 \x01(\bR\x13coordinatorAuthored\x12)\n" +
 	"\vconfinement\x18\x15 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\vconfinement\x126\n" +
 	"\tfix_batch\x18\x16 \x01(\v2\x19.frank_grimes.v2.FixBatchR\bfixBatch\x12F\n" +
-	"\fadjudication\x18\x17 \x01(\v2\".frank_grimes.v2.AdjudicationPanelR\fadjudication:\xfb!\xbaH\xf7!\x1ad\n" +
-	"\x18result.orchestrator_only\x12/only the orchestrator may emit the final result\x1a\x17this.producer_role == 3\x1a\xac\x01\n" +
+	"\fadjudication\x18\x17 \x01(\v2\".frank_grimes.v2.AdjudicationPanelR\fadjudication:\x9d#\xbaH\x99#\x1ad\n" +
+	"\x18result.orchestrator_only\x12/only the orchestrator may emit the final result\x1a\x17this.producer_role == 3\x1a\x9f\x01\n" +
+	"(result.coordinator_authored_is_not_green\x12=a review authored by the coordinating context cannot be green\x1a4!this.coordinator_authored || this.legacy_color != 1\x1a\xac\x01\n" +
 	"\x1eresult.failed_control_says_why\x12Na failed refuter control check must record what the refuter did to the control\x1a:this.refuter_check != 2 || this.refuter_check_reason != ''\x1a\x88\x01\n" +
 	"!result.report_has_no_verification\x122report mode records verification as not applicable\x1a/this.mode != 1 || this.verification.status == 4\x1a\x94\x03\n" +
 	"#result.report_completion_is_derived\x12hthe completion state must be the one the colour, iteration, bound, exhaustion, and new P0/P1 count imply\x1a\x82\x02this.mode != 1 || this.completion_state == (this.legacy_color == 1 ? 2 : this.iteration >= this.max_iterations ? 4 : (this.iteration > 1 && this.marginal_yield.new_p0_p1 == 0u) ? (this.unmet_gates.exists(g, g == 'coverage' || g == 'refutation') ? 6 : 2) : 1)\x1a\xac\x03\n" +

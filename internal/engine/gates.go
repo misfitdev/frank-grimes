@@ -16,6 +16,7 @@ const (
 	GateCoverage           = "coverage"
 	GateVerificationScope  = "verification_scope"
 	GateContested          = "contested"
+	GateCoordinator        = "coordinator_separation"
 )
 
 // unmetGates names every gate standing between this run and a pass, in a fixed
@@ -73,6 +74,12 @@ func unmetGates(v *pb.Verdict, in DeriveInput) []string {
 	// of these gates assume.
 	if in.Unconfined {
 		gates = append(gates, GateConfinement)
+	}
+	// A coordinator holds context across the whole review. One that also
+	// authors findings has rebuilt self-ratification above every fresh context
+	// beneath it.
+	if in.CoordinatorAuthored {
+		gates = append(gates, GateCoordinator)
 	}
 	return gates
 }

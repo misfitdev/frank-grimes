@@ -1109,6 +1109,11 @@ message GrimesResult {
     expression: "this.producer_role == 3"
   };
   option (buf.validate.message).cel = {
+    id: "result.coordinator_authored_is_not_green"
+    message: "a review authored by the coordinating context cannot be green"
+    expression: "!this.coordinator_authored || this.legacy_color != 1"
+  };
+  option (buf.validate.message).cel = {
     id: "result.failed_control_says_why"
     message: "a failed refuter control check must record what the refuter did to the control"
     expression: "this.refuter_check != 2 || this.refuter_check_reason != ''"
@@ -1283,6 +1288,16 @@ message GrimesResult {
   // that upheld the control, one that broke it without exhibiting the line the
   // engine read, and one that answered nothing at all.
   string refuter_check_reason = 24 [(buf.validate.field).string.max_len = 400];
+  // Set when the operator said the reviewing context is the one coordinating
+  // the run.
+  //
+  // A coordinator holds context across the whole review, which makes it the
+  // most contaminated context in the system by construction. If it also
+  // authors findings, the fresh-context rule buys nothing: the review is
+  // ratifying itself at the top. The engine cannot see this -- a provider is
+  // an opaque command either way -- so it is the operator's word, recorded as
+  // such, and it caps confidence the way a waived boundary does.
+  bool coordinator_authored = 25;
   // How each spawned role was bounded to the review's own artifacts. Named
   // rather than flagged, so a record says which mechanism was relied on and a
   // reader can tell a built-in boundary from an operator's wrapper.

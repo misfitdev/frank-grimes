@@ -265,6 +265,36 @@ fi
 rm -rf "$WS"
 
 echo ""
+echo "--- A review its own coordinator authored cannot be green ---"
+
+# A coordinator holds context across the whole review, which makes it the most
+# contaminated context in the system. If it also authors findings, the review
+# ratifies itself above every fresh context beneath it. The engine cannot see
+# this -- a provider is an opaque command either way -- so it is the operator's
+# word, and it costs what a waived boundary costs.
+WS="$(workspace)"
+OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --provider-is-coordinator --format=prototext src 2>&1 || true)"
+assert_match "$OUT" 'coordinator_authored: +true' \
+    "the declaration reaches the record"
+assert_match "$OUT" 'unmet_gates: +"coordinator_separation"' \
+    "and is named as the gate it did not meet"
+assert_no_match "$OUT" 'legacy_color: +LEGACY_COLOR_GREEN' \
+    "a self-authored review cannot be green"
+rm -rf "$WS"
+
+# The same run without the declaration is the one that can reach green, so the
+# cap is the declaration and not something else in the way.
+WS="$(workspace)"
+OUT="$("$GRIMES" run --dir="$WS" --provider-command="$FAKES/provider-green.sh" \
+    --adjudicator-command="$FAKES/adjudicator-pass.sh" --adjudicator-fresh \
+    --format=prototext src 2>&1 || true)"
+assert_match "$OUT" 'legacy_color: +LEGACY_COLOR_GREEN' \
+    "and the undeclared run still reaches green"
+rm -rf "$WS"
+
+echo ""
 echo "--- Invalid provider output fails closed ---"
 
 for fake in provider-garbage provider-noenvelope provider-exit7 provider-sealed-but-silent provider-silent; do

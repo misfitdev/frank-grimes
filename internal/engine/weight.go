@@ -176,6 +176,11 @@ func confidence(in DeriveInput) pb.ReviewConfidence {
 	if in.Unconfined {
 		return pb.ReviewConfidence_REVIEW_CONFIDENCE_MEDIUM
 	}
+	// The context that found this is the context that has seen everything else
+	// in the run, so nothing it concluded was reached without the rest.
+	if in.CoordinatorAuthored {
+		return pb.ReviewConfidence_REVIEW_CONFIDENCE_MEDIUM
+	}
 	for _, c := range driving {
 		if !c.ProbeAttempted {
 			return pb.ReviewConfidence_REVIEW_CONFIDENCE_MEDIUM
