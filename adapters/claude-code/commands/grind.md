@@ -369,3 +369,9 @@ stop hook will start one.
 ---
 
 **Begin Phase 1 now.**
+
+## Running the roles on other CLIs
+
+`adapters/roles.md` is where the per-role commands, the preflight a run needs
+before it starts, and what to do when one fails are written down. It is the only
+copy: what is here is this adapter's own wiring.
